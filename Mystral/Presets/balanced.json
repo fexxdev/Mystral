@@ -1,0 +1,1 @@
+{"id":"00000000-0000-0000-0000-000000000002","name":"Balanced","icon":"dial.medium","isPreset":true,"sensorKey":"","curvePoints":[{"temperature":30,"fanPercentage":15},{"temperature":50,"fanPercentage":30},{"temperature":65,"fanPercentage":50},{"temperature":80,"fanPercentage":75},{"temperature":95,"fanPercentage":100}]}

@@ -1,0 +1,1 @@
+{"id":"00000000-0000-0000-0000-000000000001","name":"Silent","icon":"speaker.slash","isPreset":true,"sensorKey":"","curvePoints":[{"temperature":30,"fanPercentage":10},{"temperature":50,"fanPercentage":20},{"temperature":70,"fanPercentage":40},{"temperature":85,"fanPercentage":60},{"temperature":95,"fanPercentage":80}]}

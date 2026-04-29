@@ -1,0 +1,1 @@
+{"id":"00000000-0000-0000-0000-000000000003","name":"Performance","icon":"hare","isPreset":true,"sensorKey":"","curvePoints":[{"temperature":30,"fanPercentage":25},{"temperature":45,"fanPercentage":45},{"temperature":60,"fanPercentage":70},{"temperature":75,"fanPercentage":90},{"temperature":85,"fanPercentage":100}]}
