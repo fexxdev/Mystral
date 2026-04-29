@@ -1,0 +1,38 @@
+name: Mystral
+options:
+  bundleIdPrefix: com.fexxdev
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  Mystral:
+    type: application
+    platform: macOS
+    sources:
+      - Mystral
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fexxdev.Mystral
+        INFOPLIST_FILE: Mystral/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Mystral/Mystral.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        GENERATE_INFOPLIST_FILE: false
+
+  MystralTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - MystralTests
+    dependencies:
+      - target: Mystral
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fexxdev.MystralTests
+        GENERATE_INFOPLIST_FILE: true
