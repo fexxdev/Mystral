@@ -2,9 +2,11 @@ import SwiftUI
 
 @main
 struct MystralApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
-        WindowGroup {
-            Text("Mystral")
+        Settings {
+            EmptyView()
         }
     }
 }
