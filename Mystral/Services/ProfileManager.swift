@@ -15,10 +15,19 @@ enum ProfileError: Error, LocalizedError {
 @Observable
 final class ProfileManager {
     static let maxCustomProfiles = 10
+    private static let activeProfileKey = "activeProfileId"
 
     private(set) var presets: [Profile] = []
     private(set) var customProfiles: [Profile] = []
-    var activeProfileId: UUID?
+    var activeProfileId: UUID? {
+        didSet {
+            if let id = activeProfileId {
+                UserDefaults.standard.set(id.uuidString, forKey: Self.activeProfileKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.activeProfileKey)
+            }
+        }
+    }
 
     private let storageDirectory: URL
 
@@ -35,7 +44,11 @@ final class ProfileManager {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         loadPresets()
         loadCustomProfiles()
-        if activeProfileId == nil {
+        if let saved = UserDefaults.standard.string(forKey: Self.activeProfileKey),
+           let uuid = UUID(uuidString: saved),
+           allProfiles.contains(where: { $0.id == uuid }) {
+            activeProfileId = uuid
+        } else {
             activeProfileId = presets.first { $0.name == "Balanced" }?.id ?? presets.first?.id
         }
     }

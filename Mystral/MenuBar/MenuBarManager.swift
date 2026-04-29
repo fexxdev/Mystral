@@ -1,5 +1,8 @@
 import AppKit
 import SwiftUI
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "MenuBarManager")
 
 enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconOnly = "Icon Only"
@@ -9,6 +12,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
 }
 
 @Observable
+@MainActor
 final class MenuBarManager {
     private var statusItem: NSStatusItem?
     private let fanController: FanController
@@ -16,14 +20,23 @@ final class MenuBarManager {
     private let onOpenWindow: () -> Void
     private var updateTimer: Timer?
 
+    private static let displayModeKey = "menuBarDisplayMode"
+
     var displayMode: MenuBarDisplayMode = .iconOnly {
-        didSet { updateStatusItem() }
+        didSet {
+            UserDefaults.standard.set(displayMode.rawValue, forKey: Self.displayModeKey)
+            updateStatusItem()
+        }
     }
 
     init(fanController: FanController, profileManager: ProfileManager, onOpenWindow: @escaping () -> Void) {
         self.fanController = fanController
         self.profileManager = profileManager
         self.onOpenWindow = onOpenWindow
+        if let saved = UserDefaults.standard.string(forKey: Self.displayModeKey),
+           let mode = MenuBarDisplayMode(rawValue: saved) {
+            self.displayMode = mode
+        }
         setupStatusItem()
         startUpdating()
     }
@@ -39,7 +52,7 @@ final class MenuBarManager {
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        let event = NSApp.currentEvent!
+        guard let event = NSApp.currentEvent else { onOpenWindow(); return }
         if event.type == .rightMouseUp {
             showContextMenu()
         } else {

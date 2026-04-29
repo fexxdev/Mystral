@@ -16,6 +16,7 @@ struct Fan: Identifiable, Sendable {
 
     var percentage: Double {
         guard maxRPM > minRPM else { return 0 }
-        return Double(currentRPM - minRPM) / Double(maxRPM - minRPM) * 100.0
+        let pct = Double(currentRPM - minRPM) / Double(maxRPM - minRPM) * 100.0
+        return max(0, min(100, pct))
     }
 }

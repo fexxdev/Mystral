@@ -135,9 +135,11 @@ final class SMCKit: @unchecked Sendable {
         input.key = keyCode
         input.keyInfo.dataSize = info.dataSize
         input.data8 = Self.cmdReadBytes
-        let output = try callSMC(&input)
-        let mirror = Mirror(reflecting: output.bytes)
-        let bytes = mirror.children.prefix(Int(info.dataSize)).map { $0.value as! UInt8 }
+        var output = try callSMC(&input)
+        let size = Int(info.dataSize)
+        let bytes: [UInt8] = withUnsafeBytes(of: &output.bytes) { ptr in
+            Array(ptr.prefix(size))
+        }
         return (bytes, info.dataType, info.dataSize)
     }
 
@@ -150,7 +152,7 @@ final class SMCKit: @unchecked Sendable {
             return Double(Float(bitPattern: bits))
         case DataType.sp78:
             guard bytes.count >= 2 else { return 0 }
-            let raw = Int16(Int16(bytes[0]) << 8 | Int16(bytes[1]))
+            let raw = Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))
             return Double(raw) / 256.0
         case DataType.fpe2:
             guard bytes.count >= 2 else { return 0 }
@@ -203,12 +205,21 @@ final class SMCKit: @unchecked Sendable {
         return Self.fourCharString(output.key)
     }
 
+    private var cachedAllKeys: [String]?
+    private var cachedTemperatureKeys: [String]?
+
     func allKeys() throws -> [String] {
+        if let cached = cachedAllKeys { return cached }
         let count = try keyCount()
-        return try (0..<count).map { try keyAtIndex($0) }
+        let keys = try (0..<count).map { try keyAtIndex($0) }
+        cachedAllKeys = keys
+        return keys
     }
 
     func temperatureKeys() throws -> [String] {
-        try allKeys().filter { $0.hasPrefix("T") }
+        if let cached = cachedTemperatureKeys { return cached }
+        let keys = try allKeys().filter { $0.hasPrefix("T") }
+        cachedTemperatureKeys = keys
+        return keys
     }
 }

@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SMCService")
 
 protocol SMCServiceProtocol: Sendable {
     func getAllSensors() throws -> [Sensor]
@@ -9,8 +12,16 @@ protocol SMCServiceProtocol: Sendable {
     func setFanMode(index: Int, mode: FanMode) throws
 }
 
-final class SMCService: SMCServiceProtocol {
+final class SMCService: SMCServiceProtocol, @unchecked Sendable {
     private let smc = SMCKit()
+
+    private struct FanMetadata {
+        let minRPM: Double
+        let maxRPM: Double
+    }
+
+    private var fanMetadataCache: [Int: FanMetadata] = [:]
+    private var fanCount: Int?
 
     private static let knownSensorNames: [String: String] = [
         "Tp01": "CPU Performance Core 1",
@@ -53,28 +64,43 @@ final class SMCService: SMCServiceProtocol {
         try smc.readFloat(key: key)
     }
 
-    func getAllFans() throws -> [Fan] {
+    private func getFanCount() throws -> Int {
+        if let cached = fanCount { return cached }
         let count = try smc.readInteger(key: "FNum")
+        fanCount = count
+        return count
+    }
+
+    private func getFanMetadata(index: Int) throws -> FanMetadata {
+        if let cached = fanMetadataCache[index] { return cached }
+        let prefix = "F\(index)"
+        let min = try smc.readFloat(key: "\(prefix)Mn")
+        let max = try smc.readFloat(key: "\(prefix)Mx")
+        let meta = FanMetadata(minRPM: min, maxRPM: max)
+        fanMetadataCache[index] = meta
+        return meta
+    }
+
+    func getAllFans() throws -> [Fan] {
+        let count = try getFanCount()
         return (0..<count).compactMap { i in
             let prefix = "F\(i)"
             guard let actual = try? smc.readFloat(key: "\(prefix)Ac"),
-                  let min = try? smc.readFloat(key: "\(prefix)Mn"),
-                  let max = try? smc.readFloat(key: "\(prefix)Mx") else { return nil }
+                  let meta = try? getFanMetadata(index: i) else { return nil }
             let target = (try? smc.readFloat(key: "\(prefix)Tg")) ?? actual
             let modeRaw = (try? smc.readInteger(key: "\(prefix)Md")) ?? 0
             let name = i == 0 ? "Left Fan" : "Right Fan"
             return Fan(id: i, name: name, currentRPM: Int(actual), targetRPM: Int(target),
-                       minRPM: Int(min), maxRPM: Int(max), mode: FanMode(rawValue: modeRaw) ?? .auto)
+                       minRPM: Int(meta.minRPM), maxRPM: Int(meta.maxRPM),
+                       mode: FanMode(rawValue: modeRaw) ?? .auto)
         }
     }
 
     func readFanSpeed(index: Int) throws -> Int { try smc.readInteger(key: "F\(index)Ac") }
 
     func setFanSpeed(index: Int, percentage: Double) throws {
-        let fans = try getAllFans()
-        guard index < fans.count else { return }
-        let fan = fans[index]
-        let targetRPM = Double(fan.minRPM) + (Double(fan.maxRPM - fan.minRPM) * percentage / 100.0)
+        let meta = try getFanMetadata(index: index)
+        let targetRPM = meta.minRPM + (meta.maxRPM - meta.minRPM) * percentage / 100.0
         try smc.writeFpe2(key: "F\(index)Tg", value: targetRPM)
     }
 

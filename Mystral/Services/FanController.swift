@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "FanController")
 
 protocol ProfileActivationStrategy: Sendable {
     func shouldActivate(profile: Profile, sensors: [Sensor]) -> Bool
@@ -9,6 +12,7 @@ struct ManualActivationStrategy: ProfileActivationStrategy {
 }
 
 @Observable
+@MainActor
 final class FanController {
     private let smcService: SMCServiceProtocol
     private let profileManager: ProfileManager
@@ -49,11 +53,16 @@ final class FanController {
         guard !isRunning else { return }
         isRunning = true
         tick()
-        timer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in self?.tick() }
+        timer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
     }
 
     func stop() {
-        timer?.invalidate(); timer = nil; isRunning = false; restoreAutoMode()
+        timer?.invalidate()
+        timer = nil
+        isRunning = false
+        restoreAutoMode()
     }
 
     func restart() { stop(); start() }
@@ -61,16 +70,19 @@ final class FanController {
     private func tick() {
         do {
             var newSensors = try smcService.getAllSensors()
+            let historyMap = Dictionary(uniqueKeysWithValues: sensors.map { ($0.id, $0.history) })
             for i in newSensors.indices {
-                if let existing = sensors.first(where: { $0.id == newSensors[i].id }) {
-                    newSensors[i].history = existing.history
+                if let existingHistory = historyMap[newSensors[i].id] {
+                    newSensors[i].history = existingHistory
                 }
                 newSensors[i].recordTemperature(newSensors[i].temperature)
             }
             sensors = newSensors
             fans = try smcService.getAllFans()
             applyActiveProfile()
-        } catch {}
+        } catch {
+            logger.error("SMC read failed: \(error.localizedDescription)")
+        }
     }
 
     private func applyActiveProfile() {
@@ -82,7 +94,9 @@ final class FanController {
             do {
                 try smcService.setFanMode(index: fan.id, mode: .forced)
                 try smcService.setFanSpeed(index: fan.id, percentage: percentage)
-            } catch {}
+            } catch {
+                logger.warning("Fan \(fan.id) write failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -99,6 +113,12 @@ final class FanController {
     func clearAllManualOverrides() { manualOverrides.removeAll() }
 
     private func restoreAutoMode() {
-        for fan in fans { try? smcService.setFanMode(index: fan.id, mode: .auto) }
+        for fan in fans {
+            do {
+                try smcService.setFanMode(index: fan.id, mode: .auto)
+            } catch {
+                logger.warning("Failed to restore auto mode for fan \(fan.id): \(error.localizedDescription)")
+            }
+        }
     }
 }

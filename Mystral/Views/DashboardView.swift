@@ -39,10 +39,10 @@ struct DashboardView: View {
                         }
                         Spacer()
                         Picker("Profile", selection: Binding(
-                            get: { profileManager.activeProfileId ?? UUID() },
+                            get: { profileManager.activeProfileId },
                             set: { profileManager.activeProfileId = $0 }
                         )) {
-                            ForEach(profileManager.allProfiles) { p in Text(p.name).tag(p.id) }
+                            ForEach(profileManager.allProfiles) { p in Text(p.name).tag(Optional(p.id)) }
                         }.frame(width: 200)
                     }.padding()
                 }

@@ -40,11 +40,11 @@ struct MainView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Active Profile").font(.caption).foregroundStyle(.secondary)
                 Picker("", selection: Binding(
-                    get: { profileManager.activeProfileId ?? UUID() },
+                    get: { profileManager.activeProfileId },
                     set: { profileManager.activeProfileId = $0 }
                 )) {
                     ForEach(profileManager.allProfiles) { profile in
-                        Label(profile.name, systemImage: profile.icon).tag(profile.id)
+                        Label(profile.name, systemImage: profile.icon).tag(Optional(profile.id))
                     }
                 }.labelsHidden()
             }.padding()

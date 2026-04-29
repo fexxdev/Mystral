@@ -6,6 +6,7 @@ struct ProfilesView: View {
     @State private var editingProfile: Profile?
     @State private var showDeleteConfirmation = false
     @State private var profileToDelete: Profile?
+    @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         HSplitView {
@@ -69,6 +70,15 @@ struct ProfilesView: View {
         }
     }
 
+    private func debounceSave(_ profile: Profile) {
+        saveTask?.cancel()
+        saveTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            try? profileManager.saveCustomProfile(profile)
+        }
+    }
+
     private var profileDetail: some View {
         Group {
             if var profile = editingProfile {
@@ -77,7 +87,7 @@ struct ProfilesView: View {
                         if !profile.isPreset {
                             TextField("Profile Name", text: Binding(
                                 get: { profile.name },
-                                set: { profile.name = $0; editingProfile = profile; try? profileManager.saveCustomProfile(profile) }
+                                set: { profile.name = $0; editingProfile = profile; debounceSave(profile) }
                             )).textFieldStyle(.roundedBorder).font(.title2)
                         } else {
                             HStack {
@@ -90,7 +100,7 @@ struct ProfilesView: View {
                             curvePoints: Binding(
                                 get: { profile.curvePoints },
                                 set: { profile.curvePoints = $0; editingProfile = profile
-                                    if !profile.isPreset { try? profileManager.saveCustomProfile(profile) } }
+                                    if !profile.isPreset { debounceSave(profile) } }
                             ),
                             sensorKeys: fanController.sensors.map(\.id),
                             sensorKey: Binding(

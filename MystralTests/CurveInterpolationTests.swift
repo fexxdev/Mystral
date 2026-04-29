@@ -1,6 +1,7 @@
 import XCTest
 @testable import Mystral
 
+@MainActor
 final class CurveInterpolationTests: XCTestCase {
     let curve: [CurvePoint] = [
         CurvePoint(temperature: 30, fanPercentage: 10),
