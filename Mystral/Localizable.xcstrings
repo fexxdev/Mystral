@@ -1,0 +1,141 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Dashboard": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Pannello" } }
+      }
+    },
+    "Sensors": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Sensori" } }
+      }
+    },
+    "Fans": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Ventole" } }
+      }
+    },
+    "Profiles": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Profili" } }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Impostazioni" } }
+      }
+    },
+    "Active Profile": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Profilo Attivo" } }
+      }
+    },
+    "Launch at Login": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Avvia al Login" } }
+      }
+    },
+    "Display Mode": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Modalità Display" } }
+      }
+    },
+    "Polling Interval": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Intervallo Aggiornamento" } }
+      }
+    },
+    "Manual Override": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Override Manuale" } }
+      }
+    },
+    "Add Profile": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Aggiungi Profilo" } }
+      }
+    },
+    "Add Point": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Aggiungi Punto" } }
+      }
+    },
+    "Delete Profile": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Elimina Profilo" } }
+      }
+    },
+    "Reset All Settings": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Ripristina Impostazioni" } }
+      }
+    },
+    "No Fans Detected": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Nessuna Ventola Rilevata" } }
+      }
+    },
+    "Select a Profile": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Seleziona un Profilo" } }
+      }
+    },
+    "General": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Generale" } }
+      }
+    },
+    "Menu Bar": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Barra dei Menu" } }
+      }
+    },
+    "Monitoring": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Monitoraggio" } }
+      }
+    },
+    "About": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Informazioni" } }
+      }
+    },
+    "Driving Sensor": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Sensore Guida" } }
+      }
+    },
+    "CPU Average": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Media CPU" } }
+      }
+    },
+    "Current": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Attuale" } }
+      }
+    },
+    "Target": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Obiettivo" } }
+      }
+    },
+    "Range": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Intervallo" } }
+      }
+    },
+    "Presets": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Predefiniti" } }
+      }
+    },
+    "Data": {
+      "localizations": {
+        "it": { "stringUnit": { "state": "translated", "value": "Dati" } }
+      }
+    }
+  },
+  "version": "1.0"
+}
