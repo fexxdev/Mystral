@@ -9,9 +9,11 @@ struct ProfilesView: View {
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
-        HSplitView {
-            profileList.frame(minWidth: 220, maxWidth: 300)
-            profileDetail.frame(maxWidth: .infinity)
+        NavigationSplitView {
+            profileList
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+        } detail: {
+            profileDetail
         }
         .navigationTitle("Profiles")
         .alert("Delete Profile", isPresented: $showDeleteConfirmation) {

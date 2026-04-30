@@ -85,14 +85,25 @@ final class FanController {
         }
     }
 
+    private var forcedModeSet = false
+
     private func applyActiveProfile() {
         guard let profile = profileManager.activeProfile else { return }
         let drivingTemp = resolveDrivingTemperature(for: profile)
         let targetPercentage = Self.interpolate(temperature: drivingTemp, curve: profile.curvePoints)
+
+        if !forcedModeSet {
+            do {
+                try smcService.setForcedMode(fanCount: fans.count, forced: true)
+                forcedModeSet = true
+            } catch {
+                logger.warning("Failed to enable forced fan mode: \(error.localizedDescription)")
+            }
+        }
+
         for fan in fans {
             let percentage = manualOverrides[fan.id] ?? targetPercentage
             do {
-                try smcService.setFanMode(index: fan.id, mode: .forced)
                 try smcService.setFanSpeed(index: fan.id, percentage: percentage)
             } catch {
                 logger.warning("Fan \(fan.id) write failed: \(error.localizedDescription)")
@@ -104,21 +115,23 @@ final class FanController {
         if !profile.sensorKey.isEmpty, let sensor = sensors.first(where: { $0.id == profile.sensorKey }) {
             return sensor.temperature
         }
-        let cpuSensors = sensors.filter { $0.id.hasPrefix("Tp") }
-        guard !cpuSensors.isEmpty else { return sensors.first?.temperature ?? 0 }
-        return cpuSensors.map(\.temperature).reduce(0, +) / Double(cpuSensors.count)
+        if let cpuMax = sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey }) {
+            return cpuMax.temperature
+        }
+        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
+        guard !cpuCores.isEmpty else { return sensors.first?.temperature ?? 0 }
+        return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
     }
 
     func clearManualOverride(for fanId: Int) { manualOverrides.removeValue(forKey: fanId) }
     func clearAllManualOverrides() { manualOverrides.removeAll() }
 
     private func restoreAutoMode() {
-        for fan in fans {
-            do {
-                try smcService.setFanMode(index: fan.id, mode: .auto)
-            } catch {
-                logger.warning("Failed to restore auto mode for fan \(fan.id): \(error.localizedDescription)")
-            }
+        do {
+            try smcService.setForcedMode(fanCount: max(fans.count, 2), forced: false)
+            forcedModeSet = false
+        } catch {
+            logger.warning("Failed to restore auto mode: \(error.localizedDescription)")
         }
     }
 }

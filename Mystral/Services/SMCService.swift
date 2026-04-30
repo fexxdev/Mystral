@@ -10,6 +10,7 @@ protocol SMCServiceProtocol: Sendable {
     func readFanSpeed(index: Int) throws -> Int
     func setFanSpeed(index: Int, percentage: Double) throws
     func setFanMode(index: Int, mode: FanMode) throws
+    func setForcedMode(fanCount: Int, forced: Bool) throws
 }
 
 final class SMCService: SMCServiceProtocol, @unchecked Sendable {
@@ -23,28 +24,6 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
     private var fanMetadataCache: [Int: FanMetadata] = [:]
     private var fanCount: Int?
 
-    private static let knownSensorNames: [String: String] = [
-        "Tp01": "CPU Performance Core 1",
-        "Tp02": "CPU Performance Core 2",
-        "Tp03": "CPU Performance Core 3",
-        "Tp04": "CPU Performance Core 4",
-        "Tp05": "CPU Performance Core 5",
-        "Tp06": "CPU Performance Core 6",
-        "Tp09": "CPU Efficiency Core 1",
-        "Tp0A": "CPU Efficiency Core 2",
-        "Tp0B": "CPU Efficiency Core 3",
-        "Tp0C": "CPU Efficiency Core 4",
-        "Tg0a": "GPU Core 1",
-        "Tg0b": "GPU Core 2",
-        "Tg0c": "GPU Core 3",
-        "Tg0d": "GPU Core 4",
-        "TaLP": "Airflow Left",
-        "TaRP": "Airflow Right",
-        "Tm01": "Memory 1",
-        "Tm02": "Memory 2",
-        "Ts0S": "SSD",
-    ]
-
     init() throws {
         try smc.open()
     }
@@ -55,8 +34,7 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
         let keys = try smc.temperatureKeys()
         return keys.compactMap { key in
             guard let temp = try? smc.readFloat(key: key), temp > 0, temp < 150 else { return nil }
-            let name = Self.knownSensorNames[key] ?? key
-            return Sensor(id: key, name: name, temperature: temp)
+            return Sensor(id: key, name: SensorRegistry.nameForKey(key), temperature: temp)
         }
     }
 
@@ -101,10 +79,17 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
     func setFanSpeed(index: Int, percentage: Double) throws {
         let meta = try getFanMetadata(index: index)
         let targetRPM = meta.minRPM + (meta.maxRPM - meta.minRPM) * percentage / 100.0
-        try smc.writeFpe2(key: "F\(index)Tg", value: targetRPM)
+        try smc.writeFloat(key: "F\(index)Tg", value: targetRPM)
     }
 
     func setFanMode(index: Int, mode: FanMode) throws {
         try smc.writeUInt8(key: "F\(index)Md", value: UInt8(mode.rawValue))
+    }
+
+    func setForcedMode(fanCount: Int, forced: Bool) throws {
+        // "FS! " is a bitmask where each bit forces the corresponding fan
+        let mask: UInt16 = forced ? (1 << fanCount) - 1 : 0
+        try smc.writeBytes(key: "FS! ", dataType: SMCKit.DataType.ui16,
+                           bytes: [UInt8(mask >> 8), UInt8(mask & 0xFF)])
     }
 }

@@ -1,6 +1,5 @@
 import SwiftUI
 
-@main
 struct MystralApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 

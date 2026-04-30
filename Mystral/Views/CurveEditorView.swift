@@ -8,69 +8,89 @@ struct CurveEditorView: View {
     private let tempRange: ClosedRange<Double> = 0...110
     private let fanRange: ClosedRange<Double> = 0...100
 
+    private var groupedSensorKeys: [(SensorCategory, [String])] {
+        var grouped: [SensorCategory: [String]] = [:]
+        for key in sensorKeys {
+            let cat = SensorRegistry.categoryForKey(key)
+            grouped[cat, default: []].append(key)
+        }
+        return SensorCategory.allCases.compactMap { cat in
+            guard let keys = grouped[cat], !keys.isEmpty else { return nil }
+            return (cat, keys)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
                 Text("Driving Sensor").font(.headline)
                 Picker("", selection: $sensorKey) {
-                    Text("CPU Average").tag("")
-                    ForEach(sensorKeys, id: \.self) { key in Text(key).tag(key) }
-                }.frame(width: 200)
+                    Text("CPU Average (all cores)").tag("")
+                    ForEach(groupedSensorKeys, id: \.0) { category, keys in
+                        Section(category.rawValue) {
+                            ForEach(keys, id: \.self) { key in
+                                Text("\(SensorRegistry.nameForKey(key)) (\(key))").tag(key)
+                            }
+                        }
+                    }
+                }.frame(width: 280)
             }
             HStack(alignment: .top, spacing: 20) {
-                curveChart.frame(minWidth: 300, minHeight: 250)
+                curveChart.frame(minWidth: 300, minHeight: 300)
                 curveTable.frame(minWidth: 200)
             }
         }
     }
 
     private var curveChart: some View {
-        GeometryReader { geometry in
-            let sorted = curvePoints.sortedByTemperature()
-            let w = geometry.size.width
-            let h = geometry.size.height
-            ZStack {
-                gridLines(width: w, height: h)
-                Path { path in
-                    guard !sorted.isEmpty else { return }
-                    for (i, pt) in sorted.enumerated() {
-                        let p = CGPoint(x: xPos(pt.temperature, w), y: yPos(pt.fanPercentage, h))
-                        if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
-                    }
-                }.stroke(Color.accentColor, lineWidth: 2)
-                ForEach(sorted) { point in
-                    Circle().fill(Color.accentColor).frame(width: 12, height: 12)
-                        .position(x: xPos(point.temperature, w), y: yPos(point.fanPercentage, h))
-                        .gesture(DragGesture().onChanged { value in
-                            updatePoint(id: point.id,
-                                        temperature: tempFromX(value.location.x, w),
-                                        fanPercentage: pctFromY(value.location.y, h))
-                        })
-                }
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
                 VStack {
+                    Text("100%").font(.caption2).foregroundStyle(.secondary)
                     Spacer()
-                    HStack {
-                        Text("0°").font(.caption2)
-                        Spacer()
-                        Text("Temperature (°C)").font(.caption)
-                        Spacer()
-                        Text("110°").font(.caption2)
-                    }
+                    Text("50%").font(.caption2).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("0%").font(.caption2).foregroundStyle(.secondary)
                 }
-                HStack {
-                    VStack {
-                        Text("100%").font(.caption2)
-                        Spacer()
-                        Text("Fan").font(.caption).rotationEffect(.degrees(-90))
-                        Spacer()
-                        Text("0%").font(.caption2)
+                .frame(width: 32)
+
+                GeometryReader { geometry in
+                    let sorted = curvePoints.sortedByTemperature()
+                    let w = geometry.size.width
+                    let h = geometry.size.height
+                    ZStack {
+                        gridLines(width: w, height: h)
+                        Path { path in
+                            guard !sorted.isEmpty else { return }
+                            for (i, pt) in sorted.enumerated() {
+                                let p = CGPoint(x: xPos(pt.temperature, w), y: yPos(pt.fanPercentage, h))
+                                if i == 0 { path.move(to: p) } else { path.addLine(to: p) }
+                            }
+                        }.stroke(Color.accentColor, lineWidth: 2)
+                        ForEach(sorted) { point in
+                            Circle().fill(Color.accentColor).frame(width: 12, height: 12)
+                                .position(x: xPos(point.temperature, w), y: yPos(point.fanPercentage, h))
+                                .gesture(DragGesture().onChanged { value in
+                                    updatePoint(id: point.id,
+                                                temperature: tempFromX(value.location.x, w),
+                                                fanPercentage: pctFromY(value.location.y, h))
+                                })
+                        }
                     }
-                    Spacer()
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
-            .padding(24)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            HStack {
+                Spacer().frame(width: 32)
+                HStack {
+                    Text("0°").font(.caption2).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("Temperature (°C)").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("110°").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

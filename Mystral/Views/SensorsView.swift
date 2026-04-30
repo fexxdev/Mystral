@@ -4,34 +4,88 @@ import Charts
 struct SensorsView: View {
     let fanController: FanController
     @State private var searchText = ""
+    @State private var selectedCategory: SensorCategory?
 
     private var filteredSensors: [Sensor] {
-        if searchText.isEmpty { return fanController.sensors }
-        return fanController.sensors.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) || $0.id.localizedCaseInsensitiveContains(searchText)
+        var sensors = fanController.sensors
+        if let cat = selectedCategory {
+            sensors = sensors.filter { SensorRegistry.categoryForKey($0.id) == cat }
         }
+        if !searchText.isEmpty {
+            sensors = sensors.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) || $0.id.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        return sensors
+    }
+
+    private var availableCategories: [SensorCategory] {
+        let cats = Set(fanController.sensors.map { SensorRegistry.categoryForKey($0.id) })
+        return SensorCategory.allCases.filter { cats.contains($0) }
     }
 
     var body: some View {
-        Table(filteredSensors) {
-            TableColumn("Key") { sensor in
-                Text(sensor.id).font(.system(.body, design: .monospaced))
-            }.width(min: 60, ideal: 80)
+        Group {
+            if fanController.sensors.isEmpty {
+                ContentUnavailableView("No Sensors Detected", systemImage: "thermometer.slash",
+                                       description: Text("Waiting for SMC helper to start. You may be prompted for your password."))
+            } else {
+                VStack(spacing: 0) {
+                    categoryBar
+                    Table(filteredSensors) {
+                        TableColumn("Key") { sensor in
+                            Text(sensor.id).font(.system(.body, design: .monospaced))
+                        }.width(min: 60, ideal: 80)
 
-            TableColumn("Name") { sensor in Text(sensor.name) }.width(min: 150, ideal: 200)
+                        TableColumn("Name") { sensor in Text(sensor.name) }.width(min: 150, ideal: 200)
 
-            TableColumn("Temperature") { sensor in
-                Text("\(String(format: "%.1f", sensor.temperature))°C")
-                    .foregroundStyle(temperatureColor(sensor.temperature))
-                    .font(.system(.body, design: .rounded))
-            }.width(min: 80, ideal: 100)
+                        TableColumn("Category") { sensor in
+                            Text(SensorRegistry.categoryForKey(sensor.id).rawValue)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }.width(min: 80, ideal: 100)
 
-            TableColumn("Trend") { sensor in
-                SparklineView(data: sensor.history).frame(width: 100, height: 24)
-            }.width(min: 100, ideal: 120)
+                        TableColumn("Temperature") { sensor in
+                            Text("\(String(format: "%.1f", sensor.temperature))°C")
+                                .foregroundStyle(temperatureColor(sensor.temperature))
+                                .font(.system(.body, design: .rounded))
+                        }.width(min: 80, ideal: 100)
+
+                        TableColumn("Trend") { sensor in
+                            SparklineView(data: sensor.history).frame(width: 100, height: 24)
+                        }.width(min: 100, ideal: 120)
+                    }
+                    .searchable(text: $searchText, prompt: "Filter sensors...")
+                }
+            }
         }
-        .searchable(text: $searchText, prompt: "Filter sensors...")
-        .navigationTitle("Sensors (\(fanController.sensors.count))")
+        .navigationTitle("Sensors (\(filteredSensors.count)/\(fanController.sensors.count))")
+    }
+
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                categoryChip(label: "All", category: nil)
+                ForEach(availableCategories, id: \.self) { cat in
+                    categoryChip(label: cat.rawValue, category: cat)
+                }
+            }.padding(.horizontal).padding(.vertical, 8)
+        }
+    }
+
+    private func categoryChip(label: String, category: SensorCategory?) -> some View {
+        let isSelected = selectedCategory == category
+        return Button {
+            selectedCategory = category
+        } label: {
+            Text(label)
+                .font(.caption)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: 1))
+        }.buttonStyle(.plain)
     }
 
     private func temperatureColor(_ temp: Double) -> Color {

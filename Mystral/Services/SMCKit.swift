@@ -148,8 +148,11 @@ final class SMCKit: @unchecked Sendable {
         switch dataType {
         case DataType.flt:
             guard bytes.count >= 4 else { return 0 }
-            let bits = UInt32(bytes[0]) << 24 | UInt32(bytes[1]) << 16 | UInt32(bytes[2]) << 8 | UInt32(bytes[3])
-            return Double(Float(bitPattern: bits))
+            var value: Float = 0
+            withUnsafeMutableBytes(of: &value) { ptr in
+                for i in 0..<4 { ptr[i] = bytes[i] }
+            }
+            return Double(value)
         case DataType.sp78:
             guard bytes.count >= 2 else { return 0 }
             let raw = Int16(bitPattern: UInt16(bytes[0]) << 8 | UInt16(bytes[1]))
@@ -163,6 +166,14 @@ final class SMCKit: @unchecked Sendable {
         case DataType.ui16:
             guard bytes.count >= 2 else { return 0 }
             return Double(UInt16(bytes[0]) << 8 | UInt16(bytes[1]))
+        case DataType.ui32:
+            guard bytes.count >= 4 else { return 0 }
+            let value = UInt32(bytes[0]) << 24 | UInt32(bytes[1]) << 16 | UInt32(bytes[2]) << 8 | UInt32(bytes[3])
+            return Double(value)
+        case DataType.flag:
+            return Double(bytes[0])
+        case 0:
+            throw SMCError.keyNotFound(key)
         default:
             throw SMCError.unsupportedDataType(Self.fourCharString(dataType))
         }
@@ -173,22 +184,32 @@ final class SMCKit: @unchecked Sendable {
     func writeBytes(key: String, dataType: UInt32, bytes: [UInt8]) throws {
         let keyCode = Self.fourCharCode(key)
         let info = try readKeyInfo(key: keyCode)
+        fputs("writeBytes: key=\(key) type=\(Self.fourCharString(info.dataType)) size=\(info.dataSize) attrs=\(info.dataAttributes) bytes=[\(bytes.map { String(format: "%02X", $0) }.joined(separator: " "))]\n", stderr)
         var input = SMCKeyData()
         input.key = keyCode
         input.data8 = Self.cmdWriteBytes
-        input.keyInfo.dataSize = info.dataSize
+        input.keyInfo = info
         var tupleBytes = input.bytes
         withUnsafeMutableBytes(of: &tupleBytes) { ptr in
             for (i, byte) in bytes.prefix(Int(info.dataSize)).enumerated() { ptr[i] = byte }
         }
         input.bytes = tupleBytes
         let result = try callSMC(&input)
-        if result.result != 0 { throw SMCError.writeError(kern_return_t(result.result)) }
+        if result.result != 0 {
+            fputs("writeBytes: SMC result=\(result.result) (0x\(String(result.result, radix: 16)))\n", stderr)
+            throw SMCError.writeError(kern_return_t(result.result))
+        }
     }
 
     func writeFpe2(key: String, value: Double) throws {
         let raw = UInt16(max(0, min(value * 4.0, Double(UInt16.max))))
         try writeBytes(key: key, dataType: DataType.fpe2, bytes: [UInt8(raw >> 8), UInt8(raw & 0xFF)])
+    }
+
+    func writeFloat(key: String, value: Double) throws {
+        var floatVal = Float(value)
+        let bytes: [UInt8] = withUnsafeBytes(of: &floatVal) { Array($0) }
+        try writeBytes(key: key, dataType: DataType.flt, bytes: bytes)
     }
 
     func writeUInt8(key: String, value: UInt8) throws {
