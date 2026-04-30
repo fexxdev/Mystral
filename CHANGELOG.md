@@ -6,12 +6,20 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-04-30
+
 ### Added
 - **Update checker**: Settings → Updates shows current version, last-check time, and a "Check Now" button. Auto-check runs once per launch (and at most once per 24h) when enabled. New versions trigger a "Download Update" button that opens the GitHub release page.
-- **Minimum fan speed** floor in Settings → Curve Behavior. Fans never drop below this %, regardless of curve — useful for keeping fans always spinning in summer.
+- **Minimum fan speed** floor in Settings → Fan Behavior. Fans never drop below this %, regardless of curve — useful for keeping fans always spinning in summer.
 - **Aggressive override** toggle (default on). Re-asserts forced fan mode and re-writes target speeds every tick to fight SMC firmware reverting your settings.
 - **Firmware-lock warning** in Settings for M3/M4 Pro/Max MacBook Pro models where Apple firmware-locks manual fan control on macOS Sequoia+ (no third-party app can bypass this).
 - **Sortable sensor columns**: click a column header in the Sensors view to sort by Key, Name, or Temperature.
+
+### Changed
+- Settings layout refactored for consistency: shared slider rows, locale-aware number formatting, firmware warning surfaced right below Chip Detection, and "Curve Behavior" renamed to "Fan Behavior".
+
+### Fixed
+- CI: unit-test runs no longer time out when the host app is launched under XCTest.
 
 ## [1.0.1] — 2026-04-30
 
