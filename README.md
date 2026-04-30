@@ -8,11 +8,15 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 
 ## Features
 
-- **Menu bar presence** — always-on icon with configurable display (temperature, RPM, profile name)
-- **Temperature sensors** — live readings from all SMC temperature sensors with sparkline history
-- **Fan monitoring** — real-time RPM, target speed, and per-fan manual override
-- **Fan curve editor** — drag-and-drop chart with synchronized editable table
-- **Profiles** — 4 built-in presets (Silent, Balanced, Performance, Full Blast) + up to 10 custom profiles
+- **Real fan control on Apple Silicon** — works on M1/M2/M3/M4 (uses the `Ftst` unlock to bypass `thermalmonitord`)
+- **Menu bar presence** — always-on icon with configurable display: temperature, RPM, profile name, or a live mini-graph sparkline
+- **Live dashboard** — Swift Charts 5-minute rolling history of CPU max/avg + GPU max
+- **Fan curve editor** — drag-and-drop chart with synchronized editable table; per-fan curve overrides
+- **Profiles** — 4 presets (Silent, Balanced, Performance, Full Blast) + up to 10 custom; inline rename, duplicate, delete
+- **Auto-switch** — profiles can auto-activate based on power source (AC/Battery), thermal state, or frontmost app
+- **Smoothing & hysteresis** — EMA-smoothed input temperatures + configurable deadband to eliminate fan hunting
+- **Alerts** — optional notifications for high CPU temperature and fans that stop responding
+- **30s stress test** — burns all CPU cores and verifies your fan curve actually reacts
 - **Auto-start** — launch at login via macOS native login items
 - **Localization** — English and Italian
 
@@ -23,9 +27,13 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 
 ## Installation
 
-### Download
+1. **Download** the latest `Mystral-x.x.x.dmg` from [Releases](https://github.com/fexxdev/Mystral/releases/latest).
+2. **Open** the DMG and drag **Mystral.app** into the **Applications** folder.
+3. **First launch:** right-click `Mystral.app` in `/Applications` → **Open** → click **Open** in the dialog.
+   *(This step is needed because the app is not yet signed with a paid Apple Developer ID. Subsequent launches don't require it.)*
+4. The app will ask for your password once per session to control the fans (no kernel extension required).
 
-Download the latest `.dmg` from [Releases](https://github.com/fexxdev/Mystral/releases).
+That's it. Profiles live in `~/Library/Application Support/Mystral`.
 
 ### Build from Source
 
@@ -34,10 +42,10 @@ brew install xcodegen
 git clone https://github.com/fexxdev/Mystral.git
 cd Mystral
 xcodegen generate
+./scripts/build-dmg.sh        # produces dist/Mystral-x.x.x.dmg
+# or for development:
 open Mystral.xcodeproj
 ```
-
-Build and run in Xcode (Cmd+R).
 
 ## Usage
 
