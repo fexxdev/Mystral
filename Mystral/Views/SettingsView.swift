@@ -17,6 +17,11 @@ struct SettingsView: View {
     @State private var alertsHighTemp: Double = 95
     @State private var alertsFanStuck = true
     @State private var stressTester = StressTester()
+    @State private var updatesAutoCheck: Bool = true
+    @State private var updatesStatusText: String = "Not checked yet"
+    @State private var updateAvailable: Bool = false
+    @State private var updateAvailableVersion: String = ""
+    @State private var updateReleaseURL: URL?
 
     private var chipDetection: SensorRegistry.ChipDetection {
         SensorRegistry.detectChip(sensors: fanController.sensors, fans: fanController.fans)
@@ -156,6 +161,22 @@ struct SettingsView: View {
             Section("Data") {
                 Button("Reset All Settings") { resetSettings() }.foregroundStyle(.red)
             }
+            Section("Updates") {
+                Toggle("Check for updates automatically", isOn: $updatesAutoCheck)
+                    .onChange(of: updatesAutoCheck) { _, v in
+                        if let ad = NSApp.delegate as? AppDelegate { ad.updateChecker?.autoCheckEnabled = v }
+                    }
+                HStack {
+                    Text(updatesStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if updateAvailable, updateReleaseURL != nil {
+                        Button("Download Update") { openUpdateRelease() }
+                    }
+                    Button("Check Now") { runUpdateCheck() }
+                }
+            }
             Section("About") {
                 LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")
                 LabeledContent("Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
@@ -233,8 +254,58 @@ struct SettingsView: View {
             alertsEnabled = ad.alertManager?.enabled ?? true
             alertsHighTemp = ad.alertManager?.highTempThreshold ?? 95
             alertsFanStuck = ad.alertManager?.fanStuckEnabled ?? true
+            updatesAutoCheck = ad.updateChecker?.autoCheckEnabled ?? true
+            refreshUpdateStatus()
         }
     }
+
+    private func refreshUpdateStatus() {
+        guard let checker = (NSApp.delegate as? AppDelegate)?.updateChecker else { return }
+        switch checker.status {
+        case .unknown:
+            if let last = checker.lastCheckedAt {
+                updatesStatusText = "Last checked \(Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date()))"
+            } else {
+                updatesStatusText = "Not checked yet"
+            }
+            updateAvailable = false
+            updateReleaseURL = nil
+        case .checking:
+            updatesStatusText = "Checking for updates…"
+            updateAvailable = false
+        case .upToDate:
+            updatesStatusText = "Up to date (v\(checker.currentVersion))"
+            updateAvailable = false
+            updateReleaseURL = nil
+        case .updateAvailable(let version, let url, _, _):
+            updatesStatusText = "Update available: v\(version) (you have v\(checker.currentVersion))"
+            updateAvailable = true
+            updateAvailableVersion = version
+            updateReleaseURL = url
+        case .error(let msg):
+            updatesStatusText = "Check failed: \(msg)"
+            updateAvailable = false
+        }
+    }
+
+    private func runUpdateCheck() {
+        guard let checker = (NSApp.delegate as? AppDelegate)?.updateChecker else { return }
+        Task {
+            await checker.checkForUpdates(silent: false)
+            refreshUpdateStatus()
+        }
+        refreshUpdateStatus()
+    }
+
+    private func openUpdateRelease() {
+        (NSApp.delegate as? AppDelegate)?.updateChecker?.openReleasePage()
+    }
+
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return f
+    }()
 
     private func setLaunchAtLogin(_ enabled: Bool) {
         do {

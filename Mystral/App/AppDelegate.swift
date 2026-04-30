@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var profileManager: ProfileManager?
     var autoSwitcher: ProfileAutoSwitcher?
     var alertManager: AlertManager?
+    var updateChecker: UpdateChecker?
     private var smcProxy: SMCProxyService?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -55,6 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         fanController!.start()
         autoSwitcher!.start()
+
+        updateChecker = UpdateChecker()
+        updateChecker!.runAutoCheckIfNeeded()
     }
 
     private func launchHelperAsync() {

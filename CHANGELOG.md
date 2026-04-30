@@ -6,6 +6,9 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Added
+- **Update checker**: Settings → Updates shows current version, last-check time, and a "Check Now" button. Auto-check runs once per launch (and at most once per 24h) when enabled. New versions trigger a "Download Update" button that opens the GitHub release page.
+
 ## [1.0.1] — 2026-04-30
 
 ### Added
