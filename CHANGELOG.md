@@ -6,6 +6,8 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-04-30
+
 ### Added
 - Menu bar display modes for **Temperature Only** and **RPM Only** (no icon).
 - Configurable **temperature source** for the menu bar: CPU average, CPU max, GPU average, GPU max, or hottest sensor.
