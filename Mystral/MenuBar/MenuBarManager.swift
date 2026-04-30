@@ -134,7 +134,9 @@ final class MenuBarManager {
 
     private func startUpdating() {
         updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.updateStatusItem()
+            MainActor.assumeIsolated {
+                self?.updateStatusItem()
+            }
         }
     }
 
