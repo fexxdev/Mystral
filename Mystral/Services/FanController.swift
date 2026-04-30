@@ -92,12 +92,14 @@ final class FanController {
         let drivingTemp = resolveDrivingTemperature(for: profile)
         let targetPercentage = Self.interpolate(temperature: drivingTemp, curve: profile.curvePoints)
 
+        guard !fans.isEmpty else { return }
+
         if !forcedModeSet {
             do {
                 try smcService.setForcedMode(fanCount: fans.count, forced: true)
                 forcedModeSet = true
             } catch {
-                logger.warning("Failed to enable forced fan mode: \(error.localizedDescription)")
+                logger.info("Forced fan mode not available (expected on Apple Silicon): \(error.localizedDescription)")
             }
         }
 

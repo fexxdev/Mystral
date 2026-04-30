@@ -58,6 +58,7 @@ enum SMCHelperMode {
         let timer = DispatchSource.makeTimerSource(queue: .global())
         timer.schedule(deadline: .now(), repeating: 2.0)
         timer.setEventHandler {
+            processCommands(smc: smc)
             do {
                 let sensors = try smc.getAllSensors()
                 let fans = try smc.getAllFans()
@@ -72,7 +73,6 @@ enum SMCHelperMode {
             } catch {
                 fputs("SMC read error: \(error)\n", stderr)
             }
-            processCommands(smc: smc)
         }
         timer.resume()
 

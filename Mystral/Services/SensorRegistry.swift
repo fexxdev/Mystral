@@ -195,4 +195,84 @@ enum SensorRegistry {
 
     static let defaultCpuSensorKey = "TCMz"
     static let defaultGpuSensorKey = ""
+
+    struct ChipDetection: Sendable {
+        let chipName: String
+        let isSupported: Bool
+        let cpuCoreCount: Int
+        let gpuCoreCount: Int
+        let hasFanControl: Bool
+    }
+
+    static func detectChip(sensors: [Sensor], fans: [Fan]) -> ChipDetection {
+        let keys = Set(sensors.map(\.id))
+        let cpuCores = cpuCoreSensors(from: sensors).count
+        let gpuCores = gpuCoreSensors(from: sensors).count
+        let hasSummary = keys.contains("TCMz") || keys.contains("TCMb")
+        let hasFanControl = fans.contains { $0.currentRPM > 0 || $0.targetRPM > 0 }
+
+        let chipName: String
+        if cpuCores >= 48 {
+            chipName = "M3 Pro / M3 Max (or similar)"
+        } else if cpuCores >= 24 {
+            chipName = "M2 Pro / M2 Max (or similar)"
+        } else if cpuCores >= 8 {
+            chipName = "M1 Pro / M1 Max (or similar)"
+        } else if cpuCores > 0 {
+            chipName = "Apple Silicon"
+        } else {
+            chipName = "Unknown"
+        }
+
+        return ChipDetection(
+            chipName: chipName,
+            isSupported: hasSummary && cpuCores > 0,
+            cpuCoreCount: cpuCores,
+            gpuCoreCount: gpuCores,
+            hasFanControl: hasFanControl
+        )
+    }
+
+    static func exportDiagnosticData(sensors: [Sensor], fans: [Fan]) -> String {
+        var lines: [String] = []
+        lines.append("=== Mystral SMC Export ===")
+        lines.append("Date: \(ISO8601DateFormatter().string(from: Date()))")
+
+        let chip = detectChip(sensors: sensors, fans: fans)
+        lines.append("Detected chip: \(chip.chipName)")
+        lines.append("CPU cores: \(chip.cpuCoreCount), GPU cores: \(chip.gpuCoreCount)")
+        lines.append("Supported: \(chip.isSupported)")
+        lines.append("")
+
+        lines.append("=== All Sensors (\(sensors.count)) ===")
+        for sensor in sensors {
+            let cat = categoryForKey(sensor.id)
+            let known = catalog[sensor.id] != nil ? "KNOWN" : "UNMAPPED"
+            lines.append("\(sensor.id) | \(sensor.name) | \(cat.rawValue) | \(String(format: "%.2f", sensor.temperature))°C | \(known)")
+        }
+
+        lines.append("")
+        lines.append("=== Fans (\(fans.count)) ===")
+        for fan in fans {
+            lines.append("Fan \(fan.id): \(fan.name) | RPM=\(fan.currentRPM) | target=\(fan.targetRPM) | min=\(fan.minRPM) | max=\(fan.maxRPM) | mode=\(fan.mode.rawValue)")
+        }
+
+        lines.append("")
+        lines.append("=== Sensor Categories ===")
+        let grouped = groupByCategory(sensors)
+        for (cat, catSensors) in grouped {
+            lines.append("\(cat.rawValue): \(catSensors.count) sensors")
+            for s in catSensors {
+                let known = catalog[s.id] != nil
+                lines.append("  \(s.id) → \(s.name) \(known ? "" : "[NEEDS MAPPING]")")
+            }
+        }
+
+        lines.append("")
+        lines.append("=== Instructions ===")
+        lines.append("Send this file to the developer to add support for your chip.")
+        lines.append("Keys marked [NEEDS MAPPING] need human-readable names.")
+
+        return lines.joined(separator: "\n")
+    }
 }

@@ -87,9 +87,8 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
     }
 
     func setForcedMode(fanCount: Int, forced: Bool) throws {
-        // "FS! " is a bitmask where each bit forces the corresponding fan
-        let mask: UInt16 = forced ? (1 << fanCount) - 1 : 0
-        try smc.writeBytes(key: "FS! ", dataType: SMCKit.DataType.ui16,
-                           bytes: [UInt8(mask >> 8), UInt8(mask & 0xFF)])
+        let mask: UInt16 = forced ? UInt16((1 << max(fanCount, 2)) - 1) : 0
+        try smc.writeRaw(key: "FS! ", dataType: SMCKit.DataType.ui16, dataSize: 2,
+                         bytes: [UInt8(mask >> 8), UInt8(mask & 0xFF)])
     }
 }

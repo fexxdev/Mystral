@@ -7,9 +7,40 @@ struct SettingsView: View {
     @State private var launchAtLogin = false
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
     @State private var pollingInterval: Double = 2.0
+    @State private var exportMessage: String?
+
+    private var chipDetection: SensorRegistry.ChipDetection {
+        SensorRegistry.detectChip(sensors: fanController.sensors, fans: fanController.fans)
+    }
 
     var body: some View {
         Form {
+            Section("Chip Detection") {
+                LabeledContent("Detected Chip", value: chipDetection.chipName)
+                LabeledContent("CPU Cores") {
+                    Text("\(chipDetection.cpuCoreCount) sensors")
+                }
+                LabeledContent("GPU Cores") {
+                    Text("\(chipDetection.gpuCoreCount) sensors")
+                }
+                LabeledContent("Status") {
+                    HStack(spacing: 4) {
+                        Image(systemName: chipDetection.isSupported ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(chipDetection.isSupported ? Color.green : Color.orange)
+                        Text(chipDetection.isSupported ? "Supported" : "Partially supported — some sensors may be unmapped")
+                            .foregroundStyle(chipDetection.isSupported ? Color.primary : Color.orange)
+                    }
+                }
+                LabeledContent("Fan Control") {
+                    HStack(spacing: 4) {
+                        Image(systemName: chipDetection.hasFanControl ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(chipDetection.hasFanControl ? .green : .red)
+                        Text(chipDetection.hasFanControl ? "Working" : "Not available (Apple Silicon limitation)")
+                            .foregroundStyle(chipDetection.hasFanControl ? .primary : .secondary)
+                    }
+                }
+            }
+
             Section("General") {
                 Toggle("Launch at Login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in setLaunchAtLogin(newValue) }
@@ -32,6 +63,16 @@ struct SettingsView: View {
                     UserDefaults.standard.set(newValue, forKey: "pollingInterval")
                 }
             }
+
+            Section("Diagnostics") {
+                Button("Export SMC Data for Developer") {
+                    exportSMCData()
+                }
+                if let msg = exportMessage {
+                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             Section("Data") {
                 Button("Reset All Settings") { resetSettings() }.foregroundStyle(.red)
             }
@@ -44,6 +85,21 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .onAppear { loadSettings() }
+    }
+
+    private func exportSMCData() {
+        let content = SensorRegistry.exportDiagnosticData(sensors: fanController.sensors, fans: fanController.fans)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "mystral-smc-export.txt"
+        panel.allowedContentTypes = [.plainText]
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                try content.write(to: url, atomically: true, encoding: .utf8)
+                exportMessage = "Exported to \(url.lastPathComponent)"
+            } catch {
+                exportMessage = "Export failed: \(error.localizedDescription)"
+            }
+        }
     }
 
     private func loadSettings() {

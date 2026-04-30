@@ -184,7 +184,6 @@ final class SMCKit: @unchecked Sendable {
     func writeBytes(key: String, dataType: UInt32, bytes: [UInt8]) throws {
         let keyCode = Self.fourCharCode(key)
         let info = try readKeyInfo(key: keyCode)
-        fputs("writeBytes: key=\(key) type=\(Self.fourCharString(info.dataType)) size=\(info.dataSize) attrs=\(info.dataAttributes) bytes=[\(bytes.map { String(format: "%02X", $0) }.joined(separator: " "))]\n", stderr)
         var input = SMCKeyData()
         input.key = keyCode
         input.data8 = Self.cmdWriteBytes
@@ -195,10 +194,23 @@ final class SMCKit: @unchecked Sendable {
         }
         input.bytes = tupleBytes
         let result = try callSMC(&input)
-        if result.result != 0 {
-            fputs("writeBytes: SMC result=\(result.result) (0x\(String(result.result, radix: 16)))\n", stderr)
-            throw SMCError.writeError(kern_return_t(result.result))
+        if result.result != 0 { throw SMCError.writeError(kern_return_t(result.result)) }
+    }
+
+    func writeRaw(key: String, dataType: UInt32, dataSize: UInt32, bytes: [UInt8]) throws {
+        let keyCode = Self.fourCharCode(key)
+        var input = SMCKeyData()
+        input.key = keyCode
+        input.data8 = Self.cmdWriteBytes
+        input.keyInfo.dataSize = dataSize
+        input.keyInfo.dataType = dataType
+        var tupleBytes = input.bytes
+        withUnsafeMutableBytes(of: &tupleBytes) { ptr in
+            for (i, byte) in bytes.prefix(Int(dataSize)).enumerated() { ptr[i] = byte }
         }
+        input.bytes = tupleBytes
+        let result = try callSMC(&input)
+        if result.result != 0 { throw SMCError.writeError(kern_return_t(result.result)) }
     }
 
     func writeFpe2(key: String, value: Double) throws {
