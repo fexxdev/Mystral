@@ -6,6 +6,7 @@ struct SettingsView: View {
     let profileManager: ProfileManager
     @State private var launchAtLogin = false
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
+    @State private var tempSource: MenuBarTempSource = .cpuAverage
     @State private var pollingInterval: Double = 2.0
     @State private var exportMessage: String?
     @State private var autoSwitchEnabled = true
@@ -59,6 +60,14 @@ struct SettingsView: View {
                 }.onChange(of: displayMode) { _, newValue in
                     if let ad = NSApp.delegate as? AppDelegate { ad.menuBarManager?.displayMode = newValue }
                     UserDefaults.standard.set(newValue.rawValue, forKey: "menuBarDisplayMode")
+                }
+                if displayMode == .iconAndTemperature || displayMode == .temperatureOnly {
+                    Picker("Temperature Source", selection: $tempSource) {
+                        ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }.onChange(of: tempSource) { _, newValue in
+                        if let ad = NSApp.delegate as? AppDelegate { ad.menuBarManager?.tempSource = newValue }
+                        UserDefaults.standard.set(newValue.rawValue, forKey: "menuBarTempSource")
+                    }
                 }
             }
             Section("Monitoring") {
@@ -212,6 +221,8 @@ struct SettingsView: View {
         launchAtLogin = SMAppService.mainApp.status == .enabled
         if let s = UserDefaults.standard.string(forKey: "menuBarDisplayMode"),
            let m = MenuBarDisplayMode(rawValue: s) { displayMode = m }
+        if let s = UserDefaults.standard.string(forKey: "menuBarTempSource"),
+           let t = MenuBarTempSource(rawValue: s) { tempSource = t }
         let i = UserDefaults.standard.double(forKey: "pollingInterval")
         if i > 0 { pollingInterval = i }
         smoothingEnabled = fanController.smoothingEnabled
@@ -236,6 +247,7 @@ struct SettingsView: View {
         displayMode = .iconOnly; pollingInterval = 2.0
         fanController.pollingInterval = 2.0; fanController.clearAllManualOverrides()
         UserDefaults.standard.removeObject(forKey: "menuBarDisplayMode")
+        UserDefaults.standard.removeObject(forKey: "menuBarTempSource")
         UserDefaults.standard.removeObject(forKey: "pollingInterval")
     }
 }

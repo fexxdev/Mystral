@@ -9,7 +9,24 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconAndTemperature = "Icon + Temperature"
     case iconAndRPM = "Icon + RPM"
     case iconAndProfile = "Icon + Profile"
+    case temperatureOnly = "Temperature Only"
+    case rpmOnly = "RPM Only"
     case miniGraph = "Mini Graph"
+
+    var showsIcon: Bool {
+        switch self {
+        case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile: return true
+        case .temperatureOnly, .rpmOnly, .miniGraph: return false
+        }
+    }
+}
+
+enum MenuBarTempSource: String, CaseIterable, Codable {
+    case cpuAverage = "CPU Average"
+    case cpuMax = "CPU Max"
+    case gpuAverage = "GPU Average"
+    case gpuMax = "GPU Max"
+    case hottest = "Hottest Sensor"
 }
 
 @Observable
@@ -22,10 +39,18 @@ final class MenuBarManager {
     private var updateTimer: Timer?
 
     private static let displayModeKey = "menuBarDisplayMode"
+    private static let tempSourceKey = "menuBarTempSource"
 
     var displayMode: MenuBarDisplayMode = .iconOnly {
         didSet {
             UserDefaults.standard.set(displayMode.rawValue, forKey: Self.displayModeKey)
+            updateStatusItem()
+        }
+    }
+
+    var tempSource: MenuBarTempSource = .cpuAverage {
+        didSet {
+            UserDefaults.standard.set(tempSource.rawValue, forKey: Self.tempSourceKey)
             updateStatusItem()
         }
     }
@@ -38,6 +63,10 @@ final class MenuBarManager {
            let mode = MenuBarDisplayMode(rawValue: saved) {
             self.displayMode = mode
         }
+        if let saved = UserDefaults.standard.string(forKey: Self.tempSourceKey),
+           let src = MenuBarTempSource(rawValue: saved) {
+            self.tempSource = src
+        }
         setupStatusItem()
         startUpdating()
     }
@@ -45,11 +74,26 @@ final class MenuBarManager {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem?.button else { return }
-        button.image = NSImage(systemSymbolName: "fan", accessibilityDescription: "Mystral")
+        button.image = Self.makeStatusIcon()
+        button.imagePosition = .imageLeft
         button.target = self
         button.action = #selector(statusItemClicked)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         updateStatusItem()
+    }
+
+    private static func makeStatusIcon() -> NSImage? {
+        let symbolNames = ["fanblades.fill", "fanblades", "fan.fill", "fan"]
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+            .applying(.init(scale: .medium))
+        for name in symbolNames {
+            if let img = NSImage(systemSymbolName: name, accessibilityDescription: "Mystral")?
+                .withSymbolConfiguration(config) {
+                img.isTemplate = true
+                return img
+            }
+        }
+        return nil
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -96,30 +140,63 @@ final class MenuBarManager {
 
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
-        var title = ""
 
         if displayMode == .miniGraph {
             button.image = renderMiniGraphImage()
             button.title = ""
             return
-        } else {
-            button.image = NSImage(systemSymbolName: "fan", accessibilityDescription: "Mystral")
         }
 
+        button.image = displayMode.showsIcon ? Self.makeStatusIcon() : nil
+
+        let prefix = displayMode.showsIcon ? " " : ""
         switch displayMode {
-        case .iconOnly, .miniGraph: break
-        case .iconAndTemperature:
-            let cpuSensors = fanController.sensors.filter { $0.id.hasPrefix("Tp") }
-            if !cpuSensors.isEmpty {
-                let avg = cpuSensors.map(\.temperature).reduce(0, +) / Double(cpuSensors.count)
-                title = " \(Int(avg))\u{00B0}"
-            }
-        case .iconAndRPM:
-            if let fan = fanController.fans.first { title = " \(fan.currentRPM)" }
+        case .iconOnly:
+            button.title = ""
+        case .iconAndTemperature, .temperatureOnly:
+            button.title = prefix + temperatureString()
+        case .iconAndRPM, .rpmOnly:
+            button.title = prefix + rpmString()
         case .iconAndProfile:
-            if let profile = profileManager.activeProfile { title = " \(profile.name)" }
+            if let profile = profileManager.activeProfile {
+                button.title = prefix + profile.name
+            } else {
+                button.title = ""
+            }
+        case .miniGraph:
+            break
         }
-        button.title = title
+    }
+
+    private func temperatureString() -> String {
+        let value = currentTemperature()
+        guard value > 0 else { return "--°" }
+        return "\(Int(value.rounded()))°"
+    }
+
+    private func rpmString() -> String {
+        guard let fan = fanController.fans.first else { return "-- RPM" }
+        return "\(fan.currentRPM)"
+    }
+
+    private func currentTemperature() -> Double {
+        let sensors = fanController.sensors
+        let cpu = sensors.filter { $0.id.hasPrefix("Tp") }
+        let gpu = sensors.filter { $0.id.hasPrefix("Tg") }
+        switch tempSource {
+        case .cpuAverage:
+            guard !cpu.isEmpty else { return 0 }
+            return cpu.map(\.temperature).reduce(0, +) / Double(cpu.count)
+        case .cpuMax:
+            return cpu.map(\.temperature).max() ?? 0
+        case .gpuAverage:
+            guard !gpu.isEmpty else { return 0 }
+            return gpu.map(\.temperature).reduce(0, +) / Double(gpu.count)
+        case .gpuMax:
+            return gpu.map(\.temperature).max() ?? 0
+        case .hottest:
+            return sensors.map(\.temperature).max() ?? 0
+        }
     }
 
     private func renderMiniGraphImage() -> NSImage {

@@ -1,0 +1,49 @@
+name: Bug Report
+description: Report a problem with Mystral
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please include as much detail as possible.
+  - type: input
+    id: mac-model
+    attributes:
+      label: Mac model & chip
+      description: e.g. MacBook Pro 14" M3 Pro, Mac mini M2, MacBook Air M1
+      placeholder: MacBook Pro 14" M3 Pro
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: "15.2"
+    validations:
+      required: true
+  - type: input
+    id: mystral-version
+    attributes:
+      label: Mystral version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug, what you expected, and steps to reproduce.
+    validations:
+      required: true
+  - type: textarea
+    id: smc-export
+    attributes:
+      label: SMC export (optional but helpful)
+      description: Settings → Diagnostics → "Export SMC Data for Developer" and paste the contents here.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs (optional)
+      description: Any relevant output from Console.app filtered to subsystem com.fexxdev.Mystral
+      render: text

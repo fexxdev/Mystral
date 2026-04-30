@@ -20,6 +20,7 @@ final class MockSMCService: SMCServiceProtocol, @unchecked Sendable {
     func readFanSpeed(index: Int) throws -> Int { fans[index].currentRPM }
     func setFanSpeed(index: Int, percentage: Double) throws { lastSetFanIndex = index; lastSetPercentage = percentage }
     func setFanMode(index: Int, mode: FanMode) throws { lastSetMode = mode }
+    func setForcedMode(fanCount: Int, forced: Bool) throws {}
 }
 
 final class SMCServiceTests: XCTestCase {

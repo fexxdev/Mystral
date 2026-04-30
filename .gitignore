@@ -16,3 +16,7 @@ build/
 *.app
 *.ipa
 *.dSYM
+
+# DMG / release outputs
+dist/
+.build-dmg/

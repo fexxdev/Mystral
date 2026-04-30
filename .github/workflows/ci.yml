@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        run: |
+          xcodebuild \
+            -project Mystral.xcodeproj \
+            -scheme Mystral \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            build
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project Mystral.xcodeproj \
+            -scheme Mystral \
+            -destination 'platform=macOS' \
+            -enableCodeCoverage YES
