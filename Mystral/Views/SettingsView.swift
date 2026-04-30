@@ -13,6 +13,8 @@ struct SettingsView: View {
     @State private var smoothingEnabled = true
     @State private var smoothingAlpha: Double = 0.3
     @State private var deadbandPercent: Double = 3.0
+    @State private var minimumFanPct: Double = 0
+    @State private var aggressiveOverride: Bool = true
     @State private var alertsEnabled = true
     @State private var alertsHighTemp: Double = 95
     @State private var alertsFanStuck = true
@@ -113,6 +115,43 @@ struct SettingsView: View {
                         }
                     Text("\(deadbandPercent, specifier: "%.1f")%")
                         .font(.caption.monospacedDigit()).frame(width: 50)
+                }
+                HStack {
+                    Text("Minimum fan speed")
+                    Slider(value: $minimumFanPct, in: 0...100, step: 5)
+                        .onChange(of: minimumFanPct) { _, v in
+                            fanController.minimumFanPercentage = v
+                            UserDefaults.standard.set(v, forKey: "minimumFanPercentage")
+                        }
+                    Text("\(Int(minimumFanPct))%")
+                        .font(.caption.monospacedDigit()).frame(width: 50)
+                }
+                Text("Floor that fans never go below — useful for keeping fans always spinning in summer.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Aggressively re-assert manual control", isOn: $aggressiveOverride)
+                    .onChange(of: aggressiveOverride) { _, v in
+                        fanController.aggressiveOverrideEnabled = v
+                        UserDefaults.standard.set(v, forKey: "aggressiveOverrideEnabled")
+                    }
+                Text("Re-asserts forced fan mode and re-writes target speed every tick. Helps fight SMC firmware reverting your settings.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            if HardwareInfo.isFirmwareLocked {
+                Section {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Limited fan control on this Mac")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Apple firmware-locks manual fan control on M3/M4 Pro/Max MacBook Pros running macOS Sequoia and later. No third-party app — including Mystral, Macs Fan Control, or iStat — can override this. Mystral will still display sensors and fan RPM, and may partially work for some keys, but cannot reliably force fan speeds.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Link("More info", destination: URL(string: "https://github.com/crystalidea/macs-fan-control/issues/785")!)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
 
@@ -249,6 +288,8 @@ struct SettingsView: View {
         smoothingEnabled = fanController.smoothingEnabled
         smoothingAlpha = fanController.smoothingAlpha
         deadbandPercent = fanController.deadbandPercent
+        minimumFanPct = fanController.minimumFanPercentage
+        aggressiveOverride = fanController.aggressiveOverrideEnabled
         if let ad = NSApp.delegate as? AppDelegate {
             autoSwitchEnabled = ad.autoSwitcher?.enabled ?? true
             alertsEnabled = ad.alertManager?.enabled ?? true

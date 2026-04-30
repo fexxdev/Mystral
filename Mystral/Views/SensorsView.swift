@@ -5,6 +5,9 @@ struct SensorsView: View {
     let fanController: FanController
     @State private var searchText = ""
     @State private var selectedCategory: SensorCategory?
+    @State private var sortOrder: [KeyPathComparator<Sensor>] = [
+        KeyPathComparator(\Sensor.temperature, order: .reverse)
+    ]
 
     private var filteredSensors: [Sensor] {
         var sensors = fanController.sensors
@@ -16,7 +19,7 @@ struct SensorsView: View {
                 $0.name.localizedCaseInsensitiveContains(searchText) || $0.id.localizedCaseInsensitiveContains(searchText)
             }
         }
-        return sensors
+        return sensors.sorted(using: sortOrder)
     }
 
     private var availableCategories: [SensorCategory] {
@@ -32,12 +35,14 @@ struct SensorsView: View {
             } else {
                 VStack(spacing: 0) {
                     categoryBar
-                    Table(filteredSensors) {
-                        TableColumn("Key") { sensor in
+                    Table(filteredSensors, sortOrder: $sortOrder) {
+                        TableColumn("Key", value: \.id) { sensor in
                             Text(sensor.id).font(.system(.body, design: .monospaced))
                         }.width(min: 60, ideal: 80)
 
-                        TableColumn("Name") { sensor in Text(sensor.name) }.width(min: 150, ideal: 200)
+                        TableColumn("Name", value: \.name) { sensor in
+                            Text(sensor.name)
+                        }.width(min: 150, ideal: 200)
 
                         TableColumn("Category") { sensor in
                             Text(SensorRegistry.categoryForKey(sensor.id).rawValue)
@@ -45,7 +50,7 @@ struct SensorsView: View {
                                 .foregroundStyle(.secondary)
                         }.width(min: 80, ideal: 100)
 
-                        TableColumn("Temperature") { sensor in
+                        TableColumn("Temperature", value: \.temperature) { sensor in
                             Text("\(String(format: "%.1f", sensor.temperature))°C")
                                 .foregroundStyle(temperatureColor(sensor.temperature))
                                 .font(.system(.body, design: .rounded))

@@ -34,8 +34,11 @@ final class FanController {
     var smoothingEnabled: Bool = true {
         didSet { if !smoothingEnabled { smoothedTemps.removeAll() } }
     }
+    var minimumFanPercentage: Double = 0
+    var aggressiveOverrideEnabled: Bool = true
     private var smoothedTemps: [String: Double] = [:]
     private var lastWrittenPct: [Int: Double] = [:]
+    private var ticksSinceForcedReassert = 0
 
     var alertManager: AlertManager?
 
@@ -112,12 +115,20 @@ final class FanController {
         guard let profile = profileManager.activeProfile else { return }
         guard !fans.isEmpty else { return }
 
-        if !forcedModeSet {
+        let reassertNeeded: Bool
+        if aggressiveOverrideEnabled {
+            ticksSinceForcedReassert += 1
+            reassertNeeded = !forcedModeSet || ticksSinceForcedReassert >= 5
+        } else {
+            reassertNeeded = !forcedModeSet
+        }
+        if reassertNeeded {
             do {
                 try smcService.setForcedMode(fanCount: fans.count, forced: true)
                 forcedModeSet = true
+                ticksSinceForcedReassert = 0
             } catch {
-                logger.info("Forced fan mode not available (expected on Apple Silicon): \(error.localizedDescription)")
+                logger.info("Forced fan mode not available (expected on M3/M4 Pro/Max): \(error.localizedDescription)")
             }
         }
 
@@ -129,10 +140,12 @@ final class FanController {
         for fan in fans {
             let curve = profile.curve(for: fan.id)
             let curveTarget = Self.interpolate(temperature: drivingTemp, curve: curve)
-            let percentage = manualOverrides[fan.id] ?? curveTarget
+            let manualValue = manualOverrides[fan.id]
+            let basePercentage = manualValue ?? curveTarget
+            let percentage = max(basePercentage, minimumFanPercentage)
             let last = lastWrittenPct[fan.id]
-            let isManual = manualOverrides[fan.id] != nil
-            let band = isManual ? 0.0 : deadbandPercent
+            let isManual = manualValue != nil || minimumFanPercentage > 0
+            let band = (isManual || aggressiveOverrideEnabled) ? 0.0 : deadbandPercent
             if let last = last, abs(percentage - last) < band {
                 continue
             }

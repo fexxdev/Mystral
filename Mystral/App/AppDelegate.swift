@@ -43,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if UserDefaults.standard.object(forKey: "deadbandPercent") != nil {
             fanController!.deadbandPercent = UserDefaults.standard.double(forKey: "deadbandPercent")
         }
+        if UserDefaults.standard.object(forKey: "minimumFanPercentage") != nil {
+            fanController!.minimumFanPercentage = UserDefaults.standard.double(forKey: "minimumFanPercentage")
+        }
+        if UserDefaults.standard.object(forKey: "aggressiveOverrideEnabled") != nil {
+            fanController!.aggressiveOverrideEnabled = UserDefaults.standard.bool(forKey: "aggressiveOverrideEnabled")
+        }
         let interval = UserDefaults.standard.double(forKey: "pollingInterval")
         if interval > 0 { fanController!.pollingInterval = interval }
         autoSwitcher = ProfileAutoSwitcher(profileManager: profileManager!)
