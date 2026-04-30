@@ -8,6 +8,14 @@ struct SettingsView: View {
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
     @State private var pollingInterval: Double = 2.0
     @State private var exportMessage: String?
+    @State private var autoSwitchEnabled = true
+    @State private var smoothingEnabled = true
+    @State private var smoothingAlpha: Double = 0.3
+    @State private var deadbandPercent: Double = 3.0
+    @State private var alertsEnabled = true
+    @State private var alertsHighTemp: Double = 95
+    @State private var alertsFanStuck = true
+    @State private var stressTester = StressTester()
 
     private var chipDetection: SensorRegistry.ChipDetection {
         SensorRegistry.detectChip(sensors: fanController.sensors, fans: fanController.fans)
@@ -64,6 +72,68 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Curve Behavior") {
+                Toggle("Smoothing (EMA)", isOn: $smoothingEnabled)
+                    .onChange(of: smoothingEnabled) { _, v in
+                        fanController.smoothingEnabled = v
+                        UserDefaults.standard.set(v, forKey: "smoothingEnabled")
+                    }
+                if smoothingEnabled {
+                    HStack {
+                        Text("Responsiveness")
+                        Slider(value: $smoothingAlpha, in: 0.05...1.0, step: 0.05)
+                            .onChange(of: smoothingAlpha) { _, v in
+                                fanController.smoothingAlpha = v
+                                UserDefaults.standard.set(v, forKey: "smoothingAlpha")
+                            }
+                        Text(String(format: "%.2f", smoothingAlpha))
+                            .font(.caption.monospacedDigit()).frame(width: 40)
+                    }
+                }
+                HStack {
+                    Text("Deadband")
+                    Slider(value: $deadbandPercent, in: 0...10, step: 0.5)
+                        .onChange(of: deadbandPercent) { _, v in
+                            fanController.deadbandPercent = v
+                            UserDefaults.standard.set(v, forKey: "deadbandPercent")
+                        }
+                    Text("\(deadbandPercent, specifier: "%.1f")%")
+                        .font(.caption.monospacedDigit()).frame(width: 50)
+                }
+            }
+
+            Section("Alerts") {
+                Toggle("Enable notifications", isOn: $alertsEnabled)
+                    .onChange(of: alertsEnabled) { _, v in
+                        if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.enabled = v }
+                    }
+                if alertsEnabled {
+                    HStack {
+                        Text("High-temp threshold")
+                        Slider(value: $alertsHighTemp, in: 70...110, step: 1)
+                            .onChange(of: alertsHighTemp) { _, v in
+                                if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.highTempThreshold = v }
+                            }
+                        Text("\(Int(alertsHighTemp))°C").font(.caption.monospacedDigit()).frame(width: 50)
+                    }
+                    Toggle("Alert when a fan stops responding", isOn: $alertsFanStuck)
+                        .onChange(of: alertsFanStuck) { _, v in
+                            if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.fanStuckEnabled = v }
+                        }
+                }
+            }
+
+            Section("Auto-Switch") {
+                Toggle("Auto-activate profiles based on triggers", isOn: $autoSwitchEnabled)
+                    .onChange(of: autoSwitchEnabled) { _, v in
+                        if let ad = NSApp.delegate as? AppDelegate {
+                            ad.autoSwitcher?.enabled = v
+                        }
+                    }
+                Text("When on, profiles with triggers (power, thermal state, frontmost app) will auto-activate.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Diagnostics") {
                 Button("Export SMC Data for Developer") {
                     exportSMCData()
@@ -71,6 +141,7 @@ struct SettingsView: View {
                 if let msg = exportMessage {
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                 }
+                stressTestRow
             }
 
             Section("Data") {
@@ -85,6 +156,41 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .onAppear { loadSettings() }
+    }
+
+    @ViewBuilder
+    private var stressTestRow: some View {
+        switch stressTester.state {
+        case .idle:
+            HStack {
+                Button("Run 30s Stress Test") {
+                    stressTester.runStressTest(durationSeconds: 30, fanController: fanController)
+                }
+                Text("Burns CPU on all cores and verifies fans respond.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        case .running(let elapsed, let total):
+            HStack(spacing: 12) {
+                ProgressView(value: Double(elapsed), total: Double(total))
+                Text("\(elapsed) / \(total)s").font(.caption.monospacedDigit())
+                Button("Stop") { stressTester.cancel() }
+            }
+        case .finished(let r):
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: r.fanResponded ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(r.fanResponded ? Color.green : Color.orange)
+                    Text(r.fanResponded ? "Fans responded" : "No clear fan response")
+                        .font(.subheadline)
+                }
+                Text(String(format: "Temp %.0f°C → %.0f°C   |   Fan %d → %d RPM",
+                            r.baselineMaxTemp, r.peakTemp, r.baselineMaxRPM, r.peakRPM))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                Button("Run Again") {
+                    stressTester.runStressTest(durationSeconds: 30, fanController: fanController)
+                }
+            }
+        }
     }
 
     private func exportSMCData() {
@@ -108,6 +214,15 @@ struct SettingsView: View {
            let m = MenuBarDisplayMode(rawValue: s) { displayMode = m }
         let i = UserDefaults.standard.double(forKey: "pollingInterval")
         if i > 0 { pollingInterval = i }
+        smoothingEnabled = fanController.smoothingEnabled
+        smoothingAlpha = fanController.smoothingAlpha
+        deadbandPercent = fanController.deadbandPercent
+        if let ad = NSApp.delegate as? AppDelegate {
+            autoSwitchEnabled = ad.autoSwitcher?.enabled ?? true
+            alertsEnabled = ad.alertManager?.enabled ?? true
+            alertsHighTemp = ad.alertManager?.highTempThreshold ?? 95
+            alertsFanStuck = ad.alertManager?.fanStuckEnabled ?? true
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

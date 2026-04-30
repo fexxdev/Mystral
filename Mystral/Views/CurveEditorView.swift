@@ -1,9 +1,16 @@
 import SwiftUI
 
+private enum FanScope: Hashable {
+    case shared
+    case fan(Int)
+}
+
 struct CurveEditorView: View {
-    @Binding var curvePoints: [CurvePoint]
+    @Binding var profile: Profile
     let sensorKeys: [String]
-    @Binding var sensorKey: String
+    let fans: [Fan]
+
+    @State private var scope: FanScope = .shared
 
     private let tempRange: ClosedRange<Double> = 0...110
     private let fanRange: ClosedRange<Double> = 0...100
@@ -20,11 +27,26 @@ struct CurveEditorView: View {
         }
     }
 
+    private var activeCurve: [CurvePoint] {
+        switch scope {
+        case .shared: return profile.curvePoints
+        case .fan(let i): return profile.fanCurves?[i] ?? profile.curvePoints
+        }
+    }
+
+    private var hasOverride: Bool {
+        if case .fan(let i) = scope { return profile.fanCurves?[i] != nil }
+        return false
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
                 Text("Driving Sensor").font(.headline)
-                Picker("", selection: $sensorKey) {
+                Picker("", selection: Binding(
+                    get: { profile.sensorKey },
+                    set: { profile.sensorKey = $0 }
+                )) {
                     Text("CPU Average (all cores)").tag("")
                     ForEach(groupedSensorKeys, id: \.0) { category, keys in
                         Section(category.rawValue) {
@@ -33,13 +55,70 @@ struct CurveEditorView: View {
                             }
                         }
                     }
-                }.frame(width: 280)
+                }.frame(width: 280).labelsHidden()
+                Spacer()
             }
+
+            if fans.count > 1 {
+                fanScopePicker
+            }
+
             HStack(alignment: .top, spacing: 20) {
-                curveChart.frame(minWidth: 300, minHeight: 300)
-                curveTable.frame(minWidth: 200)
+                curveChart.frame(minWidth: 360, minHeight: 320)
+                curveTable.frame(minWidth: 220)
             }
         }
+    }
+
+    private var fanScopePicker: some View {
+        HStack(spacing: 12) {
+            Text("Curve").font(.headline)
+            Picker("", selection: $scope) {
+                Text("Shared (all fans)").tag(FanScope.shared)
+                ForEach(fans) { fan in
+                    let badge = profile.fanCurves?[fan.id] != nil ? " ●" : ""
+                    Text("\(fan.name)\(badge)").tag(FanScope.fan(fan.id))
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if case .fan(let i) = scope {
+                if hasOverride {
+                    Button("Reset to shared") {
+                        var fc = profile.fanCurves ?? [:]
+                        fc.removeValue(forKey: i)
+                        profile.fanCurves = fc.isEmpty ? nil : fc
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else {
+                    Button("Customize") {
+                        var fc = profile.fanCurves ?? [:]
+                        fc[i] = profile.curvePoints
+                        profile.fanCurves = fc
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private var curveBinding: Binding<[CurvePoint]> {
+        Binding(
+            get: { activeCurve },
+            set: { newPoints in
+                switch scope {
+                case .shared:
+                    profile.curvePoints = newPoints
+                case .fan(let i):
+                    var fc = profile.fanCurves ?? [:]
+                    fc[i] = newPoints
+                    profile.fanCurves = fc
+                }
+            }
+        )
     }
 
     private var curveChart: some View {
@@ -55,7 +134,7 @@ struct CurveEditorView: View {
                 .frame(width: 32)
 
                 GeometryReader { geometry in
-                    let sorted = curvePoints.sortedByTemperature()
+                    let sorted = activeCurve.sortedByTemperature()
                     let w = geometry.size.width
                     let h = geometry.size.height
                     ZStack {
@@ -121,7 +200,7 @@ struct CurveEditorView: View {
                 Text("Fan (%)").font(.caption.bold()).frame(width: 80)
                 Spacer()
             }
-            ForEach(curvePoints.sortedByTemperature()) { point in
+            ForEach(activeCurve.sortedByTemperature()) { point in
                 HStack {
                     TextField("°C", value: Binding(
                         get: { point.temperature },
@@ -133,11 +212,11 @@ struct CurveEditorView: View {
                     ), format: .number).frame(width: 80).textFieldStyle(.roundedBorder)
                     Button(role: .destructive) { removePoint(id: point.id) } label: {
                         Image(systemName: "minus.circle")
-                    }.buttonStyle(.plain).disabled(curvePoints.count <= 2)
+                    }.buttonStyle(.plain).disabled(activeCurve.count <= 2)
                 }
             }
             Button { addPoint() } label: { Label("Add Point", systemImage: "plus.circle") }
-                .disabled(curvePoints.count >= 10)
+                .disabled(activeCurve.count >= 10)
         }
     }
 
@@ -160,22 +239,28 @@ struct CurveEditorView: View {
     }
 
     private func updatePoint(id: UUID, temperature: Double?, fanPercentage: Double?) {
-        guard let i = curvePoints.firstIndex(where: { $0.id == id }) else { return }
-        if let t = temperature { curvePoints[i].temperature = max(tempRange.lowerBound, min(tempRange.upperBound, t)) }
-        if let p = fanPercentage { curvePoints[i].fanPercentage = max(fanRange.lowerBound, min(fanRange.upperBound, p)) }
+        var points = activeCurve
+        guard let i = points.firstIndex(where: { $0.id == id }) else { return }
+        if let t = temperature { points[i].temperature = max(tempRange.lowerBound, min(tempRange.upperBound, t)) }
+        if let p = fanPercentage { points[i].fanPercentage = max(fanRange.lowerBound, min(fanRange.upperBound, p)) }
+        curveBinding.wrappedValue = points
     }
 
     private func removePoint(id: UUID) {
-        guard curvePoints.count > 2 else { return }
-        curvePoints.removeAll { $0.id == id }
+        var points = activeCurve
+        guard points.count > 2 else { return }
+        points.removeAll { $0.id == id }
+        curveBinding.wrappedValue = points
     }
 
     private func addPoint() {
-        guard curvePoints.count < 10 else { return }
-        let sorted = curvePoints.sortedByTemperature()
-        curvePoints.append(CurvePoint(
+        var points = activeCurve
+        guard points.count < 10 else { return }
+        let sorted = points.sortedByTemperature()
+        points.append(CurvePoint(
             temperature: min((sorted.last?.temperature ?? 50) + 10, 110),
             fanPercentage: min((sorted.last?.fanPercentage ?? 50) + 10, 100)
         ))
+        curveBinding.wrappedValue = points
     }
 }

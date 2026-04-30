@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var menuBarManager: MenuBarManager?
     var fanController: FanController?
     var profileManager: ProfileManager?
+    var autoSwitcher: ProfileAutoSwitcher?
+    var alertManager: AlertManager?
     private var smcProxy: SMCProxyService?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -32,12 +34,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         fanController = FanController(smcService: smcService, profileManager: profileManager!)
+        if UserDefaults.standard.object(forKey: "smoothingEnabled") != nil {
+            fanController!.smoothingEnabled = UserDefaults.standard.bool(forKey: "smoothingEnabled")
+        }
+        let alpha = UserDefaults.standard.double(forKey: "smoothingAlpha")
+        if alpha > 0 { fanController!.smoothingAlpha = alpha }
+        if UserDefaults.standard.object(forKey: "deadbandPercent") != nil {
+            fanController!.deadbandPercent = UserDefaults.standard.double(forKey: "deadbandPercent")
+        }
+        let interval = UserDefaults.standard.double(forKey: "pollingInterval")
+        if interval > 0 { fanController!.pollingInterval = interval }
+        autoSwitcher = ProfileAutoSwitcher(profileManager: profileManager!)
+        alertManager = AlertManager()
+        fanController!.alertManager = alertManager
+        alertManager!.requestPermissionIfNeeded()
         menuBarManager = MenuBarManager(
             fanController: fanController!,
             profileManager: profileManager!,
             onOpenWindow: { [weak self] in self?.openMainWindow() }
         )
         fanController!.start()
+        autoSwitcher!.start()
     }
 
     private func launchHelperAsync() {

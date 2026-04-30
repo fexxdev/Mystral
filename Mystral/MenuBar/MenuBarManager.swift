@@ -9,6 +9,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconAndTemperature = "Icon + Temperature"
     case iconAndRPM = "Icon + RPM"
     case iconAndProfile = "Icon + Profile"
+    case miniGraph = "Mini Graph"
 }
 
 @Observable
@@ -96,8 +97,17 @@ final class MenuBarManager {
     private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
         var title = ""
+
+        if displayMode == .miniGraph {
+            button.image = renderMiniGraphImage()
+            button.title = ""
+            return
+        } else {
+            button.image = NSImage(systemSymbolName: "fan", accessibilityDescription: "Mystral")
+        }
+
         switch displayMode {
-        case .iconOnly: break
+        case .iconOnly, .miniGraph: break
         case .iconAndTemperature:
             let cpuSensors = fanController.sensors.filter { $0.id.hasPrefix("Tp") }
             if !cpuSensors.isEmpty {
@@ -110,5 +120,78 @@ final class MenuBarManager {
             if let profile = profileManager.activeProfile { title = " \(profile.name)" }
         }
         button.title = title
+    }
+
+    private func renderMiniGraphImage() -> NSImage {
+        let cpuSensors = fanController.sensors.filter { $0.id.hasPrefix("Tp") }
+        let history: [Double]
+        if !cpuSensors.isEmpty {
+            let len = cpuSensors.map { $0.history.count }.max() ?? 0
+            var avgs: [Double] = []
+            for i in 0..<len {
+                let vals = cpuSensors.compactMap { $0.history.count > i ? $0.history[i] : nil }
+                if !vals.isEmpty { avgs.append(vals.reduce(0, +) / Double(vals.count)) }
+            }
+            history = avgs
+        } else {
+            history = []
+        }
+        let currentTemp = history.last ?? 0
+        let currentRPM = fanController.fans.first?.currentRPM ?? 0
+        let stroke = Self.lineColor(for: currentTemp)
+
+        let width: CGFloat = 78
+        let height: CGFloat = 22
+        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { rect in
+            let chartWidth: CGFloat = 36
+            let chartX: CGFloat = 0
+            let chartY: CGFloat = 2
+            let chartH: CGFloat = 18
+
+            NSColor.clear.setFill()
+            rect.fill()
+
+            if history.count > 1 {
+                let path = NSBezierPath()
+                let minT: Double = 30
+                let maxT: Double = 100
+                for (i, t) in history.suffix(36).enumerated() {
+                    let suffixStart = max(0, history.count - 36)
+                    let count = history.count - suffixStart
+                    let x = chartX + chartWidth * CGFloat(i) / CGFloat(max(count - 1, 1))
+                    let normalized = (max(minT, min(maxT, t)) - minT) / (maxT - minT)
+                    let y = chartY + chartH * CGFloat(normalized)
+                    if i == 0 { path.move(to: NSPoint(x: x, y: y)) } else { path.line(to: NSPoint(x: x, y: y)) }
+                }
+                path.lineWidth = 1.2
+                stroke.setStroke()
+                path.stroke()
+            }
+
+            let tempStr = "\(Int(currentTemp))°"
+            let rpmStr = "\(currentRPM)"
+            let tempAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 9, weight: .medium),
+                .foregroundColor: NSColor.labelColor
+            ]
+            let rpmAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 8, weight: .regular),
+                .foregroundColor: NSColor.secondaryLabelColor
+            ]
+            tempStr.draw(at: NSPoint(x: chartWidth + 4, y: 11), withAttributes: tempAttrs)
+            rpmStr.draw(at: NSPoint(x: chartWidth + 4, y: 1), withAttributes: rpmAttrs)
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+
+    private static func lineColor(for temp: Double) -> NSColor {
+        switch temp {
+        case ..<50: return .systemGreen
+        case 50..<70: return .systemYellow
+        case 70..<85: return .systemOrange
+        default: return .systemRed
+        }
     }
 }

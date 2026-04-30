@@ -29,6 +29,16 @@ final class FanController {
 
     var manualOverrides: [Int: Double] = [:]
 
+    var smoothingAlpha: Double = 0.3
+    var deadbandPercent: Double = 3.0
+    var smoothingEnabled: Bool = true {
+        didSet { if !smoothingEnabled { smoothedTemps.removeAll() } }
+    }
+    private var smoothedTemps: [String: Double] = [:]
+    private var lastWrittenPct: [Int: Double] = [:]
+
+    var alertManager: AlertManager?
+
     init(smcService: SMCServiceProtocol, profileManager: ProfileManager) {
         self.smcService = smcService
         self.profileManager = profileManager
@@ -90,6 +100,7 @@ final class FanController {
             sensors = newSensors
             fans = try smcService.getAllFans()
             applyActiveProfile()
+            alertManager?.evaluate(sensors: sensors, fans: fans, expectedFanPercent: lastWrittenPct)
         } catch {
             logger.error("SMC read failed: \(error.localizedDescription)")
         }
@@ -99,9 +110,6 @@ final class FanController {
 
     private func applyActiveProfile() {
         guard let profile = profileManager.activeProfile else { return }
-        let drivingTemp = resolveDrivingTemperature(for: profile)
-        let targetPercentage = Self.interpolate(temperature: drivingTemp, curve: profile.curvePoints)
-
         guard !fans.isEmpty else { return }
 
         if !forcedModeSet {
@@ -113,14 +121,39 @@ final class FanController {
             }
         }
 
+        let rawTemp = resolveDrivingTemperature(for: profile)
+        let drivingTemp = smoothingEnabled
+            ? smooth(key: profile.sensorKey.isEmpty ? "_avg" : profile.sensorKey, raw: rawTemp)
+            : rawTemp
+
         for fan in fans {
-            let percentage = manualOverrides[fan.id] ?? targetPercentage
+            let curve = profile.curve(for: fan.id)
+            let curveTarget = Self.interpolate(temperature: drivingTemp, curve: curve)
+            let percentage = manualOverrides[fan.id] ?? curveTarget
+            let last = lastWrittenPct[fan.id]
+            let isManual = manualOverrides[fan.id] != nil
+            let band = isManual ? 0.0 : deadbandPercent
+            if let last = last, abs(percentage - last) < band {
+                continue
+            }
             do {
                 try smcService.setFanSpeed(index: fan.id, percentage: percentage)
+                lastWrittenPct[fan.id] = percentage
             } catch {
                 logger.warning("Fan \(fan.id) write failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    private func smooth(key: String, raw: Double) -> Double {
+        let alpha = max(0.05, min(1.0, smoothingAlpha))
+        if let prev = smoothedTemps[key] {
+            let next = alpha * raw + (1 - alpha) * prev
+            smoothedTemps[key] = next
+            return next
+        }
+        smoothedTemps[key] = raw
+        return raw
     }
 
     private func resolveDrivingTemperature(for profile: Profile) -> Double {

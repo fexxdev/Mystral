@@ -13,7 +13,7 @@ struct Sensor: Identifiable, Sendable {
         self.history = history
     }
 
-    mutating func recordTemperature(_ temp: Double, maxHistory: Int = 30) {
+    mutating func recordTemperature(_ temp: Double, maxHistory: Int = 150) {
         temperature = temp
         history.append(temp)
         if history.count > maxHistory {

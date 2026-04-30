@@ -145,26 +145,25 @@ struct ProfilesView: View {
                 detailHeader(profile, isActive: isActive)
                 Divider()
                 CurveEditorView(
-                    curvePoints: Binding(
-                        get: { profile.curvePoints },
-                        set: { newCurve in
-                            var updated = profile
-                            updated.curvePoints = newCurve
-                            commit(updated)
-                        }
+                    profile: Binding(
+                        get: { profile },
+                        set: { commit($0) }
                     ),
                     sensorKeys: fanController.sensors.map(\.id),
-                    sensorKey: Binding(
-                        get: { profile.sensorKey },
-                        set: { newKey in
-                            var updated = profile
-                            updated.sensorKey = newKey
-                            commit(updated)
-                        }
-                    )
+                    fans: fanController.fans
                 )
                 .disabled(profile.isPreset)
                 .opacity(profile.isPreset ? 0.7 : 1.0)
+
+                if !profile.isPreset {
+                    Divider()
+                    TriggersEditorView(
+                        profile: Binding(
+                            get: { profile },
+                            set: { commit($0) }
+                        )
+                    )
+                }
             }
             .padding(24)
         }
@@ -243,6 +242,102 @@ struct ProfilesView: View {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             try? profileManager.saveCustomProfile(profile)
+        }
+    }
+}
+
+struct TriggersEditorView: View {
+    @Binding var profile: Profile
+    @State private var newAppBundleId = ""
+
+    private var triggers: [ProfileTrigger] { profile.triggers ?? [] }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Auto-Activation Triggers").font(.headline)
+                Text("(any match)").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+            Text("This profile activates automatically when any trigger matches. Frontmost-app triggers beat thermal-state triggers, which beat power-source triggers.")
+                .font(.caption).foregroundStyle(.secondary)
+
+            if triggers.isEmpty {
+                Text("No triggers — profile activates only manually.")
+                    .font(.caption).foregroundStyle(.tertiary).italic()
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(Array(triggers.enumerated()), id: \.offset) { index, trigger in
+                    HStack {
+                        Image(systemName: iconName(for: trigger))
+                            .foregroundStyle(.tint).frame(width: 20)
+                        Text(label(for: trigger))
+                        Spacer()
+                        Button(role: .destructive) {
+                            var t = triggers
+                            t.remove(at: index)
+                            profile.triggers = t.isEmpty ? nil : t
+                        } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+
+            HStack(spacing: 8) {
+                Menu {
+                    Section("Power Source") {
+                        Button("On AC Power") { add(.powerSource(.ac)) }
+                        Button("On Battery") { add(.powerSource(.battery)) }
+                    }
+                    Section("Thermal State") {
+                        Button("Nominal") { add(.thermalState(.nominal)) }
+                        Button("Fair") { add(.thermalState(.fair)) }
+                        Button("Serious") { add(.thermalState(.serious)) }
+                        Button("Critical") { add(.thermalState(.critical)) }
+                    }
+                } label: {
+                    Label("Add Trigger", systemImage: "plus.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 140)
+
+                TextField("App bundle id (e.g. com.apple.Xcode)", text: $newAppBundleId)
+                    .textFieldStyle(.roundedBorder)
+                Button("Add App") {
+                    let trimmed = newAppBundleId.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty else { return }
+                    add(.frontmostApp(bundleId: trimmed))
+                    newAppBundleId = ""
+                }
+                .disabled(newAppBundleId.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+    }
+
+    private func add(_ trigger: ProfileTrigger) {
+        var t = triggers
+        if !t.contains(trigger) { t.append(trigger) }
+        profile.triggers = t
+    }
+
+    private func iconName(for trigger: ProfileTrigger) -> String {
+        switch trigger {
+        case .powerSource(.ac): return "powerplug"
+        case .powerSource(.battery): return "battery.100"
+        case .thermalState: return "thermometer"
+        case .frontmostApp: return "app"
+        }
+    }
+
+    private func label(for trigger: ProfileTrigger) -> String {
+        switch trigger {
+        case .powerSource(.ac): return "On AC Power"
+        case .powerSource(.battery): return "On Battery"
+        case .thermalState(let level): return "Thermal: \(level.rawValue.capitalized)"
+        case .frontmostApp(let bid): return "App is frontmost: \(bid)"
         }
     }
 }

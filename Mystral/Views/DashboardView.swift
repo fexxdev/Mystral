@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct DashboardView: View {
     let fanController: FanController
@@ -47,6 +48,7 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity, minHeight: 200)
                 } else {
                     temperatureOverview
+                    historyChartSection
                     fansSection
                     profileSection
                 }
@@ -120,6 +122,87 @@ struct DashboardView: View {
                 }
             }
             .padding(8)
+        }
+    }
+
+    private struct HistoryPoint: Identifiable {
+        let id = UUID()
+        let series: String
+        let secondsAgo: Double
+        let value: Double
+    }
+
+    private var historySamples: [HistoryPoint] {
+        let interval = fanController.pollingInterval
+        var pts: [HistoryPoint] = []
+        let cpuCores = cpuCoreSensors
+        let gpuCores = gpuCoreSensors
+
+        let cpuLen = cpuCores.map { $0.history.count }.max() ?? 0
+        if cpuLen > 0 {
+            for i in 0..<cpuLen {
+                let vals = cpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
+                guard !vals.isEmpty else { continue }
+                let secondsAgo = -Double(cpuLen - 1 - i) * interval
+                pts.append(HistoryPoint(series: "CPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
+                pts.append(HistoryPoint(series: "CPU Avg", secondsAgo: secondsAgo, value: vals.reduce(0, +) / Double(vals.count)))
+            }
+        }
+
+        let gpuLen = gpuCores.map { $0.history.count }.max() ?? 0
+        if gpuLen > 0 {
+            for i in 0..<gpuLen {
+                let vals = gpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
+                guard !vals.isEmpty else { continue }
+                let secondsAgo = -Double(gpuLen - 1 - i) * interval
+                pts.append(HistoryPoint(series: "GPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
+            }
+        }
+        return pts
+    }
+
+    private var historyChartSection: some View {
+        let samples = historySamples
+        return GroupBox("Last 5 Minutes") {
+            if samples.isEmpty {
+                Text("Collecting samples…").font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                Chart(samples) { p in
+                    LineMark(
+                        x: .value("Time", p.secondsAgo),
+                        y: .value("Temp", p.value)
+                    )
+                    .foregroundStyle(by: .value("Series", p.series))
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartForegroundStyleScale([
+                    "CPU Max": Color.orange,
+                    "CPU Avg": Color.yellow,
+                    "GPU Max": Color.purple
+                ])
+                .chartYScale(domain: 0...110)
+                .chartXAxis {
+                    AxisMarks(values: [-300, -240, -180, -120, -60, 0]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let s = value.as(Double.self) {
+                                Text(s == 0 ? "now" : "\(Int(-s / 60))m")
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(values: [0, 25, 50, 75, 100]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) { Text("\(Int(v))°") }
+                        }
+                    }
+                }
+                .frame(height: 160)
+                .padding(.vertical, 8)
+            }
         }
     }
 
