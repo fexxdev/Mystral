@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import os
 
@@ -31,6 +32,15 @@ final class FanController {
     init(smcService: SMCServiceProtocol, profileManager: ProfileManager) {
         self.smcService = smcService
         self.profileManager = profileManager
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(handleWake),
+            name: NSWorkspace.didWakeNotification, object: nil
+        )
+    }
+
+    @objc private func handleWake() {
+        logger.info("System woke — re-applying forced fan mode on next tick")
+        forcedModeSet = false
     }
 
     static func interpolate(temperature: Double, curve: [CurvePoint]) -> Double {

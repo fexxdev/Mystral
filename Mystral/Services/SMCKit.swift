@@ -113,7 +113,7 @@ final class SMCKit: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         var output = SMCKeyData()
-        var inputSize = MemoryLayout<SMCKeyData>.stride
+        let inputSize = MemoryLayout<SMCKeyData>.stride
         var outputSize = MemoryLayout<SMCKeyData>.stride
         let result = IOConnectCallStructMethod(connection, Self.smcHandlerSelector,
                                                 &input, inputSize, &output, &outputSize)
@@ -182,8 +182,15 @@ final class SMCKit: @unchecked Sendable {
     func readInteger(key: String) throws -> Int { Int(try readFloat(key: key)) }
 
     func writeBytes(key: String, dataType: UInt32, bytes: [UInt8]) throws {
+        let code = try tryWriteBytes(key: key, dataType: dataType, bytes: bytes)
+        if code != 0 { throw SMCError.writeError(kern_return_t(code)) }
+    }
+
+    @discardableResult
+    func tryWriteBytes(key: String, dataType: UInt32, bytes: [UInt8]) throws -> UInt8 {
         let keyCode = Self.fourCharCode(key)
         let info = try readKeyInfo(key: keyCode)
+        guard info.dataSize > 0 else { return 0x84 }
         var input = SMCKeyData()
         input.key = keyCode
         input.data8 = Self.cmdWriteBytes
@@ -194,7 +201,25 @@ final class SMCKit: @unchecked Sendable {
         }
         input.bytes = tupleBytes
         let result = try callSMC(&input)
-        if result.result != 0 { throw SMCError.writeError(kern_return_t(result.result)) }
+        return result.result
+    }
+
+    @discardableResult
+    func tryWriteUInt8(key: String, value: UInt8) throws -> UInt8 {
+        try tryWriteBytes(key: key, dataType: DataType.ui8, bytes: [value])
+    }
+
+    @discardableResult
+    func tryWriteFloat(key: String, value: Double) throws -> UInt8 {
+        var floatVal = Float(value)
+        let bytes: [UInt8] = withUnsafeBytes(of: &floatVal) { Array($0) }
+        return try tryWriteBytes(key: key, dataType: DataType.flt, bytes: bytes)
+    }
+
+    func keyExists(_ key: String) -> Bool {
+        let keyCode = Self.fourCharCode(key)
+        guard let info = try? readKeyInfo(key: keyCode) else { return false }
+        return info.dataSize > 0 && info.dataType != 0
     }
 
     func writeRaw(key: String, dataType: UInt32, dataSize: UInt32, bytes: [UInt8]) throws {

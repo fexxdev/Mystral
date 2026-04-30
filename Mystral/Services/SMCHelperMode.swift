@@ -114,7 +114,7 @@ enum SMCHelperMode {
             }
 
             log += "\n--- Fan control keys ---\n"
-            for key in ["FNum", "FS! ", "FS!!", "F0Ac", "F0Mn", "F0Mx", "F0Tg", "F0Md", "F1Ac", "F1Mn", "F1Mx", "F1Tg", "F1Md"] {
+            for key in ["FNum", "Ftst", "FS! ", "FS!!", "F0Ac", "F0Mn", "F0Mx", "F0Tg", "F0Md", "F1Ac", "F1Mn", "F1Mx", "F1Tg", "F1Md"] {
                 if let (bytes, dataType, dataSize) = try? smcKit.readRawBytes(key: key) {
                     let typeStr = SMCKit.fourCharString(dataType)
                     let bytesHex = bytes.map { String(format: "%02X", $0) }.joined(separator: " ")

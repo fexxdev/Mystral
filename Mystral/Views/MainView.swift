@@ -57,6 +57,6 @@ struct MainView: View {
             case .settings: SettingsView(fanController: fanController, profileManager: profileManager)
             }
         }
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(minWidth: 1100, minHeight: 640)
     }
 }

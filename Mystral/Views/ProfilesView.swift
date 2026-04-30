@@ -3,120 +3,246 @@ import SwiftUI
 struct ProfilesView: View {
     let fanController: FanController
     let profileManager: ProfileManager
-    @State private var editingProfile: Profile?
+    @State private var selectedProfileId: UUID?
     @State private var showDeleteConfirmation = false
     @State private var profileToDelete: Profile?
     @State private var saveTask: Task<Void, Never>?
 
+    private var selectedProfile: Profile? {
+        guard let id = selectedProfileId else { return nil }
+        return profileManager.allProfiles.first { $0.id == id }
+    }
+
     var body: some View {
-        NavigationSplitView {
-            profileList
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
-        } detail: {
-            profileDetail
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 260)
+                .background(Color(nsColor: .windowBackgroundColor))
+            Divider()
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Profiles")
+        .onAppear {
+            if selectedProfileId == nil {
+                selectedProfileId = profileManager.activeProfileId ?? profileManager.allProfiles.first?.id
+            }
+        }
         .alert("Delete Profile", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 if let p = profileToDelete {
                     try? profileManager.deleteCustomProfile(id: p.id)
-                    if editingProfile?.id == p.id { editingProfile = nil }
+                    if selectedProfileId == p.id { selectedProfileId = profileManager.activeProfileId }
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Are you sure you want to delete \"\(profileToDelete?.name ?? "")\"?") }
     }
 
-    private var profileList: some View {
-        List {
-            Section("Presets") {
-                ForEach(profileManager.presets) { p in profileRow(p, isPreset: true) }
-            }
-            Section("Custom (\(profileManager.customProfiles.count)/\(ProfileManager.maxCustomProfiles))") {
-                ForEach(profileManager.customProfiles) { p in profileRow(p, isPreset: false) }
-                if profileManager.customProfiles.count < ProfileManager.maxCustomProfiles {
-                    Button {
-                        let newP = Profile(name: "New Profile", curvePoints: [
-                            CurvePoint(temperature: 30, fanPercentage: 15),
-                            CurvePoint(temperature: 60, fanPercentage: 50),
-                            CurvePoint(temperature: 90, fanPercentage: 100)
-                        ])
-                        try? profileManager.saveCustomProfile(newP)
-                        editingProfile = newP
-                    } label: { Label("Add Profile", systemImage: "plus") }
+    // MARK: - Sidebar
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionHeader("Presets")
+            ForEach(profileManager.presets) { p in profileRow(p, isPreset: true) }
+
+            sectionHeader("Custom (\(profileManager.customProfiles.count)/\(ProfileManager.maxCustomProfiles))")
+            ForEach(profileManager.customProfiles) { p in profileRow(p, isPreset: false) }
+
+            if profileManager.customProfiles.count < ProfileManager.maxCustomProfiles {
+                Button {
+                    let newP = Profile(name: "New Profile", curvePoints: [
+                        CurvePoint(temperature: 30, fanPercentage: 15),
+                        CurvePoint(temperature: 60, fanPercentage: 50),
+                        CurvePoint(temperature: 90, fanPercentage: 100)
+                    ])
+                    try? profileManager.saveCustomProfile(newP)
+                    selectedProfileId = newP.id
+                } label: {
+                    Label("New Profile", systemImage: "plus")
+                        .font(.callout)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
+            Spacer()
         }
+        .padding(.vertical, 8)
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.bold())
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
     }
 
     private func profileRow(_ profile: Profile, isPreset: Bool) -> some View {
-        HStack {
+        let isSelected = profile.id == selectedProfileId
+        let isActive = profile.id == profileManager.activeProfileId
+
+        return HStack(spacing: 10) {
             Image(systemName: profile.icon)
+                .frame(width: 20)
+                .foregroundStyle(isSelected ? Color.white : .primary)
             Text(profile.name)
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? Color.white : .primary)
             Spacer()
-            if profile.id == profileManager.activeProfileId {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            if isActive {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? Color.white : Color.green)
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(isSelected ? Color.accentColor : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 6)
         .contentShape(Rectangle())
-        .onTapGesture { editingProfile = profile }
+        .onTapGesture { selectedProfileId = profile.id }
         .contextMenu {
-            Button("Activate") { profileManager.activeProfileId = profile.id }
+            if !isActive {
+                Button("Activate") { profileManager.activeProfileId = profile.id }
+            }
             if isPreset {
                 Button("Duplicate as Custom") {
-                    if let copy = try? profileManager.duplicateAsCustom(profile) { editingProfile = copy }
+                    if let copy = try? profileManager.duplicateAsCustom(profile) {
+                        selectedProfileId = copy.id
+                    }
                 }
             } else {
-                Button("Delete", role: .destructive) { profileToDelete = profile; showDeleteConfirmation = true }
+                Button("Delete", role: .destructive) {
+                    profileToDelete = profile
+                    showDeleteConfirmation = true
+                }
             }
         }
     }
 
-    private func debounceSave(_ profile: Profile) {
+    // MARK: - Detail
+
+    @ViewBuilder
+    private var detail: some View {
+        if let profile = selectedProfile {
+            profileDetailContent(profile)
+        } else {
+            ContentUnavailableView("Select a Profile", systemImage: "list.bullet",
+                                   description: Text("Choose a profile from the list to view or edit its fan curve."))
+        }
+    }
+
+    private func profileDetailContent(_ profile: Profile) -> some View {
+        let isActive = profile.id == profileManager.activeProfileId
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                detailHeader(profile, isActive: isActive)
+                Divider()
+                CurveEditorView(
+                    curvePoints: Binding(
+                        get: { profile.curvePoints },
+                        set: { newCurve in
+                            var updated = profile
+                            updated.curvePoints = newCurve
+                            commit(updated)
+                        }
+                    ),
+                    sensorKeys: fanController.sensors.map(\.id),
+                    sensorKey: Binding(
+                        get: { profile.sensorKey },
+                        set: { newKey in
+                            var updated = profile
+                            updated.sensorKey = newKey
+                            commit(updated)
+                        }
+                    )
+                )
+                .disabled(profile.isPreset)
+                .opacity(profile.isPreset ? 0.7 : 1.0)
+            }
+            .padding(24)
+        }
+    }
+
+    private func detailHeader(_ profile: Profile, isActive: Bool) -> some View {
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: profile.icon)
+                .font(.system(size: 28))
+                .foregroundStyle(.tint)
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 4) {
+                if profile.isPreset {
+                    HStack(spacing: 8) {
+                        Text(profile.name).font(.title2.bold())
+                        Text("Preset").font(.caption)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.15))
+                            .clipShape(Capsule())
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    TextField("Profile Name", text: Binding(
+                        get: { profile.name },
+                        set: { newName in
+                            var updated = profile
+                            updated.name = newName
+                            commit(updated)
+                        }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.title2.bold())
+                }
+                Text(profile.isPreset ? "Read-only fan curve" : "Custom profile — edit freely")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isActive {
+                Label("Active", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Color.green.opacity(0.15))
+                    .foregroundStyle(.green)
+                    .clipShape(Capsule())
+            } else {
+                Button {
+                    profileManager.activeProfileId = profile.id
+                } label: {
+                    Label("Activate", systemImage: "play.fill")
+                }
+                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+            }
+
+            if !profile.isPreset {
+                Button(role: .destructive) {
+                    profileToDelete = profile
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .controlSize(.large)
+            }
+        }
+    }
+
+    private func commit(_ profile: Profile) {
+        guard !profile.isPreset else { return }
         saveTask?.cancel()
         saveTask = Task {
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             try? profileManager.saveCustomProfile(profile)
-        }
-    }
-
-    private var profileDetail: some View {
-        Group {
-            if var profile = editingProfile {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if !profile.isPreset {
-                            TextField("Profile Name", text: Binding(
-                                get: { profile.name },
-                                set: { profile.name = $0; editingProfile = profile; debounceSave(profile) }
-                            )).textFieldStyle(.roundedBorder).font(.title2)
-                        } else {
-                            HStack {
-                                Image(systemName: "lock")
-                                Text(profile.name).font(.title2.bold())
-                                Text("(Preset — read only)").foregroundStyle(.secondary)
-                            }
-                        }
-                        CurveEditorView(
-                            curvePoints: Binding(
-                                get: { profile.curvePoints },
-                                set: { profile.curvePoints = $0; editingProfile = profile
-                                    if !profile.isPreset { debounceSave(profile) } }
-                            ),
-                            sensorKeys: fanController.sensors.map(\.id),
-                            sensorKey: Binding(
-                                get: { profile.sensorKey },
-                                set: { profile.sensorKey = $0; editingProfile = profile
-                                    if !profile.isPreset { try? profileManager.saveCustomProfile(profile) } }
-                            )
-                        ).disabled(profile.isPreset).opacity(profile.isPreset ? 0.7 : 1.0)
-                    }.padding()
-                }
-            } else {
-                ContentUnavailableView("Select a Profile", systemImage: "list.bullet",
-                                       description: Text("Choose a profile from the list to view or edit its fan curve."))
-            }
         }
     }
 }
