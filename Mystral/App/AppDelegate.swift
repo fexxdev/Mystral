@@ -95,8 +95,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         case .staleOrMismatch(let pid):
             logger.info("Helper version mismatch or stale — killing old helper")
-            kill(pid, SIGTERM)
-            usleep(500_000)
+            Task.detached {
+                kill(pid, SIGTERM)
+                try? await Task.sleep(for: .milliseconds(500))
+                await self.launchHelper()
+            }
+            return
         case .notRunning:
             break
         }

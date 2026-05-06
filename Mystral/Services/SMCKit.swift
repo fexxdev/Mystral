@@ -121,11 +121,16 @@ final class SMCKit: @unchecked Sendable {
         return output
     }
 
+    private var keyInfoCache: [UInt32: SMCKeyInfoData] = [:]
+
     private func readKeyInfo(key: UInt32) throws -> SMCKeyInfoData {
+        if let cached = keyInfoCache[key] { return cached }
         var input = SMCKeyData()
         input.key = key
         input.data8 = Self.cmdReadKeyInfo
-        return try callSMC(&input).keyInfo
+        let info = try callSMC(&input).keyInfo
+        keyInfoCache[key] = info
+        return info
     }
 
     func readRawBytes(key: String) throws -> (bytes: [UInt8], dataType: UInt32, dataSize: UInt32) {
@@ -265,6 +270,12 @@ final class SMCKit: @unchecked Sendable {
 
     private var cachedAllKeys: [String]?
     private var cachedTemperatureKeys: [String]?
+
+    func invalidateCaches() {
+        cachedAllKeys = nil
+        cachedTemperatureKeys = nil
+        keyInfoCache.removeAll()
+    }
 
     func allKeys() throws -> [String] {
         if let cached = cachedAllKeys { return cached }

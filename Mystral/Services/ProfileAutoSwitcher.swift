@@ -52,14 +52,31 @@ final class ProfileAutoSwitcher {
     }
 
     private func startPowerSourceMonitor() {
-        let context = Unmanaged.passUnretained(self).toOpaque()
+        let context = Unmanaged.passRetained(self).toOpaque()
         guard let source = IOPSNotificationCreateRunLoopSource({ ctx in
             guard let ctx else { return }
             let switcher = Unmanaged<ProfileAutoSwitcher>.fromOpaque(ctx).takeUnretainedValue()
             Task { @MainActor in switcher.evaluate() }
-        }, context)?.takeRetainedValue() else { return }
+        }, context)?.takeRetainedValue() else {
+            Unmanaged<ProfileAutoSwitcher>.fromOpaque(context).release()
+            return
+        }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
         powerSourceRunLoopSource = source
+    }
+
+    func stop() {
+        guard isStarted else { return }
+        isStarted = false
+
+        if let source = powerSourceRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
+            powerSourceRunLoopSource = nil
+            Unmanaged.passUnretained(self).release()
+        }
+
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     @objc private func handleThermalChange() { Task { @MainActor in self.evaluate() } }

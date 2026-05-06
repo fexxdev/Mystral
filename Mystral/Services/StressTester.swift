@@ -73,7 +73,7 @@ final class StressTester {
     }
 
     private static func maxCpuTemp(sensors: [Sensor]) -> Double {
-        sensors.filter { $0.id.hasPrefix("Tp") }.map(\.temperature).max() ?? 0
+        SensorRegistry.cpuCoreSensors(from: sensors).map(\.temperature).max() ?? 0
     }
 
     private static func spawnBurner() -> Task<Void, Never> {

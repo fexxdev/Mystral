@@ -2,11 +2,28 @@ import Foundation
 
 struct CurvePoint: Codable, Identifiable, Equatable, Sendable {
     var id = UUID()
-    var temperature: Double
-    var fanPercentage: Double
+    var temperature: Double {
+        didSet { temperature = min(max(temperature, 0), 120) }
+    }
+    var fanPercentage: Double {
+        didSet { fanPercentage = min(max(fanPercentage, 0), 100) }
+    }
+
+    init(temperature: Double, fanPercentage: Double) {
+        self.temperature = min(max(temperature, 0), 120)
+        self.fanPercentage = min(max(fanPercentage, 0), 100)
+    }
 
     enum CodingKeys: String, CodingKey {
         case temperature, fanPercentage
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rawTemp = try c.decode(Double.self, forKey: .temperature)
+        let rawPct = try c.decode(Double.self, forKey: .fanPercentage)
+        self.temperature = min(max(rawTemp, 0), 120)
+        self.fanPercentage = min(max(rawPct, 0), 100)
     }
 }
 

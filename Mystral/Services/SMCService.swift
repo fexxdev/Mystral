@@ -96,6 +96,7 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
         let clamped = max(0, min(100, percentage))
         let targetRPM = meta.minRPM + (meta.maxRPM - meta.minRPM) * clamped / 100.0
         let code = try smc.tryWriteFloat(key: "F\(index)Tg", value: targetRPM)
+        // 0x87 = kSMCBadArgumentError — benign on Apple Silicon fan target keys (float precision mismatch)
         if code != 0 && code != 0x87 {
             throw SMCError.writeError(kern_return_t(code))
         }
@@ -124,10 +125,27 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
 
     func reUnlockAfterWake(fanCount: Int) throws {
         ftstUnlocked = false
+        smc.invalidateCaches()
         try unlockFanControl()
         for i in 0..<fanCount {
             try ensureFanMode(index: i, target: 1)
         }
+    }
+
+    func invalidateCaches() {
+        smc.invalidateCaches()
+    }
+
+    func readRawBytes(key: String) throws -> (bytes: [UInt8], dataType: UInt32, dataSize: UInt32) {
+        try smc.readRawBytes(key: key)
+    }
+
+    func temperatureKeys() throws -> [String] {
+        try smc.temperatureKeys()
+    }
+
+    func keyExists(_ key: String) -> Bool {
+        smc.keyExists(key)
     }
 
     private func unlockFanControl() throws {
@@ -151,7 +169,7 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
             throw SMCError.writeError(kern_return_t(direct))
         }
         if target == 1 && !ftstUnlocked { try unlockFanControl() }
-        let deadline = Date().addingTimeInterval(10.0)
+        let deadline = Date().addingTimeInterval(1.0)
         var lastCode: UInt8 = direct
         while Date() < deadline {
             let code = try smc.tryWriteUInt8(key: key, value: target)

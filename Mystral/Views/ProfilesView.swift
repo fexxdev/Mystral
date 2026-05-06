@@ -237,11 +237,14 @@ struct ProfilesView: View {
 
     private func commit(_ profile: Profile) {
         guard !profile.isPreset else { return }
+        var sanitized = profile
+        let trimmed = sanitized.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { sanitized.name = "Untitled Profile" } else { sanitized.name = trimmed }
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            try? profileManager.saveCustomProfile(profile)
+            try? profileManager.saveCustomProfile(sanitized)
         }
     }
 }

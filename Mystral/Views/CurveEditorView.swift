@@ -257,8 +257,13 @@ struct CurveEditorView: View {
         var points = activeCurve
         guard points.count < 10 else { return }
         let sorted = points.sortedByTemperature()
+        var newTemp = min((sorted.last?.temperature ?? 50) + 10, 110)
+        let existingTemps = Set(points.map { Int(($0.temperature * 2).rounded()) })
+        while existingTemps.contains(Int((newTemp * 2).rounded())) && newTemp < 110 {
+            newTemp += 1
+        }
         points.append(CurvePoint(
-            temperature: min((sorted.last?.temperature ?? 50) + 10, 110),
+            temperature: min(newTemp, 110),
             fanPercentage: min((sorted.last?.fanPercentage ?? 50) + 10, 100)
         ))
         curveBinding.wrappedValue = points

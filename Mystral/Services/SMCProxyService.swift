@@ -18,7 +18,10 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     private var cachedFans: [Fan] = []
     private let startTime = Date()
     private static let staleThreshold: TimeInterval = 10
-    private static let startupGrace: TimeInterval = 15
+    private static let startupGrace: TimeInterval = 60
+    private var lastRefreshUptime: TimeInterval = 0
+    private static let refreshCooldown: TimeInterval = 0.5
+    private var helperAlive = true
 
     func getAllSensors() throws -> [Sensor] {
         try refreshData()
@@ -56,19 +59,13 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         let fm = FileManager.default
         let path = SMCHelperMode.dataPath
 
-        guard fm.fileExists(atPath: path) else {
-            if Date().timeIntervalSince(startTime) > Self.startupGrace {
-                throw SMCProxyError.helperNotResponding
-            }
-            logger.debug("refreshData — data file not yet available (startup grace)")
-            return
-        }
+        // Staleness check always runs regardless of cooldown
+        try checkHelperHealth(fm: fm, path: path)
 
-        if let attrs = try? fm.attributesOfItem(atPath: path),
-           let modDate = attrs[.modificationDate] as? Date,
-           Date().timeIntervalSince(modDate) > Self.staleThreshold {
-            logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
-            throw SMCProxyError.helperNotResponding
+        // Skip full I/O if we already refreshed this tick
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - lastRefreshUptime < Self.refreshCooldown {
+            return
         }
 
         let url = URL(fileURLWithPath: path)
@@ -88,7 +85,28 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
             Fan(id: $0.id, name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM,
                 minRPM: $0.minRPM, maxRPM: $0.maxRPM, mode: FanMode(rawValue: $0.mode) ?? .auto)
         }
+        lastRefreshUptime = now
+        helperAlive = true
         logger.debug("refreshData — decoded \(self.cachedSensors.count, privacy: .public) sensors, \(self.cachedFans.count, privacy: .public) fans")
+    }
+
+    private func checkHelperHealth(fm: FileManager, path: String) throws {
+        guard fm.fileExists(atPath: path) else {
+            if Date().timeIntervalSince(startTime) > Self.startupGrace {
+                helperAlive = false
+                throw SMCProxyError.helperNotResponding
+            }
+            logger.debug("refreshData — data file not yet available (startup grace)")
+            return
+        }
+
+        if let attrs = try? fm.attributesOfItem(atPath: path),
+           let modDate = attrs[.modificationDate] as? Date,
+           Date().timeIntervalSince(modDate) > Self.staleThreshold {
+            helperAlive = false
+            logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
+            throw SMCProxyError.helperNotResponding
+        }
     }
 
     func purgeStaleCommands() {
@@ -105,6 +123,10 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     }
 
     private func writeCommand(_ command: SMCHelperMode.Command) throws {
+        guard helperAlive else {
+            logger.debug("writeCommand skipped (helper dead) — action=\(command.action, privacy: .public)")
+            return
+        }
         try? FileManager.default.createDirectory(atPath: SMCHelperMode.cmdDir, withIntermediateDirectories: true)
         let data = try JSONEncoder().encode(command)
         let path = "\(SMCHelperMode.cmdDir)/\(UUID().uuidString).json"

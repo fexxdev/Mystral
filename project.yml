@@ -24,6 +24,12 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Mystral/Mystral.entitlements
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         GENERATE_INFOPLIST_FILE: false
+      configs:
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: -O
+          SWIFT_COMPILATION_MODE: wholemodule
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+          ENABLE_TESTABILITY: NO
 
   MystralTests:
     type: bundle.unit-test

@@ -57,7 +57,8 @@ final class AlertManager {
 
     func evaluate(sensors: [Sensor], fans: [Fan], expectedFanPercent: [Int: Double]) {
         guard enabled else { return }
-        let cpuMax = sensors.filter { $0.id.hasPrefix("Tp") }.map(\.temperature).max() ?? 0
+        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
+        let cpuMax = cpuCores.map(\.temperature).max() ?? 0
         logger.debug("evaluate — cpuMax=\(Int(cpuMax), privacy: .public)°, threshold=\(Int(self.highTempThreshold), privacy: .public)°, fans=\(fans.count, privacy: .public)")
         if cpuMax >= highTempThreshold {
             tryFire(key: "highTemp", lastFire: lastHighTempAlert) {
@@ -73,7 +74,7 @@ final class AlertManager {
         let now = Date()
         for fan in fans {
             let expected = expectedFanPercent[fan.id] ?? 0
-            if fan.currentRPM == 0 && expected > 30 {
+            if fan.currentRPM < 100 && expected > 30 {
                 if let since = fanZeroSince[fan.id] {
                     if now.timeIntervalSince(since) > 8 {
                         let last = lastFanStuckAlert[fan.id] ?? .distantPast
@@ -81,7 +82,7 @@ final class AlertManager {
                             lastFanStuckAlert[fan.id] = now
                             send(
                                 title: "Fan not responding",
-                                body: "\(fan.name) reading 0 RPM while target is \(Int(expected))%."
+                                body: "\(fan.name) reading \(fan.currentRPM) RPM while target is \(Int(expected))%."
                             )
                         }
                     }

@@ -24,7 +24,7 @@ final class FanController {
     private(set) var isRunning = false
     private(set) var isHelperResponsive = true
     private var consecutiveHelperFailures = 0
-    private var lastHelperRestartAttempt: Date?
+    private var lastHelperRestartUptime: TimeInterval = 0
     var helperRestarter: (() -> Void)?
 
     var pollingInterval: TimeInterval = 2.0 {
@@ -69,7 +69,9 @@ final class FanController {
         for i in 0..<(sorted.count - 1) {
             let low = sorted[i]; let high = sorted[i + 1]
             if temperature >= low.temperature && temperature <= high.temperature {
-                let ratio = (temperature - low.temperature) / (high.temperature - low.temperature)
+                let range = high.temperature - low.temperature
+                if range <= 0 { return low.fanPercentage }
+                let ratio = (temperature - low.temperature) / range
                 return low.fanPercentage + ratio * (high.fanPercentage - low.fanPercentage)
             }
         }
@@ -138,9 +140,10 @@ final class FanController {
 
     private func attemptHelperRestart() {
         guard consecutiveHelperFailures >= 3 else { return }
-        guard lastHelperRestartAttempt.map({ Date().timeIntervalSince($0) > Self.restartCooldown }) ?? true else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard lastHelperRestartUptime == 0 || (now - lastHelperRestartUptime > Self.restartCooldown) else { return }
         logger.info("Triggering helper restart (failures=\(self.consecutiveHelperFailures, privacy: .public))")
-        lastHelperRestartAttempt = Date()
+        lastHelperRestartUptime = now
         forcedModeSet = false
         lastWrittenPct.removeAll()
         if let proxy = smcService as? SMCProxyService {

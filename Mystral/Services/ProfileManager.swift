@@ -102,10 +102,15 @@ final class ProfileManager {
         guard let files = try? FileManager.default.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil)
             .filter({ $0.pathExtension == "json" }) else { return }
         customProfiles = files.compactMap { url in
-            guard let data = try? Data(contentsOf: url),
-                  let profile = try? decoder.decode(Profile.self, from: data),
-                  !profile.isPreset else { return nil }
-            return profile
+            do {
+                let data = try Data(contentsOf: url)
+                let profile = try decoder.decode(Profile.self, from: data)
+                guard !profile.isPreset else { return nil }
+                return profile
+            } catch {
+                logger.error("Failed to load profile \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }
     }
 

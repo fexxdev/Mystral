@@ -424,16 +424,30 @@ struct SettingsView: View {
 
     private func resetSettings() {
         setLaunchAtLogin(false); launchAtLogin = false
+
         displayMode = .iconOnly
+        tempSource = .cpuAverage
         pollingInterval = 2.0
-        fanController.pollingInterval = 2.0
-        fanController.clearAllManualOverrides()
-        fanController.minimumFanPercentage = 0
+        smoothingEnabled = true
+        smoothingAlpha = 0.3
+        deadbandPercent = 3.0
         minimumFanPct = 0
-        UserDefaults.standard.removeObject(forKey: "menuBarDisplayMode")
-        UserDefaults.standard.removeObject(forKey: "menuBarTempSource")
-        UserDefaults.standard.removeObject(forKey: "pollingInterval")
-        UserDefaults.standard.removeObject(forKey: "minimumFanPercentage")
+        aggressiveOverride = true
+
+        fanController.pollingInterval = 2.0
+        fanController.smoothingEnabled = true
+        fanController.smoothingAlpha = 0.3
+        fanController.deadbandPercent = 3.0
+        fanController.minimumFanPercentage = 0
+        fanController.aggressiveOverrideEnabled = true
+        fanController.clearAllManualOverrides()
+
+        for key in ["menuBarDisplayMode", "menuBarTempSource", "pollingInterval",
+                     "smoothingEnabled", "smoothingAlpha", "deadbandPercent",
+                     "minimumFanPercentage", "aggressiveOverrideEnabled"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
         NotificationCenter.default.post(name: .menuBarSettingsChanged, object: nil)
     }
 }

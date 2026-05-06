@@ -226,7 +226,7 @@ final class MenuBarManager {
     @objc private func quitApp() { NSApp.terminate(nil) }
 
     private func startUpdating() {
-        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: fanController.pollingInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.syncFromDefaults()
                 self?.updateStatusItem()

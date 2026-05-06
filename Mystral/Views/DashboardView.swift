@@ -138,7 +138,7 @@ struct DashboardView: View {
     }
 
     private struct HistoryPoint: Identifiable {
-        let id = UUID()
+        let id: String
         let series: String
         let secondsAgo: Double
         let value: Double
@@ -156,8 +156,8 @@ struct DashboardView: View {
                 let vals = cpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
                 guard !vals.isEmpty else { continue }
                 let secondsAgo = -Double(cpuLen - 1 - i) * interval
-                pts.append(HistoryPoint(series: "CPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
-                pts.append(HistoryPoint(series: "CPU Avg", secondsAgo: secondsAgo, value: vals.reduce(0, +) / Double(vals.count)))
+                pts.append(HistoryPoint(id: "CPU Max-\(i)", series: "CPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
+                pts.append(HistoryPoint(id: "CPU Avg-\(i)", series: "CPU Avg", secondsAgo: secondsAgo, value: vals.reduce(0, +) / Double(vals.count)))
             }
         }
 
@@ -167,7 +167,7 @@ struct DashboardView: View {
                 let vals = gpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
                 guard !vals.isEmpty else { continue }
                 let secondsAgo = -Double(gpuLen - 1 - i) * interval
-                pts.append(HistoryPoint(series: "GPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
+                pts.append(HistoryPoint(id: "GPU Max-\(i)", series: "GPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
             }
         }
         return pts

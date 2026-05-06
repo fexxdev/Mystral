@@ -96,8 +96,8 @@ final class UpdateChecker {
     }
 
     nonisolated static func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
-        let aParts = a.split(separator: ".").compactMap { Int($0) }
-        let bParts = b.split(separator: ".").compactMap { Int($0) }
+        let aParts = a.split(separator: ".").compactMap { Int($0.prefix(while: \.isNumber)) }
+        let bParts = b.split(separator: ".").compactMap { Int($0.prefix(while: \.isNumber)) }
         let count = max(aParts.count, bParts.count)
         for i in 0..<count {
             let av = i < aParts.count ? aParts[i] : 0

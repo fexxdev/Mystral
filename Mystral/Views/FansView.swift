@@ -21,13 +21,8 @@ struct FanDetailCard: View {
     let fan: Fan
     let fanController: FanController
     @State private var isOverriding = false
-
-    private var overridePercentage: Binding<Double> {
-        Binding(
-            get: { fanController.manualOverrides[fan.id] ?? fan.percentage },
-            set: { fanController.manualOverrides[fan.id] = $0 }
-        )
-    }
+    @State private var sliderValue: Double = 0
+    @State private var debounceTask: Task<Void, Never>?
 
     var body: some View {
         GroupBox {
@@ -60,10 +55,22 @@ struct FanDetailCard: View {
                     .onChange(of: isOverriding) { _, newValue in
                         if !newValue { fanController.clearManualOverride(for: fan.id) }
                     }
+                    .onAppear {
+                        isOverriding = fanController.manualOverrides[fan.id] != nil
+                        sliderValue = fanController.manualOverrides[fan.id] ?? fan.percentage
+                    }
                 if isOverriding {
                     HStack {
-                        Text("\(Int(overridePercentage.wrappedValue))%").frame(width: 50).font(.system(.body, design: .rounded))
-                        Slider(value: overridePercentage, in: 0...100, step: 5)
+                        Text("\(Int(sliderValue))%").frame(width: 50).font(.system(.body, design: .rounded))
+                        Slider(value: $sliderValue, in: 0...100, step: 5)
+                            .onChange(of: sliderValue) { _, newValue in
+                                debounceTask?.cancel()
+                                debounceTask = Task {
+                                    try? await Task.sleep(for: .milliseconds(200))
+                                    guard !Task.isCancelled else { return }
+                                    fanController.manualOverrides[fan.id] = newValue
+                                }
+                            }
                     }
                 }
             }.padding()
