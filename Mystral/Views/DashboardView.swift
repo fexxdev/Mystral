@@ -42,6 +42,18 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                if !fanController.isHelperResponsive {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("SMC helper is not responding — fan control is inactive. Attempting to restart...")
+                        Spacer()
+                    }
+                    .font(.callout)
+                    .foregroundStyle(.white)
+                    .padding(12)
+                    .background(Color.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                }
+
                 if fanController.sensors.isEmpty && fanController.fans.isEmpty {
                     ContentUnavailableView("No SMC Data", systemImage: "exclamationmark.triangle",
                                            description: Text("Waiting for SMC helper to start. You may be prompted for your password."))

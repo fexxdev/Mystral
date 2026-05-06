@@ -22,6 +22,10 @@ final class FanController {
     private(set) var sensors: [Sensor] = []
     private(set) var fans: [Fan] = []
     private(set) var isRunning = false
+    private(set) var isHelperResponsive = true
+    private var consecutiveHelperFailures = 0
+    private var lastHelperRestartAttempt: Date?
+    var helperRestarter: (() -> Void)?
 
     var pollingInterval: TimeInterval = 2.0 {
         didSet { if isRunning { restart() } }
@@ -113,11 +117,36 @@ final class FanController {
             sensors = newSensors
             fans = try smcService.getAllFans()
             logger.debug("tick — sensors=\(newSensors.count, privacy: .public), fans=\(self.fans.count, privacy: .public)")
+
+            if consecutiveHelperFailures > 0 {
+                logger.info("Helper recovered after \(self.consecutiveHelperFailures, privacy: .public) consecutive failures")
+                consecutiveHelperFailures = 0
+            }
+            isHelperResponsive = true
+
             applyActiveProfile()
             alertManager?.evaluate(sensors: sensors, fans: fans, expectedFanPercent: lastWrittenPct)
         } catch {
-            logger.error("SMC read failed: \(error.localizedDescription, privacy: .public)")
+            consecutiveHelperFailures += 1
+            isHelperResponsive = false
+            logger.error("SMC read failed (\(self.consecutiveHelperFailures, privacy: .public) consecutive): \(error.localizedDescription, privacy: .public)")
+            attemptHelperRestart()
         }
+    }
+
+    private static let restartCooldown: TimeInterval = 30
+
+    private func attemptHelperRestart() {
+        guard consecutiveHelperFailures >= 3 else { return }
+        guard lastHelperRestartAttempt.map({ Date().timeIntervalSince($0) > Self.restartCooldown }) ?? true else { return }
+        logger.info("Triggering helper restart (failures=\(self.consecutiveHelperFailures, privacy: .public))")
+        lastHelperRestartAttempt = Date()
+        forcedModeSet = false
+        lastWrittenPct.removeAll()
+        if let proxy = smcService as? SMCProxyService {
+            proxy.purgeStaleCommands()
+        }
+        helperRestarter?()
     }
 
     private var forcedModeSet = false

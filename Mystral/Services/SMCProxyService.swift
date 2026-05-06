@@ -3,27 +3,40 @@ import os
 
 private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SMCProxyService")
 
+enum SMCProxyError: Error, LocalizedError {
+    case helperNotResponding
+
+    var errorDescription: String? {
+        switch self {
+        case .helperNotResponding: "SMC helper process is not responding"
+        }
+    }
+}
+
 final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     private var cachedSensors: [Sensor] = []
     private var cachedFans: [Fan] = []
+    private let startTime = Date()
+    private static let staleThreshold: TimeInterval = 10
+    private static let startupGrace: TimeInterval = 15
 
     func getAllSensors() throws -> [Sensor] {
-        refreshData()
+        try refreshData()
         return cachedSensors
     }
 
     func readTemperature(key: String) throws -> Double {
-        refreshData()
+        try refreshData()
         return cachedSensors.first { $0.id == key }?.temperature ?? 0
     }
 
     func getAllFans() throws -> [Fan] {
-        refreshData()
+        try refreshData()
         return cachedFans
     }
 
     func readFanSpeed(index: Int) throws -> Int {
-        refreshData()
+        try refreshData()
         return cachedFans.first { $0.id == index }?.currentRPM ?? 0
     }
 
@@ -39,10 +52,28 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         try writeCommand(SMCHelperMode.Command(action: "setForcedMode", index: fanCount, value: forced ? 1 : 0))
     }
 
-    private func refreshData() {
-        let url = URL(fileURLWithPath: SMCHelperMode.dataPath)
+    private func refreshData() throws {
+        let fm = FileManager.default
+        let path = SMCHelperMode.dataPath
+
+        guard fm.fileExists(atPath: path) else {
+            if Date().timeIntervalSince(startTime) > Self.startupGrace {
+                throw SMCProxyError.helperNotResponding
+            }
+            logger.debug("refreshData — data file not yet available (startup grace)")
+            return
+        }
+
+        if let attrs = try? fm.attributesOfItem(atPath: path),
+           let modDate = attrs[.modificationDate] as? Date,
+           Date().timeIntervalSince(modDate) > Self.staleThreshold {
+            logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
+            throw SMCProxyError.helperNotResponding
+        }
+
+        let url = URL(fileURLWithPath: path)
         guard let data = try? Data(contentsOf: url) else {
-            logger.warning("refreshData — failed to read data file at \(SMCHelperMode.dataPath, privacy: .public)")
+            logger.warning("refreshData — failed to read data file at \(path, privacy: .public)")
             return
         }
         guard let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else {
@@ -58,6 +89,19 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
                 minRPM: $0.minRPM, maxRPM: $0.maxRPM, mode: FanMode(rawValue: $0.mode) ?? .auto)
         }
         logger.debug("refreshData — decoded \(self.cachedSensors.count, privacy: .public) sensors, \(self.cachedFans.count, privacy: .public) fans")
+    }
+
+    func purgeStaleCommands() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: SMCHelperMode.cmdDir) else { return }
+        var removed = 0
+        for file in files where file.hasSuffix(".json") {
+            try? fm.removeItem(atPath: "\(SMCHelperMode.cmdDir)/\(file)")
+            removed += 1
+        }
+        if removed > 0 {
+            logger.info("purgeStaleCommands — removed \(removed, privacy: .public) orphaned command files")
+        }
     }
 
     private func writeCommand(_ command: SMCHelperMode.Command) throws {

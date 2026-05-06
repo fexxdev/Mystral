@@ -49,6 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         fanController = FanController(smcService: smcService, profileManager: profileManager!)
+        fanController!.helperRestarter = { [weak self] in
+            self?.launchHelperAsync()
+        }
         if UserDefaults.standard.object(forKey: "smoothingEnabled") != nil {
             fanController!.smoothingEnabled = UserDefaults.standard.bool(forKey: "smoothingEnabled")
         }

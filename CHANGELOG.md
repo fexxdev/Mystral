@@ -6,6 +6,16 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.0.6] — 2026-05-06
+
+### Fixed
+- **Helper crash on Debug builds**: the root helper's working directory was `/` (read-only on modern macOS), causing LLVM profiling to abort the process with `Failed to write file "default.profraw": Read-only file system`. Helper now sets its cwd to `/tmp` on startup.
+- **Stale data after helper death**: when the SMC helper process died, the app silently showed frozen temperatures and queued fan commands that were never executed. `SMCProxyService` now detects missing or stale data files (>10 s) and throws `helperNotResponding`.
+- **No automatic recovery**: added helper health monitoring with auto-restart after 3 consecutive failures (30 s cooldown). Orphaned command files are purged before restarting.
+
+### Added
+- **Helper status banner**: the Dashboard now shows a red warning when the SMC helper is unresponsive, so the user knows fan control is inactive instead of seeing frozen readings.
+
 ## [1.0.2] — 2026-04-30
 
 ### Added

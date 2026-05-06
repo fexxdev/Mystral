@@ -39,6 +39,10 @@ enum SMCHelperMode {
     }
 
     static func run() -> Never {
+        // Root's cwd is / which is read-only on macOS — LLVM profiling (Debug builds)
+        // crashes writing default.profraw there
+        FileManager.default.changeCurrentDirectoryPath("/tmp")
+
         logger.info("SMCHelper starting — pid=\(getpid()), version=\(appVersion)")
         try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
         try? FileManager.default.createDirectory(atPath: cmdDir, withIntermediateDirectories: true)
