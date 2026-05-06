@@ -1,9 +1,15 @@
 import SwiftUI
 import ServiceManagement
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SettingsView")
 
 struct SettingsView: View {
     let fanController: FanController
     let profileManager: ProfileManager
+    let alertManager: AlertManager?
+    let autoSwitcher: ProfileAutoSwitcher?
+    let updateChecker: UpdateChecker?
 
     @State private var launchAtLogin = false
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
@@ -112,16 +118,20 @@ struct SettingsView: View {
                 ForEach(MenuBarDisplayMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .onChange(of: displayMode) { _, newValue in
-                if let ad = NSApp.delegate as? AppDelegate { ad.menuBarManager?.displayMode = newValue }
+                logger.info("Settings: displayMode picker changed to \(newValue.rawValue, privacy: .public)")
                 UserDefaults.standard.set(newValue.rawValue, forKey: "menuBarDisplayMode")
+                logger.info("Settings: wrote UD, posting .menuBarSettingsChanged")
+                NotificationCenter.default.post(name: .menuBarSettingsChanged, object: nil)
+                logger.info("Settings: notification posted")
             }
             if displayMode == .iconAndTemperature || displayMode == .temperatureOnly {
                 Picker("Temperature source", selection: $tempSource) {
                     ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .onChange(of: tempSource) { _, newValue in
-                    if let ad = NSApp.delegate as? AppDelegate { ad.menuBarManager?.tempSource = newValue }
+                    logger.info("Settings: tempSource picker changed to \(newValue.rawValue, privacy: .public)")
                     UserDefaults.standard.set(newValue.rawValue, forKey: "menuBarTempSource")
+                    NotificationCenter.default.post(name: .menuBarSettingsChanged, object: nil)
                 }
             }
         }
@@ -182,16 +192,16 @@ struct SettingsView: View {
         Section("Alerts") {
             Toggle("Enable notifications", isOn: $alertsEnabled)
                 .onChange(of: alertsEnabled) { _, v in
-                    if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.enabled = v }
+                    alertManager?.enabled = v
                 }
             if alertsEnabled {
                 sliderRow(title: "High-temp threshold", value: $alertsHighTemp, in: 70...110, step: 1, valueText: "\(Int(alertsHighTemp)) °C")
                     .onChange(of: alertsHighTemp) { _, v in
-                        if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.highTempThreshold = v }
+                        alertManager?.highTempThreshold = v
                     }
                 Toggle("Alert when a fan stops responding", isOn: $alertsFanStuck)
                     .onChange(of: alertsFanStuck) { _, v in
-                        if let ad = NSApp.delegate as? AppDelegate { ad.alertManager?.fanStuckEnabled = v }
+                        alertManager?.fanStuckEnabled = v
                     }
             }
         }
@@ -201,7 +211,7 @@ struct SettingsView: View {
         Section("Auto-Switch") {
             Toggle("Auto-activate profiles based on triggers", isOn: $autoSwitchEnabled)
                 .onChange(of: autoSwitchEnabled) { _, v in
-                    if let ad = NSApp.delegate as? AppDelegate { ad.autoSwitcher?.enabled = v }
+                    autoSwitcher?.enabled = v
                 }
             captionText("Profiles with triggers (power source, thermal state, frontmost app) will auto-activate.")
         }
@@ -211,7 +221,7 @@ struct SettingsView: View {
         Section("Updates") {
             Toggle("Check for updates automatically", isOn: $updatesAutoCheck)
                 .onChange(of: updatesAutoCheck) { _, v in
-                    if let ad = NSApp.delegate as? AppDelegate { ad.updateChecker?.autoCheckEnabled = v }
+                    updateChecker?.autoCheckEnabled = v
                 }
             HStack(spacing: 8) {
                 Text(updatesStatusText)
@@ -333,9 +343,13 @@ struct SettingsView: View {
     }
 
     private func loadSettings() {
+        logger.info("loadSettings called")
         launchAtLogin = SMAppService.mainApp.status == .enabled
         if let s = UserDefaults.standard.string(forKey: "menuBarDisplayMode"),
-           let m = MenuBarDisplayMode(rawValue: s) { displayMode = m }
+           let m = MenuBarDisplayMode(rawValue: s) {
+            logger.info("loadSettings: UD displayMode=\(s, privacy: .public)")
+            displayMode = m
+        }
         if let s = UserDefaults.standard.string(forKey: "menuBarTempSource"),
            let t = MenuBarTempSource(rawValue: s) { tempSource = t }
         let i = UserDefaults.standard.double(forKey: "pollingInterval")
@@ -345,18 +359,17 @@ struct SettingsView: View {
         deadbandPercent = fanController.deadbandPercent
         minimumFanPct = fanController.minimumFanPercentage
         aggressiveOverride = fanController.aggressiveOverrideEnabled
-        if let ad = NSApp.delegate as? AppDelegate {
-            autoSwitchEnabled = ad.autoSwitcher?.enabled ?? true
-            alertsEnabled = ad.alertManager?.enabled ?? true
-            alertsHighTemp = ad.alertManager?.highTempThreshold ?? 95
-            alertsFanStuck = ad.alertManager?.fanStuckEnabled ?? true
-            updatesAutoCheck = ad.updateChecker?.autoCheckEnabled ?? true
-            refreshUpdateStatus()
-        }
+        autoSwitchEnabled = autoSwitcher?.enabled ?? true
+        alertsEnabled = alertManager?.enabled ?? true
+        alertsHighTemp = alertManager?.highTempThreshold ?? 95
+        alertsFanStuck = alertManager?.fanStuckEnabled ?? true
+        updatesAutoCheck = updateChecker?.autoCheckEnabled ?? true
+        refreshUpdateStatus()
+        logger.info("loadSettings: alertManager=\(self.alertManager == nil ? "nil" : "exists", privacy: .public), autoSwitcher=\(self.autoSwitcher == nil ? "nil" : "exists", privacy: .public), updateChecker=\(self.updateChecker == nil ? "nil" : "exists", privacy: .public)")
     }
 
     private func refreshUpdateStatus() {
-        guard let checker = (NSApp.delegate as? AppDelegate)?.updateChecker else { return }
+        guard let checker = updateChecker else { return }
         switch checker.status {
         case .unknown:
             if let last = checker.lastCheckedAt {
@@ -385,7 +398,7 @@ struct SettingsView: View {
     }
 
     private func runUpdateCheck() {
-        guard let checker = (NSApp.delegate as? AppDelegate)?.updateChecker else { return }
+        guard let checker = updateChecker else { return }
         Task {
             await checker.checkForUpdates(silent: false)
             refreshUpdateStatus()
@@ -394,7 +407,7 @@ struct SettingsView: View {
     }
 
     private func openUpdateRelease() {
-        (NSApp.delegate as? AppDelegate)?.updateChecker?.openReleasePage()
+        updateChecker?.openReleasePage()
     }
 
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {
@@ -412,7 +425,6 @@ struct SettingsView: View {
     private func resetSettings() {
         setLaunchAtLogin(false); launchAtLogin = false
         displayMode = .iconOnly
-        if let ad = NSApp.delegate as? AppDelegate { ad.menuBarManager?.displayMode = .iconOnly }
         pollingInterval = 2.0
         fanController.pollingInterval = 2.0
         fanController.clearAllManualOverrides()
@@ -422,5 +434,6 @@ struct SettingsView: View {
         UserDefaults.standard.removeObject(forKey: "menuBarTempSource")
         UserDefaults.standard.removeObject(forKey: "pollingInterval")
         UserDefaults.standard.removeObject(forKey: "minimumFanPercentage")
+        NotificationCenter.default.post(name: .menuBarSettingsChanged, object: nil)
     }
 }

@@ -4,6 +4,10 @@ import os
 
 private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "MenuBarManager")
 
+extension Notification.Name {
+    static let menuBarSettingsChanged = Notification.Name("com.fexxdev.Mystral.menuBarSettingsChanged")
+}
+
 enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconOnly = "Icon Only"
     case iconAndTemperature = "Icon + Temperature"
@@ -38,37 +42,58 @@ final class MenuBarManager {
     private let onOpenWindow: () -> Void
     private var updateTimer: Timer?
 
+    private var liveCpuItem: NSMenuItem?
+    private var liveGpuItem: NSMenuItem?
+    private var liveFanItems: [NSMenuItem] = []
+    private var liveProfileItems: [NSMenuItem] = []
+
     private static let displayModeKey = "menuBarDisplayMode"
     private static let tempSourceKey = "menuBarTempSource"
 
-    var displayMode: MenuBarDisplayMode = .iconOnly {
-        didSet {
-            UserDefaults.standard.set(displayMode.rawValue, forKey: Self.displayModeKey)
-            updateStatusItem()
-        }
-    }
-
-    var tempSource: MenuBarTempSource = .cpuAverage {
-        didSet {
-            UserDefaults.standard.set(tempSource.rawValue, forKey: Self.tempSourceKey)
-            updateStatusItem()
-        }
-    }
+    private(set) var displayMode: MenuBarDisplayMode = .iconOnly
+    private(set) var tempSource: MenuBarTempSource = .cpuAverage
 
     init(fanController: FanController, profileManager: ProfileManager, onOpenWindow: @escaping () -> Void) {
         self.fanController = fanController
         self.profileManager = profileManager
         self.onOpenWindow = onOpenWindow
-        if let saved = UserDefaults.standard.string(forKey: Self.displayModeKey),
-           let mode = MenuBarDisplayMode(rawValue: saved) {
-            self.displayMode = mode
-        }
-        if let saved = UserDefaults.standard.string(forKey: Self.tempSourceKey),
-           let src = MenuBarTempSource(rawValue: saved) {
-            self.tempSource = src
-        }
+        logger.info("MenuBarManager init")
+        syncFromDefaults()
         setupStatusItem()
         startUpdating()
+        NotificationCenter.default.addObserver(forName: .menuBarSettingsChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                logger.info("Received .menuBarSettingsChanged notification, self is \(self == nil ? "nil" : "alive", privacy: .public)")
+                self?.syncFromDefaults()
+                self?.updateStatusItem()
+            }
+        }
+    }
+
+    func setDisplayMode(_ mode: MenuBarDisplayMode) {
+        logger.info("setDisplayMode called: \(mode.rawValue, privacy: .public) (was \(self.displayMode.rawValue, privacy: .public))")
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.displayModeKey)
+        displayMode = mode
+        updateStatusItem()
+    }
+
+    func setTempSource(_ source: MenuBarTempSource) {
+        logger.info("setTempSource called: \(source.rawValue, privacy: .public) (was \(self.tempSource.rawValue, privacy: .public))")
+        UserDefaults.standard.set(source.rawValue, forKey: Self.tempSourceKey)
+        tempSource = source
+        updateStatusItem()
+    }
+
+    private func syncFromDefaults() {
+        let savedMode = UserDefaults.standard.string(forKey: Self.displayModeKey)
+        let savedSource = UserDefaults.standard.string(forKey: Self.tempSourceKey)
+        logger.debug("syncFromDefaults — UD displayMode=\(savedMode ?? "nil", privacy: .public), UD tempSource=\(savedSource ?? "nil", privacy: .public), current displayMode=\(self.displayMode.rawValue, privacy: .public)")
+        if let saved = savedMode, let mode = MenuBarDisplayMode(rawValue: saved) {
+            displayMode = mode
+        }
+        if let saved = savedSource, let src = MenuBarTempSource(rawValue: saved) {
+            tempSource = src
+        }
     }
 
     private func setupStatusItem() {
@@ -97,30 +122,98 @@ final class MenuBarManager {
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        guard let event = NSApp.currentEvent else { onOpenWindow(); return }
-        if event.type == .rightMouseUp {
-            showContextMenu()
-        } else {
-            onOpenWindow()
-        }
+        logger.info("statusItemClicked — showing context menu")
+        showContextMenu()
     }
 
     private func showContextMenu() {
         let menu = NSMenu()
+
+        let sensors = fanController.sensors
+        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
+        let gpuCores = SensorRegistry.gpuCoreSensors(from: sensors)
+
+        if !cpuCores.isEmpty {
+            let item = Self.infoItem("")
+            liveCpuItem = item
+            menu.addItem(item)
+        }
+        if !gpuCores.isEmpty {
+            let item = Self.infoItem("")
+            liveGpuItem = item
+            menu.addItem(item)
+        }
+        liveFanItems = []
+        for _ in fanController.fans {
+            let item = Self.infoItem("")
+            liveFanItems.append(item)
+            menu.addItem(item)
+        }
+
+        updateContextMenuItems()
+
+        if menu.numberOfItems > 0 { menu.addItem(.separator()) }
+
+        liveProfileItems = []
         for profile in profileManager.allProfiles {
             let item = NSMenuItem(title: profile.name, action: #selector(selectProfile(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = profile.id
             if profile.id == profileManager.activeProfileId { item.state = .on }
+            liveProfileItems.append(item)
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Open Mystral", action: #selector(openApp), keyEquivalent: "o"))
+
+        let openItem = NSMenuItem(title: "Open Mystral", action: #selector(openApp), keyEquivalent: "o")
+        openItem.target = self
+        menu.addItem(openItem)
+
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q"))
+
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
         statusItem?.menu = menu
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil
+
+        liveCpuItem = nil
+        liveGpuItem = nil
+        liveFanItems = []
+        liveProfileItems = []
+    }
+
+    private func updateContextMenuItems() {
+        let sensors = fanController.sensors
+        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
+        let gpuCores = SensorRegistry.gpuCoreSensors(from: sensors)
+
+        if let item = liveCpuItem, !cpuCores.isEmpty {
+            let avg = cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
+            let mx = cpuCores.map(\.temperature).max() ?? 0
+            item.title = "CPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
+        }
+        if let item = liveGpuItem, !gpuCores.isEmpty {
+            let avg = gpuCores.map(\.temperature).reduce(0, +) / Double(gpuCores.count)
+            let mx = gpuCores.map(\.temperature).max() ?? 0
+            item.title = "GPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
+        }
+        let fans = fanController.fans
+        for (i, item) in liveFanItems.enumerated() where i < fans.count {
+            item.title = "\(fans[i].name)  \(fans[i].currentRPM) RPM  (\(Int(fans[i].percentage))%)"
+        }
+        for item in liveProfileItems {
+            guard let id = item.representedObject as? UUID else { continue }
+            item.state = id == profileManager.activeProfileId ? .on : .off
+        }
+    }
+
+    private static func infoItem(_ text: String) -> NSMenuItem {
+        let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
     }
 
     @objc private func selectProfile(_ sender: NSMenuItem) {
@@ -133,15 +226,24 @@ final class MenuBarManager {
     @objc private func quitApp() { NSApp.terminate(nil) }
 
     private func startUpdating() {
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.syncFromDefaults()
                 self?.updateStatusItem()
+                self?.updateContextMenuItems()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        updateTimer = timer
     }
 
     private func updateStatusItem() {
-        guard let button = statusItem?.button else { return }
+        guard let button = statusItem?.button else {
+            logger.warning("updateStatusItem — statusItem button is nil!")
+            return
+        }
+
+        logger.debug("updateStatusItem — mode=\(self.displayMode.rawValue, privacy: .public)")
 
         if displayMode == .miniGraph {
             button.image = renderMiniGraphImage()
@@ -168,6 +270,7 @@ final class MenuBarManager {
         case .miniGraph:
             break
         }
+        logger.debug("updateStatusItem — title='\(button.title, privacy: .public)', hasImage=\(button.image != nil, privacy: .public)")
     }
 
     private func temperatureString() -> String {
@@ -183,26 +286,29 @@ final class MenuBarManager {
 
     private func currentTemperature() -> Double {
         let sensors = fanController.sensors
-        let cpu = sensors.filter { $0.id.hasPrefix("Tp") }
-        let gpu = sensors.filter { $0.id.hasPrefix("Tg") }
+        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
+        let gpuCores = SensorRegistry.gpuCoreSensors(from: sensors)
         switch tempSource {
         case .cpuAverage:
-            guard !cpu.isEmpty else { return 0 }
-            return cpu.map(\.temperature).reduce(0, +) / Double(cpu.count)
+            if !cpuCores.isEmpty {
+                return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
+            }
+            return sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey })?.temperature ?? 0
         case .cpuMax:
-            return cpu.map(\.temperature).max() ?? 0
+            if !cpuCores.isEmpty { return cpuCores.map(\.temperature).max() ?? 0 }
+            return sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey })?.temperature ?? 0
         case .gpuAverage:
-            guard !gpu.isEmpty else { return 0 }
-            return gpu.map(\.temperature).reduce(0, +) / Double(gpu.count)
+            guard !gpuCores.isEmpty else { return 0 }
+            return gpuCores.map(\.temperature).reduce(0, +) / Double(gpuCores.count)
         case .gpuMax:
-            return gpu.map(\.temperature).max() ?? 0
+            return gpuCores.map(\.temperature).max() ?? 0
         case .hottest:
             return sensors.map(\.temperature).max() ?? 0
         }
     }
 
     private func renderMiniGraphImage() -> NSImage {
-        let cpuSensors = fanController.sensors.filter { $0.id.hasPrefix("Tp") }
+        let cpuSensors = SensorRegistry.cpuCoreSensors(from: fanController.sensors)
         let history: [Double]
         if !cpuSensors.isEmpty {
             let len = cpuSensors.map { $0.history.count }.max() ?? 0

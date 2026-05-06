@@ -30,8 +30,12 @@ final class ProfileAutoSwitcher {
     }
 
     func start() {
-        guard !isStarted else { return }
+        guard !isStarted else {
+            logger.info("start() called but already started — no-op")
+            return
+        }
         isStarted = true
+        logger.info("start() — enabled=\(self.enabled, privacy: .public)")
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleThermalChange),
@@ -62,8 +66,12 @@ final class ProfileAutoSwitcher {
     @objc private func handleAppChange() { Task { @MainActor in self.evaluate() } }
 
     func evaluate() {
-        guard enabled else { return }
+        guard enabled else {
+            logger.debug("evaluate() — disabled, skipping")
+            return
+        }
         let state = currentState()
+        logger.debug("evaluate() — power=\(state.powerSource.rawValue, privacy: .public), thermal=\(state.thermalLevel.rawValue, privacy: .public), frontApp=\(state.frontmostBundleId ?? "nil", privacy: .public)")
         let candidates = profileManager.allProfiles.compactMap { profile -> (Profile, Int)? in
             guard let triggers = profile.triggers, !triggers.isEmpty else { return nil }
             var bestPriority = -1
@@ -76,7 +84,7 @@ final class ProfileAutoSwitcher {
         }
         guard let winner = candidates.max(by: { $0.1 < $1.1 })?.0 else { return }
         if profileManager.activeProfileId != winner.id {
-            logger.info("Auto-switching to profile \(winner.name)")
+            logger.info("Auto-switching to profile \(winner.name, privacy: .public)")
             profileManager.activeProfileId = winner.id
         }
     }

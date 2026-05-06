@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "ProfileManager")
 
 enum ProfileError: Error, LocalizedError {
     case maxProfilesReached
@@ -21,6 +24,8 @@ final class ProfileManager {
     private(set) var customProfiles: [Profile] = []
     var activeProfileId: UUID? {
         didSet {
+            let name = allProfiles.first { $0.id == activeProfileId }?.name ?? "nil"
+            logger.info("activeProfileId changed to \(name, privacy: .public) (\(self.activeProfileId?.uuidString ?? "nil", privacy: .public))")
             if let id = activeProfileId {
                 UserDefaults.standard.set(id.uuidString, forKey: Self.activeProfileKey)
             } else {
@@ -51,6 +56,7 @@ final class ProfileManager {
         } else {
             activeProfileId = presets.first { $0.name == "Balanced" }?.id ?? presets.first?.id
         }
+        logger.info("ProfileManager init — presets=\(self.presets.count, privacy: .public), custom=\(self.customProfiles.count, privacy: .public), active=\(self.activeProfile?.name ?? "nil", privacy: .public)")
     }
 
     private func loadPresets() {

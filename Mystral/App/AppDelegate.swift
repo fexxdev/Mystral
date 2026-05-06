@@ -5,7 +5,7 @@ import os
 private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "AppDelegate")
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var window: NSWindow?
     var menuBarManager: MenuBarManager?
     var fanController: FanController?
@@ -14,11 +14,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var alertManager: AlertManager?
     var updateChecker: UpdateChecker?
     private var smcProxy: SMCProxyService?
+    private var activityToken: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        logger.info("applicationDidFinishLaunching — start")
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            logger.info("Running under XCTest — skipping init")
             return
         }
+
+        activityToken = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep, .suddenTerminationDisabled],
+            reason: "Active fan monitoring and control"
+        )
+        logger.info("App Nap prevention token acquired")
+
         profileManager = ProfileManager()
 
         let smcService: SMCServiceProtocol
@@ -27,10 +37,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 smcService = try SMCService()
                 logger.info("Running as root — direct SMC access")
             } catch {
-                logger.error("SMC init failed as root: \(error.localizedDescription)")
+                logger.error("SMC init failed as root: \(error.localizedDescription, privacy: .public)")
                 smcService = FallbackSMCService()
             }
         } else {
+            logger.info("Running as user — using SMCProxyService")
             let proxy = SMCProxyService()
             smcProxy = proxy
             smcService = proxy
@@ -58,26 +69,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alertManager = AlertManager()
         fanController!.alertManager = alertManager
         alertManager!.requestPermissionIfNeeded()
+        logger.info("Creating MenuBarManager — fanController=\(self.fanController == nil ? "nil" : "exists", privacy: .public)")
         menuBarManager = MenuBarManager(
             fanController: fanController!,
             profileManager: profileManager!,
             onOpenWindow: { [weak self] in self?.openMainWindow() }
         )
+        logger.info("MenuBarManager created — menuBarManager=\(self.menuBarManager == nil ? "nil" : "exists", privacy: .public)")
         fanController!.start()
         autoSwitcher!.start()
 
         updateChecker = UpdateChecker()
         updateChecker!.runAutoCheckIfNeeded()
+        logger.info("applicationDidFinishLaunching — complete")
     }
 
     private func launchHelperAsync() {
-        if isHelperRunning() {
-            logger.info("Helper already running")
+        let helperState = checkHelper()
+        switch helperState {
+        case .running:
+            logger.info("Helper already running (version match)")
             return
+        case .staleOrMismatch(let pid):
+            logger.info("Helper version mismatch or stale — killing old helper")
+            kill(pid, SIGTERM)
+            usleep(500_000)
+        case .notRunning:
+            break
         }
         Task.detached {
             await self.launchHelper()
         }
+    }
+
+    private enum HelperState {
+        case running
+        case staleOrMismatch(pid: Int32)
+        case notRunning
+    }
+
+    private func checkHelper() -> HelperState {
+        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+              let pid = Int32(pidStr),
+              kill(pid, 0) == 0 else { return .notRunning }
+
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: SMCHelperMode.dataPath)),
+              let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else {
+            return .staleOrMismatch(pid: pid)
+        }
+
+        if smcData.version != SMCHelperMode.appVersion {
+            return .staleOrMismatch(pid: pid)
+        }
+
+        let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath)
+        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) < 10 {
+            return .running
+        }
+        return .staleOrMismatch(pid: pid)
     }
 
     private func launchHelper() {
@@ -88,16 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var error: NSDictionary?
         appleScript.executeAndReturnError(&error)
         if let error {
-            logger.error("Helper launch failed: \(error)")
+            logger.error("Helper launch failed: \(error, privacy: .public)")
         } else {
             logger.info("Helper launched successfully")
         }
-    }
-
-    private func isHelperRunning() -> Bool {
-        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-              let pid = Int32(pidStr) else { return false }
-        return kill(pid, 0) == 0
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -106,6 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        logger.info("applicationWillTerminate — stopping fan controller and killing helper")
         fanController?.stop()
         killHelper()
     }
@@ -117,15 +161,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func openMainWindow() {
+        logger.info("openMainWindow — existing window=\(self.window != nil, privacy: .public)")
         if let window = window {
             window.makeKeyAndOrderFront(nil)
+            NSApp.setActivationPolicy(.regular)
             NSApp.activate()
             return
         }
 
         let contentView = MainView(
             fanController: fanController!,
-            profileManager: profileManager!
+            profileManager: profileManager!,
+            alertManager: alertManager,
+            autoSwitcher: autoSwitcher,
+            updateChecker: updateChecker
         )
 
         let window = NSWindow(
@@ -139,10 +188,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.setFrameAutosaveName("MystralMainWindow")
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
 
         self.window = window
+        logger.info("openMainWindow — new window created and shown")
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        logger.info("windowWillClose — switching to accessory mode")
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 

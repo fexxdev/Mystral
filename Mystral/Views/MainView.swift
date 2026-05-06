@@ -25,6 +25,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 struct MainView: View {
     let fanController: FanController
     let profileManager: ProfileManager
+    let alertManager: AlertManager?
+    let autoSwitcher: ProfileAutoSwitcher?
+    let updateChecker: UpdateChecker?
     @State private var selectedItem: SidebarItem = .dashboard
 
     var body: some View {
@@ -54,7 +57,7 @@ struct MainView: View {
             case .sensors: SensorsView(fanController: fanController)
             case .fans: FansView(fanController: fanController)
             case .profiles: ProfilesView(fanController: fanController, profileManager: profileManager)
-            case .settings: SettingsView(fanController: fanController, profileManager: profileManager)
+            case .settings: SettingsView(fanController: fanController, profileManager: profileManager, alertManager: alertManager, autoSwitcher: autoSwitcher, updateChecker: updateChecker)
             }
         }
         .frame(minWidth: 1100, minHeight: 640)

@@ -73,22 +73,32 @@ final class FanController {
     }
 
     func start() {
-        guard !isRunning else { return }
+        guard !isRunning else {
+            logger.info("start() called but already running — no-op")
+            return
+        }
+        logger.info("start() — interval=\(self.pollingInterval, privacy: .public)s")
         isRunning = true
         tick()
-        timer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: pollingInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
 
     func stop() {
+        logger.info("stop() — invalidating timer, restoring auto mode")
         timer?.invalidate()
         timer = nil
         isRunning = false
         restoreAutoMode()
     }
 
-    func restart() { stop(); start() }
+    func restart() {
+        logger.info("restart()")
+        stop(); start()
+    }
 
     private func tick() {
         do {
@@ -102,10 +112,11 @@ final class FanController {
             }
             sensors = newSensors
             fans = try smcService.getAllFans()
+            logger.debug("tick — sensors=\(newSensors.count, privacy: .public), fans=\(self.fans.count, privacy: .public)")
             applyActiveProfile()
             alertManager?.evaluate(sensors: sensors, fans: fans, expectedFanPercent: lastWrittenPct)
         } catch {
-            logger.error("SMC read failed: \(error.localizedDescription)")
+            logger.error("SMC read failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -128,7 +139,7 @@ final class FanController {
                 forcedModeSet = true
                 ticksSinceForcedReassert = 0
             } catch {
-                logger.info("Forced fan mode not available (expected on M3/M4 Pro/Max): \(error.localizedDescription)")
+                logger.info("Forced fan mode not available (expected on M3/M4 Pro/Max): \(error.localizedDescription, privacy: .public)")
             }
         }
 
@@ -153,7 +164,7 @@ final class FanController {
                 try smcService.setFanSpeed(index: fan.id, percentage: percentage)
                 lastWrittenPct[fan.id] = percentage
             } catch {
-                logger.warning("Fan \(fan.id) write failed: \(error.localizedDescription)")
+                logger.warning("Fan \(fan.id, privacy: .public) write failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

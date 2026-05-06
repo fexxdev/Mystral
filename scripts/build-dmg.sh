@@ -81,6 +81,8 @@ hdiutil create \
 
 codesign --force --sign - "$DMG_PATH" || true
 
+rm -rf "$BUILD_DIR"
+
 echo
 echo "==> Done"
 echo "DMG:  $DMG_PATH"

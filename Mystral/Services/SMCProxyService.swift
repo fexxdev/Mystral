@@ -41,8 +41,14 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
 
     private func refreshData() {
         let url = URL(fileURLWithPath: SMCHelperMode.dataPath)
-        guard let data = try? Data(contentsOf: url),
-              let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else { return }
+        guard let data = try? Data(contentsOf: url) else {
+            logger.warning("refreshData — failed to read data file at \(SMCHelperMode.dataPath, privacy: .public)")
+            return
+        }
+        guard let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else {
+            logger.warning("refreshData — failed to decode SMCData (size=\(data.count, privacy: .public) bytes)")
+            return
+        }
 
         cachedSensors = smcData.sensors.map {
             Sensor(id: $0.key, name: $0.name, temperature: $0.temperature)
@@ -51,6 +57,7 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
             Fan(id: $0.id, name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM,
                 minRPM: $0.minRPM, maxRPM: $0.maxRPM, mode: FanMode(rawValue: $0.mode) ?? .auto)
         }
+        logger.debug("refreshData — decoded \(self.cachedSensors.count, privacy: .public) sensors, \(self.cachedFans.count, privacy: .public) fans")
     }
 
     private func writeCommand(_ command: SMCHelperMode.Command) throws {
@@ -58,5 +65,6 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         let data = try JSONEncoder().encode(command)
         let path = "\(SMCHelperMode.cmdDir)/\(UUID().uuidString).json"
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        logger.debug("writeCommand — action=\(command.action, privacy: .public), index=\(command.index, privacy: .public), value=\(command.value ?? -1, privacy: .public)")
     }
 }

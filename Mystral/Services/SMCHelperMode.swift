@@ -1,9 +1,16 @@
 import Foundation
+import os
+
+private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SMCHelper")
 
 enum SMCHelperMode {
     static let dataPath = "/tmp/mystral-smc-data.json"
     static let cmdDir = "/tmp/mystral-cmds"
     static let pidPath = "/tmp/mystral-helper.pid"
+
+    static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+    }
 
     struct SMCData: Codable {
         struct SensorData: Codable {
@@ -20,6 +27,7 @@ enum SMCHelperMode {
             let maxRPM: Int
             let mode: Int
         }
+        var version: String?
         let sensors: [SensorData]
         let fans: [FanData]
     }
@@ -31,6 +39,7 @@ enum SMCHelperMode {
     }
 
     static func run() -> Never {
+        logger.info("SMCHelper starting — pid=\(getpid()), version=\(appVersion)")
         try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
         try? FileManager.default.createDirectory(atPath: cmdDir, withIntermediateDirectories: true)
         chmod(cmdDir, 0o777)
@@ -38,7 +47,9 @@ enum SMCHelperMode {
         let smc: SMCService
         do {
             smc = try SMCService()
+            logger.info("SMCHelper — SMC opened successfully")
         } catch {
+            logger.error("SMCHelper — SMC open failed: \(error.localizedDescription)")
             fputs("SMC open failed: \(error)\n", stderr)
             exit(1)
         }
@@ -46,6 +57,7 @@ enum SMCHelperMode {
         let sigSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         signal(SIGTERM, SIG_IGN)
         sigSource.setEventHandler {
+            logger.info("SMCHelper — SIGTERM received, restoring auto mode and cleaning up")
             let count = (try? smc.getAllFans().count) ?? 2
             try? smc.setForcedMode(fanCount: count, forced: false)
             cleanup()
@@ -63,6 +75,7 @@ enum SMCHelperMode {
                 let sensors = try smc.getAllSensors()
                 let fans = try smc.getAllFans()
                 let data = SMCData(
+                    version: appVersion,
                     sensors: sensors.map { .init(key: $0.id, name: $0.name, temperature: $0.temperature) },
                     fans: fans.map { .init(id: $0.id, name: $0.name, currentRPM: $0.currentRPM,
                                            targetRPM: $0.targetRPM, minRPM: $0.minRPM,

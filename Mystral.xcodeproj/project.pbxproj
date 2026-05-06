@@ -1,0 +1,631 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0081FC70476CBC6FF6651D62 /* balanced.json in Resources */ = {isa = PBXBuildFile; fileRef = 05CF7747832DCA542BD53959 /* balanced.json */; };
+		087F37A5A74965FBC32E170C /* SensorsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0FEEE75B02FC262F7E93DA5 /* SensorsView.swift */; };
+		0DB5B4CC35587BF02A1830FB /* SMCProxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D1A2E70A200040B2020DA5 /* SMCProxyService.swift */; };
+		14F963889C40BB573B7C85B0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E40345530F6EBC95C639FE /* main.swift */; };
+		1F17A09E0B12AFF9DDB990E1 /* HardwareInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */; };
+		20157A49BC121C0B85F8CDEC /* FansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBACE8663AB1AB3822319558 /* FansView.swift */; };
+		2597AC1634E722BD0B0A9692 /* SensorRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */; };
+		26304EC1C1CABE9025CF9AF9 /* Fan.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA6F2DABB940EF0DB47624E /* Fan.swift */; };
+		2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044D527A57845C5CC26E4D89 /* SMCService.swift */; };
+		3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */; };
+		41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64319980C33FE2804285A28 /* UpdateChecker.swift */; };
+		46532E2210160C677CFBC603 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC93D0D514DBB473923BF1 /* Profile.swift */; };
+		5A30B8A06990AF35DEF41DEA /* fullblast.json in Resources */ = {isa = PBXBuildFile; fileRef = 0706841903D9F8775DF00DD5 /* fullblast.json */; };
+		656C56239CD0755E5D131427 /* CurveEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */; };
+		6667E72A957BD3FD5ED320B6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */; };
+		67C3F3419C50912ECEE40382 /* SMCHelperMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CF7452AAC9270DEEE70F65 /* SMCHelperMode.swift */; };
+		6C038669A8C0A2BFE72E02C8 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */; };
+		6E00FE4CD7801F690CD1A4A4 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */; };
+		6E94234F55A4F8ED3AA0E835 /* ProfilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */; };
+		759D269E2FAC5C162D35DDB4 /* MystralApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D45FE9AA6E54A07C10FDC7 /* MystralApp.swift */; };
+		76E19A16214C1D92B7A71E92 /* AlertManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */; };
+		76F88EE130206297075CE520 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1951A392BF1111D58D8543A3 /* Assets.xcassets */; };
+		814977F6568741E44A2300EE /* StressTesterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */; };
+		83AF1B971B28BA878E620BA0 /* ProfileAutoSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */; };
+		83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */; };
+		899EF7962938FA899A4AA954 /* SMCKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DEB194BD8B7268EA696A8B /* SMCKit.swift */; };
+		8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32669FE44D66FA46AE1A940B /* MenuBarManager.swift */; };
+		8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462BE967A2BED80A410B8FD6 /* Sensor.swift */; };
+		9749F172B278C7C00382A6E3 /* SMCServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */; };
+		9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B84A99260FBBACE9652B11 /* MystralTests.swift */; };
+		AACB9F0BEBE77A4BC19B21A6 /* performance.json in Resources */ = {isa = PBXBuildFile; fileRef = 0141EF015312ABA6408CBBB5 /* performance.json */; };
+		AFAA438FE7FF7868A67230D4 /* SensorRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55974A74B43876077772D5D /* SensorRegistry.swift */; };
+		B81F91BB671069D90EE0FE59 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B308C0724E27C538E68CE1FD /* MainView.swift */; };
+		B9D70EFE61A693B14E15AA96 /* SensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F396958B870BBA4EAA4FDF95 /* SensorTests.swift */; };
+		BA5D2794F2D30FDA9C732C35 /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1704CD9C898267DFA1A539A /* ProfileManager.swift */; };
+		D26E077786FEE88922BE207D /* AlertManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7DD7E0E7A61390B45908D9 /* AlertManager.swift */; };
+		D32BC00661EAACAF15E12DCB /* silent.json in Resources */ = {isa = PBXBuildFile; fileRef = 919FF1ACE98F8B2CE9F077CC /* silent.json */; };
+		DBB3A459CD1B613B1967C3C6 /* UpdateCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */; };
+		DFF2CDB314AE582DA1BF5566 /* StressTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EFCA98618725CFF71FBF44 /* StressTester.swift */; };
+		E8B5AC4AE236301F73984345 /* FanController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EA4F8C6E8D825A5768015E /* FanController.swift */; };
+		F043C27F29A95684188E630A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1492F8F118B5D2787454874D /* SettingsView.swift */; };
+		F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */; };
+		FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */; };
+		A1C2D3E4F5A6B7C8D9E0F1A2 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D3E4F5A6B7C8D9E0F1A2B3 /* MenuBarTests.swift */; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* FanModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A7B8C9D0E1F2A3B4C5 /* FanModelTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8475F98C482B73C58845758F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DDF944BAACB9D461421B5184 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0D8F85990461824D0F3F65E7;
+			remoteInfo = Mystral;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0141EF015312ABA6408CBBB5 /* performance.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = performance.json; sourceTree = "<group>"; };
+		044D527A57845C5CC26E4D89 /* SMCService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCService.swift; sourceTree = "<group>"; };
+		05CF7747832DCA542BD53959 /* balanced.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = balanced.json; sourceTree = "<group>"; };
+		0706841903D9F8775DF00DD5 /* fullblast.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = fullblast.json; sourceTree = "<group>"; };
+		0807B01B551A1CD2EB515238 /* Mystral.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mystral.entitlements; sourceTree = "<group>"; };
+		1492F8F118B5D2787454874D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1951A392BF1111D58D8543A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveEditorView.swift; sourceTree = "<group>"; };
+		20B84A99260FBBACE9652B11 /* MystralTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MystralTests.swift; sourceTree = "<group>"; };
+		31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAutoSwitcher.swift; sourceTree = "<group>"; };
+		32669FE44D66FA46AE1A940B /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
+		39DEB194BD8B7268EA696A8B /* SMCKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCKit.swift; sourceTree = "<group>"; };
+		3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
+		462BE967A2BED80A410B8FD6 /* Sensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensor.swift; sourceTree = "<group>"; };
+		53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManagerTests.swift; sourceTree = "<group>"; };
+		556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		69DB5298EB34D69B0470542B /* Mystral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mystral.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareInfo.swift; sourceTree = "<group>"; };
+		76D45FE9AA6E54A07C10FDC7 /* MystralApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MystralApp.swift; sourceTree = "<group>"; };
+		7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveInterpolationTests.swift; sourceTree = "<group>"; };
+		8F88AACF57AD8F7628D4D98C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		919FF1ACE98F8B2CE9F077CC /* silent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = silent.json; sourceTree = "<group>"; };
+		93CF7452AAC9270DEEE70F65 /* SMCHelperMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCHelperMode.swift; sourceTree = "<group>"; };
+		95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileModelTests.swift; sourceTree = "<group>"; };
+		A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManagerTests.swift; sourceTree = "<group>"; };
+		A1EFCA98618725CFF71FBF44 /* StressTester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTester.swift; sourceTree = "<group>"; };
+		A64319980C33FE2804285A28 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		A9CC93D0D514DBB473923BF1 /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		AE7DD7E0E7A61390B45908D9 /* AlertManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManager.swift; sourceTree = "<group>"; };
+		B1704CD9C898267DFA1A539A /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		B1D1A2E70A200040B2020DA5 /* SMCProxyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCProxyService.swift; sourceTree = "<group>"; };
+		B308C0724E27C538E68CE1FD /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		BA93ECE73A3B2340948236B3 /* MystralTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MystralTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTesterTests.swift; sourceTree = "<group>"; };
+		C6E40345530F6EBC95C639FE /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		CBACE8663AB1AB3822319558 /* FansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FansView.swift; sourceTree = "<group>"; };
+		D0FEEE75B02FC262F7E93DA5 /* SensorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorsView.swift; sourceTree = "<group>"; };
+		D55974A74B43876077772D5D /* SensorRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorRegistry.swift; sourceTree = "<group>"; };
+		D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCServiceTests.swift; sourceTree = "<group>"; };
+		D9EA4F8C6E8D825A5768015E /* FanController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanController.swift; sourceTree = "<group>"; };
+		E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
+		E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdvancedTests.swift; sourceTree = "<group>"; };
+		F396958B870BBA4EAA4FDF95 /* SensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorTests.swift; sourceTree = "<group>"; };
+		FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorRegistryTests.swift; sourceTree = "<group>"; };
+		FDA6F2DABB940EF0DB47624E /* Fan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fan.swift; sourceTree = "<group>"; };
+		B2D3E4F5A6B7C8D9E0F1A2B3 /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* FanModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanModelTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1BBC3181D860B5C4D2408084 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				FDA6F2DABB940EF0DB47624E /* Fan.swift */,
+				A9CC93D0D514DBB473923BF1 /* Profile.swift */,
+				462BE967A2BED80A410B8FD6 /* Sensor.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4EC88627BE230A277F435695 = {
+			isa = PBXGroup;
+			children = (
+				60F8196C4C20DC9F4049A276 /* Mystral */,
+				F31D82F14379D316215F4203 /* MystralTests */,
+				6F77BA6D5ADF3C6F81FC4818 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		60F8196C4C20DC9F4049A276 /* Mystral */ = {
+			isa = PBXGroup;
+			children = (
+				CE28D5709DFC0FAB1B7BD64B /* App */,
+				AC0EAFAC937B7C7D1F88E13A /* MenuBar */,
+				1BBC3181D860B5C4D2408084 /* Models */,
+				990D9484B5A05C92835A60CF /* Presets */,
+				85591CEC182E07E401075581 /* Services */,
+				8D7343059AB473B1AFE610F1 /* Views */,
+				1951A392BF1111D58D8543A3 /* Assets.xcassets */,
+				8F88AACF57AD8F7628D4D98C /* Info.plist */,
+				641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */,
+				C6E40345530F6EBC95C639FE /* main.swift */,
+				0807B01B551A1CD2EB515238 /* Mystral.entitlements */,
+			);
+			path = Mystral;
+			sourceTree = "<group>";
+		};
+		6F77BA6D5ADF3C6F81FC4818 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				69DB5298EB34D69B0470542B /* Mystral.app */,
+				BA93ECE73A3B2340948236B3 /* MystralTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		85591CEC182E07E401075581 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				AE7DD7E0E7A61390B45908D9 /* AlertManager.swift */,
+				D9EA4F8C6E8D825A5768015E /* FanController.swift */,
+				6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */,
+				31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */,
+				B1704CD9C898267DFA1A539A /* ProfileManager.swift */,
+				D55974A74B43876077772D5D /* SensorRegistry.swift */,
+				93CF7452AAC9270DEEE70F65 /* SMCHelperMode.swift */,
+				39DEB194BD8B7268EA696A8B /* SMCKit.swift */,
+				B1D1A2E70A200040B2020DA5 /* SMCProxyService.swift */,
+				044D527A57845C5CC26E4D89 /* SMCService.swift */,
+				A1EFCA98618725CFF71FBF44 /* StressTester.swift */,
+				A64319980C33FE2804285A28 /* UpdateChecker.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		8D7343059AB473B1AFE610F1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */,
+				556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */,
+				CBACE8663AB1AB3822319558 /* FansView.swift */,
+				B308C0724E27C538E68CE1FD /* MainView.swift */,
+				E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */,
+				D0FEEE75B02FC262F7E93DA5 /* SensorsView.swift */,
+				1492F8F118B5D2787454874D /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		990D9484B5A05C92835A60CF /* Presets */ = {
+			isa = PBXGroup;
+			children = (
+				05CF7747832DCA542BD53959 /* balanced.json */,
+				0706841903D9F8775DF00DD5 /* fullblast.json */,
+				0141EF015312ABA6408CBBB5 /* performance.json */,
+				919FF1ACE98F8B2CE9F077CC /* silent.json */,
+			);
+			path = Presets;
+			sourceTree = "<group>";
+		};
+		AC0EAFAC937B7C7D1F88E13A /* MenuBar */ = {
+			isa = PBXGroup;
+			children = (
+				32669FE44D66FA46AE1A940B /* MenuBarManager.swift */,
+			);
+			path = MenuBar;
+			sourceTree = "<group>";
+		};
+		CE28D5709DFC0FAB1B7BD64B /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */,
+				76D45FE9AA6E54A07C10FDC7 /* MystralApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F31D82F14379D316215F4203 /* MystralTests */ = {
+			isa = PBXGroup;
+			children = (
+				53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */,
+				7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */,
+				20B84A99260FBBACE9652B11 /* MystralTests.swift */,
+				E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */,
+				A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */,
+				95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */,
+				FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */,
+				F396958B870BBA4EAA4FDF95 /* SensorTests.swift */,
+				D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */,
+				BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */,
+				3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */,
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* FanModelTests.swift */,
+				B2D3E4F5A6B7C8D9E0F1A2B3 /* MenuBarTests.swift */,
+			);
+			path = MystralTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0D8F85990461824D0F3F65E7 /* Mystral */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF2BB3647F54A7C6FFB47AD6 /* Build configuration list for PBXNativeTarget "Mystral" */;
+			buildPhases = (
+				6E0FF98CCDF99C03B8174325 /* Sources */,
+				BC944D124724614936AFE4DD /* Resources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* Unregister from LaunchServices */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Mystral;
+			packageProductDependencies = (
+			);
+			productName = Mystral;
+			productReference = 69DB5298EB34D69B0470542B /* Mystral.app */;
+			productType = "com.apple.product-type.application";
+		};
+		73017AF83E94FA91DC6C5263 /* MystralTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4536F8209A4D84A70B35C5FE /* Build configuration list for PBXNativeTarget "MystralTests" */;
+			buildPhases = (
+				C075FF5E6155010F95B9FA86 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E1A4A0E647EDEBD15C270851 /* PBXTargetDependency */,
+			);
+			name = MystralTests;
+			packageProductDependencies = (
+			);
+			productName = MystralTests;
+			productReference = BA93ECE73A3B2340948236B3 /* MystralTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DDF944BAACB9D461421B5184 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = AF8FD67A6EBFE34F60034E39 /* Build configuration list for PBXProject "Mystral" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+				it,
+			);
+			mainGroup = 4EC88627BE230A277F435695;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6F77BA6D5ADF3C6F81FC4818 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0D8F85990461824D0F3F65E7 /* Mystral */,
+				73017AF83E94FA91DC6C5263 /* MystralTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BC944D124724614936AFE4DD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				76F88EE130206297075CE520 /* Assets.xcassets in Resources */,
+				6C038669A8C0A2BFE72E02C8 /* Localizable.xcstrings in Resources */,
+				0081FC70476CBC6FF6651D62 /* balanced.json in Resources */,
+				5A30B8A06990AF35DEF41DEA /* fullblast.json in Resources */,
+				AACB9F0BEBE77A4BC19B21A6 /* performance.json in Resources */,
+				D32BC00661EAACAF15E12DCB /* silent.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Unregister from LaunchServices */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Unregister from LaunchServices";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" = \"Debug\" ]; then\n  /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -u \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app\" 2>/dev/null || true\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6E0FF98CCDF99C03B8174325 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D26E077786FEE88922BE207D /* AlertManager.swift in Sources */,
+				6667E72A957BD3FD5ED320B6 /* AppDelegate.swift in Sources */,
+				656C56239CD0755E5D131427 /* CurveEditorView.swift in Sources */,
+				6E00FE4CD7801F690CD1A4A4 /* DashboardView.swift in Sources */,
+				26304EC1C1CABE9025CF9AF9 /* Fan.swift in Sources */,
+				E8B5AC4AE236301F73984345 /* FanController.swift in Sources */,
+				20157A49BC121C0B85F8CDEC /* FansView.swift in Sources */,
+				1F17A09E0B12AFF9DDB990E1 /* HardwareInfo.swift in Sources */,
+				B81F91BB671069D90EE0FE59 /* MainView.swift in Sources */,
+				8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */,
+				759D269E2FAC5C162D35DDB4 /* MystralApp.swift in Sources */,
+				46532E2210160C677CFBC603 /* Profile.swift in Sources */,
+				83AF1B971B28BA878E620BA0 /* ProfileAutoSwitcher.swift in Sources */,
+				BA5D2794F2D30FDA9C732C35 /* ProfileManager.swift in Sources */,
+				6E94234F55A4F8ED3AA0E835 /* ProfilesView.swift in Sources */,
+				67C3F3419C50912ECEE40382 /* SMCHelperMode.swift in Sources */,
+				899EF7962938FA899A4AA954 /* SMCKit.swift in Sources */,
+				0DB5B4CC35587BF02A1830FB /* SMCProxyService.swift in Sources */,
+				2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */,
+				8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */,
+				AFAA438FE7FF7868A67230D4 /* SensorRegistry.swift in Sources */,
+				087F37A5A74965FBC32E170C /* SensorsView.swift in Sources */,
+				F043C27F29A95684188E630A /* SettingsView.swift in Sources */,
+				DFF2CDB314AE582DA1BF5566 /* StressTester.swift in Sources */,
+				41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */,
+				14F963889C40BB573B7C85B0 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C075FF5E6155010F95B9FA86 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				76E19A16214C1D92B7A71E92 /* AlertManagerTests.swift in Sources */,
+				3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */,
+				9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */,
+				F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */,
+				83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */,
+				FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */,
+				9749F172B278C7C00382A6E3 /* SMCServiceTests.swift in Sources */,
+				2597AC1634E722BD0B0A9692 /* SensorRegistryTests.swift in Sources */,
+				B9D70EFE61A693B14E15AA96 /* SensorTests.swift in Sources */,
+				814977F6568741E44A2300EE /* StressTesterTests.swift in Sources */,
+				DBB3A459CD1B613B1967C3C6 /* UpdateCheckerTests.swift in Sources */,
+				A1C2D3E4F5A6B7C8D9E0F1A2 /* MenuBarTests.swift in Sources */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* FanModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E1A4A0E647EDEBD15C270851 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0D8F85990461824D0F3F65E7 /* Mystral */;
+			targetProxy = 8475F98C482B73C58845758F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		18C2D898271D0C295F98719E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Mystral/Mystral.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Mystral/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.Mystral;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		9099CD4F860A57CE749D34FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B9B352C7D4EEAD454296B005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.MystralTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mystral.app/Contents/MacOS/Mystral";
+			};
+			name = Debug;
+		};
+		D34D71E7F6C08821825B2F3D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		D9564176CE4BAE9ACDA9F18D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.MystralTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mystral.app/Contents/MacOS/Mystral";
+			};
+			name = Release;
+		};
+		EF4ABAD4A4904DA47CE6B05D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Mystral/Mystral.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Mystral/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.Mystral;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4536F8209A4D84A70B35C5FE /* Build configuration list for PBXNativeTarget "MystralTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B9B352C7D4EEAD454296B005 /* Debug */,
+				D9564176CE4BAE9ACDA9F18D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AF2BB3647F54A7C6FFB47AD6 /* Build configuration list for PBXNativeTarget "Mystral" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				18C2D898271D0C295F98719E /* Debug */,
+				EF4ABAD4A4904DA47CE6B05D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AF8FD67A6EBFE34F60034E39 /* Build configuration list for PBXProject "Mystral" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9099CD4F860A57CE749D34FC /* Debug */,
+				D34D71E7F6C08821825B2F3D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DDF944BAACB9D461421B5184 /* Project object */;
+}
