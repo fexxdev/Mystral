@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var updateChecker: UpdateChecker?
     private var smcProxy: SMCProxyService?
     private var activityToken: NSObjectProtocol?
+    private var helperLaunchFailures = 0
+    private static let maxHelperLaunchAttempts = 3
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("applicationDidFinishLaunching — start")
@@ -88,24 +90,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func launchHelperAsync() {
+        guard helperLaunchFailures < Self.maxHelperLaunchAttempts else {
+            logger.warning("Helper launch suppressed — \(self.helperLaunchFailures) consecutive failures, giving up until next app launch")
+            return
+        }
         let helperState = checkHelper()
         switch helperState {
         case .running:
             logger.info("Helper already running (version match)")
+            helperLaunchFailures = 0
             return
         case .staleOrMismatch(let pid):
             logger.info("Helper version mismatch or stale — killing old helper")
             Task.detached {
                 kill(pid, SIGTERM)
                 try? await Task.sleep(for: .milliseconds(500))
-                await self.launchHelper()
+                await self.launchAndVerifyHelper()
             }
             return
         case .notRunning:
             break
         }
         Task.detached {
-            await self.launchHelper()
+            await self.launchAndVerifyHelper()
         }
     }
 
@@ -136,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return .staleOrMismatch(pid: pid)
     }
 
-    private func launchHelper() {
+    private func launchAndVerifyHelper() {
         guard let execPath = Bundle.main.executablePath else { return }
         let escaped = execPath.replacingOccurrences(of: "'", with: "'\\''")
         let script = "do shell script \"'\(escaped)' --smc-helper >/tmp/mystral-helper-stdout.log 2>/tmp/mystral-helper-stderr.log &\" with administrator privileges"
@@ -144,9 +151,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         var error: NSDictionary?
         appleScript.executeAndReturnError(&error)
         if let error {
-            logger.error("Helper launch failed: \(error, privacy: .public)")
+            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
+            logger.error("Helper launch failed (code=\(code, privacy: .public)): \(error, privacy: .public)")
+            helperLaunchFailures += 1
+            return
+        }
+
+        // Poll for PID file to confirm the helper actually started
+        var verified = false
+        for _ in 0..<10 {
+            usleep(300_000)
+            if let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+               let pid = Int32(pidStr),
+               kill(pid, 0) == 0 {
+                verified = true
+                break
+            }
+        }
+
+        if verified {
+            logger.info("Helper launched and verified (PID file confirmed)")
+            helperLaunchFailures = 0
         } else {
-            logger.info("Helper launched successfully")
+            helperLaunchFailures += 1
+            logger.error("Helper launch appeared to succeed but process not running after 3s (attempt \(self.helperLaunchFailures)/\(Self.maxHelperLaunchAttempts, privacy: .public))")
         }
     }
 

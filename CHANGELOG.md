@@ -14,6 +14,10 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ### Improved
 - Better observability in the helper: consecutive SMC read errors are counted and logged, with a recovery message when normal operation resumes.
+- Helper launch now verifies the process actually started (polls PID file for up to 3s) instead of blindly trusting the AppleScript return.
+- Helper launch capped at 3 attempts — stops pestering with password dialogs after repeated failures until next app launch.
+- Power source monitor now fires during modal dialogs and menu tracking (`.commonModes` instead of `.defaultMode`).
+- SMC key info cache invalidated on system wake (prevents stale IOKit state from persisting).
 
 ## [1.0.6] — 2026-05-06
 

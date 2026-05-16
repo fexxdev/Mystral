@@ -61,7 +61,7 @@ final class ProfileAutoSwitcher {
             Unmanaged<ProfileAutoSwitcher>.fromOpaque(context).release()
             return
         }
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         powerSourceRunLoopSource = source
     }
 
@@ -70,7 +70,7 @@ final class ProfileAutoSwitcher {
         isStarted = false
 
         if let source = powerSourceRunLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
             powerSourceRunLoopSource = nil
             Unmanaged.passUnretained(self).release()
         }

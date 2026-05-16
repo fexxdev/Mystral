@@ -61,7 +61,11 @@ final class FanController {
         forcedModeSet = false
         consecutiveHelperFailures = 0
         wakeGraceUntil = ProcessInfo.processInfo.systemUptime + 15
-        (smcService as? SMCProxyService)?.notifyWake()
+        if let proxy = smcService as? SMCProxyService {
+            proxy.notifyWake()
+        } else if let direct = smcService as? SMCService {
+            direct.notifyWake()
+        }
     }
 
     static func interpolate(temperature: Double, curve: [CurvePoint]) -> Double {

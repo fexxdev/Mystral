@@ -123,17 +123,10 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
         }
     }
 
-    func reUnlockAfterWake(fanCount: Int) throws {
+    func notifyWake() {
         ftstUnlocked = false
         smc.invalidateCaches()
-        try unlockFanControl()
-        for i in 0..<fanCount {
-            try ensureFanMode(index: i, target: 1)
-        }
-    }
-
-    func invalidateCaches() {
-        smc.invalidateCaches()
+        logger.info("Wake notification — cleared Ftst state and key info cache")
     }
 
     func readRawBytes(key: String) throws -> (bytes: [UInt8], dataType: UInt32, dataSize: UInt32) {
