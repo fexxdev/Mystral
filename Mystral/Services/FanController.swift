@@ -25,6 +25,7 @@ final class FanController {
     private(set) var isHelperResponsive = true
     private var consecutiveHelperFailures = 0
     private var lastHelperRestartUptime: TimeInterval = 0
+    private var wakeGraceUntil: TimeInterval = 0
     var helperRestarter: (() -> Void)?
 
     var pollingInterval: TimeInterval = 2.0 {
@@ -56,8 +57,11 @@ final class FanController {
     }
 
     @objc private func handleWake() {
-        logger.info("System woke — re-applying forced fan mode on next tick")
+        logger.info("System woke — re-applying forced fan mode on next tick, granting helper 15s grace")
         forcedModeSet = false
+        consecutiveHelperFailures = 0
+        wakeGraceUntil = ProcessInfo.processInfo.systemUptime + 15
+        (smcService as? SMCProxyService)?.notifyWake()
     }
 
     static func interpolate(temperature: Double, curve: [CurvePoint]) -> Double {
@@ -141,6 +145,10 @@ final class FanController {
     private func attemptHelperRestart() {
         guard consecutiveHelperFailures >= 3 else { return }
         let now = ProcessInfo.processInfo.systemUptime
+        if now < wakeGraceUntil {
+            logger.info("Suppressing helper restart during wake grace period")
+            return
+        }
         guard lastHelperRestartUptime == 0 || (now - lastHelperRestartUptime > Self.restartCooldown) else { return }
         logger.info("Triggering helper restart (failures=\(self.consecutiveHelperFailures, privacy: .public))")
         lastHelperRestartUptime = now

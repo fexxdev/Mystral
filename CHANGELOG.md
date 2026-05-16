@@ -6,6 +6,15 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-05-16
+
+### Fixed
+- **Helper killed by macOS power management**: the root SMC helper had no activity assertion, so macOS throttled/suspended its timer during display sleep (~10 min idle). This caused the data file to go stale, triggering a helper restart and repeated admin password prompts. The helper now holds a `latencyCritical` activity assertion and uses a tight timer leeway.
+- **Spurious restart after wake**: waking from sleep always left the data file momentarily stale, racing against the staleness check. Added a 15-second grace period after wake in both the proxy service and the fan controller to let the helper resume before declaring it dead.
+
+### Improved
+- Better observability in the helper: consecutive SMC read errors are counted and logged, with a recovery message when normal operation resumes.
+
 ## [1.0.6] — 2026-05-06
 
 ### Fixed

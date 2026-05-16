@@ -48,6 +48,13 @@ enum SMCHelperMode {
         try? FileManager.default.createDirectory(atPath: cmdDir, withIntermediateDirectories: true)
         chmod(cmdDir, 0o733)
 
+        // Prevent macOS from throttling/coalescing our timer during display sleep
+        let activityToken = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical],
+            reason: "SMC helper must update fan data without interruption"
+        )
+        logger.info("SMCHelper — activity assertion acquired")
+
         let smc: SMCService
         do {
             smc = try SMCService()
@@ -71,9 +78,10 @@ enum SMCHelperMode {
 
         dumpDiagnostics(smc: smc)
 
+        var consecutiveErrors = 0
         let queue = DispatchQueue(label: "com.fexxdev.Mystral.helper", qos: .userInitiated)
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: 2.0)
+        timer.schedule(deadline: .now(), repeating: 2.0, leeway: .milliseconds(100))
         timer.setEventHandler {
             processCommands(smc: smc)
             do {
@@ -88,13 +96,21 @@ enum SMCHelperMode {
                 )
                 let json = try JSONEncoder().encode(data)
                 try json.write(to: URL(fileURLWithPath: dataPath), options: .atomic)
+                if consecutiveErrors > 0 {
+                    logger.info("SMCHelper — recovered after \(consecutiveErrors) errors")
+                    consecutiveErrors = 0
+                }
             } catch {
-                fputs("SMC read error: \(error)\n", stderr)
+                consecutiveErrors += 1
+                logger.error("SMCHelper — SMC read error (#\(consecutiveErrors)): \(error.localizedDescription)")
+                fputs("SMC read error (#\(consecutiveErrors)): \(error)\n", stderr)
             }
         }
         timer.resume()
 
-        dispatchMain()
+        withExtendedLifetime(activityToken) {
+            dispatchMain()
+        }
     }
 
     private static func dumpDiagnostics(smc: SMCService) {

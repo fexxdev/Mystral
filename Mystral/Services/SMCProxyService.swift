@@ -22,6 +22,7 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     private var lastRefreshUptime: TimeInterval = 0
     private static let refreshCooldown: TimeInterval = 0.5
     private var helperAlive = true
+    private var wakeGraceDeadline: TimeInterval = 0
 
     func getAllSensors() throws -> [Sensor] {
         try refreshData()
@@ -91,22 +92,35 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     }
 
     private func checkHelperHealth(fm: FileManager, path: String) throws {
+        let now = ProcessInfo.processInfo.systemUptime
+        let inGrace = now < wakeGraceDeadline
+
         guard fm.fileExists(atPath: path) else {
-            if Date().timeIntervalSince(startTime) > Self.startupGrace {
+            if Date().timeIntervalSince(startTime) > Self.startupGrace && !inGrace {
                 helperAlive = false
                 throw SMCProxyError.helperNotResponding
             }
-            logger.debug("refreshData — data file not yet available (startup grace)")
+            logger.debug("refreshData — data file not yet available (startup/wake grace)")
             return
         }
 
         if let attrs = try? fm.attributesOfItem(atPath: path),
            let modDate = attrs[.modificationDate] as? Date,
            Date().timeIntervalSince(modDate) > Self.staleThreshold {
+            if inGrace {
+                logger.debug("refreshData — data file stale but within wake grace period")
+                return
+            }
             helperAlive = false
             logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
             throw SMCProxyError.helperNotResponding
         }
+    }
+
+    func notifyWake() {
+        wakeGraceDeadline = ProcessInfo.processInfo.systemUptime + 15
+        helperAlive = true
+        logger.info("Wake notification received — granting 15s grace for helper to resume")
     }
 
     func purgeStaleCommands() {
