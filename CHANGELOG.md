@@ -6,18 +6,18 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
-## [1.0.8] — 2026-05-16
+## [1.0.9] — 2026-05-16
 
 ### Fixed
 - **Helper killed by macOS power management**: the root SMC helper had no activity assertion, so macOS throttled/suspended its timer during display sleep (~10 min idle). This caused the data file to go stale, triggering a helper restart and repeated admin password prompts. The helper now holds a `latencyCritical` activity assertion and uses a tight timer leeway.
 - **Spurious restart after wake**: waking from sleep always left the data file momentarily stale, racing against the staleness check. Added a 15-second grace period after wake in both the proxy service and the fan controller to let the helper resume before declaring it dead.
+- **Infinite password prompt loop**: if the user cancelled the admin dialog or the binary was missing, the app would re-prompt every 30 seconds indefinitely. Now capped at 3 attempts before giving up.
+- **Helper launch not verified**: the app trusted `NSAppleScript` success without confirming the process started. Now polls for PID file (up to 3s) after launch.
+- **Stale SMC caches after wake**: IOKit key info cache was never invalidated after system sleep, risking stale reads. Added `notifyWake()` for both proxy and direct SMC modes.
+- **Power source changes missed during dialogs**: `IOPSNotification` run loop source was on `.defaultMode` — now `.commonModes` so profile auto-switching reacts even during modal interactions.
 
 ### Improved
 - Better observability in the helper: consecutive SMC read errors are counted and logged, with a recovery message when normal operation resumes.
-- Helper launch now verifies the process actually started (polls PID file for up to 3s) instead of blindly trusting the AppleScript return.
-- Helper launch capped at 3 attempts — stops pestering with password dialogs after repeated failures until next app launch.
-- Power source monitor now fires during modal dialogs and menu tracking (`.commonModes` instead of `.defaultMode`).
-- SMC key info cache invalidated on system wake (prevents stale IOKit state from persisting).
 
 ## [1.0.6] — 2026-05-06
 
