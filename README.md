@@ -8,8 +8,6 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 
 <img width="1036" height="680" alt="Snapzy_2026-05-17_13-18-57_926" src="https://github.com/user-attachments/assets/8f58606a-a3d3-4066-ae61-1c5e6805ccfe" />
 
-<img width="1036" height="680" alt="Snapzy_2026-05-17_13-19-06_819" src="https://github.com/user-attachments/assets/96a3af59-3505-43cf-bb43-b3bac9b90090" />
-
 <img width="1036" height="680" alt="Snapzy_2026-05-17_13-19-06_819" src="https://github.com/user-attachments/assets/fa2aecbc-c29f-4630-ace3-084b726111cf" />
 
 <img width="1036" height="680" alt="Snapzy_2026-05-17_13-19-10_545" src="https://github.com/user-attachments/assets/6adad4a6-1347-4c5d-a233-18e07653a2f8" />
