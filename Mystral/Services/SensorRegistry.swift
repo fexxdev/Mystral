@@ -179,10 +179,7 @@ enum SensorRegistry {
     }
 
     static func cpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
-        sensors.filter {
-            let cat = categoryForKey($0.id)
-            return cat == .cpuPerformance || cat == .cpuEfficiency
-        }
+        sensors.filter { $0.id.hasPrefix("Tp") }
     }
 
     static func gpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
@@ -211,18 +208,8 @@ enum SensorRegistry {
         let hasSummary = keys.contains("TCMz") || keys.contains("TCMb")
         let hasFanControl = fans.contains { $0.currentRPM > 0 || $0.targetRPM > 0 }
 
-        let chipName: String
-        if cpuCores >= 48 {
-            chipName = "M3 Pro / M3 Max (or similar)"
-        } else if cpuCores >= 24 {
-            chipName = "M2 Pro / M2 Max (or similar)"
-        } else if cpuCores >= 8 {
-            chipName = "M1 Pro / M1 Max (or similar)"
-        } else if cpuCores > 0 {
-            chipName = "Apple Silicon"
-        } else {
-            chipName = "Unknown"
-        }
+        let sysName = HardwareInfo.chipName()
+        let chipName = sysName.isEmpty ? (cpuCores > 0 ? "Apple Silicon" : "Unknown") : sysName
 
         return ChipDetection(
             chipName: chipName,
@@ -237,6 +224,8 @@ enum SensorRegistry {
         var lines: [String] = []
         lines.append("=== Mystral SMC Export ===")
         lines.append("Date: \(ISO8601DateFormatter().string(from: Date()))")
+        lines.append("Model: \(HardwareInfo.modelIdentifier())")
+        lines.append("Chip: \(HardwareInfo.chipName())")
 
         let chip = detectChip(sensors: sensors, fans: fans)
         lines.append("Detected chip: \(chip.chipName)")
