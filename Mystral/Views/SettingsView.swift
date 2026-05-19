@@ -29,10 +29,6 @@ struct SettingsView: View {
     @State private var autoSwitchEnabled = true
 
     @State private var updatesAutoCheck: Bool = true
-    @State private var updatesStatusText: String = "Not checked yet"
-    @State private var updateAvailable: Bool = false
-    @State private var updateAvailableVersion: String = ""
-    @State private var updateReleaseURL: URL?
 
     @State private var stressTester = StressTester()
     @State private var exportMessage: String?
@@ -223,20 +219,102 @@ struct SettingsView: View {
                 .onChange(of: updatesAutoCheck) { _, v in
                     updateChecker?.autoCheckEnabled = v
                 }
-            HStack(spacing: 8) {
-                Text(updatesStatusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if updateAvailable, updateReleaseURL != nil {
-                    Button("Download Update") { openUpdateRelease() }
+            updateStatusRow
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatusRow: some View {
+        if let checker = updateChecker {
+            switch checker.status {
+            case .downloading(_, let progress):
+                VStack(alignment: .leading, spacing: 4) {
+                    ProgressView(value: progress)
+                    HStack {
+                        Text("Downloading… \(Int(progress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Cancel") { checker.cancelInstall() }
+                            .controlSize(.small)
+                    }
+                }
+            case .installing(let version):
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Installing v\(version)…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            case .updateAvailable(let version, _, let dmgURL, _):
+                HStack(spacing: 8) {
+                    Text("v\(version) available")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if dmgURL != nil {
+                        Button("Install Update") {
+                            Task { await checker.installUpdate() }
+                        }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
+                    } else {
+                        Button("View Release") { checker.openReleasePage() }
+                            .controlSize(.small)
+                    }
                 }
-                Button("Check Now") { runUpdateCheck() }
-                    .controlSize(.small)
+            case .error(let msg):
+                HStack(spacing: 8) {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                    Spacer()
+                    if checker.pendingUpdate != nil {
+                        Button("Retry") {
+                            checker.retryInstall()
+                        }
+                        .controlSize(.small)
+                    }
+                    Button("Check Now") { runUpdateCheck() }
+                        .controlSize(.small)
+                }
+            case .checking:
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Checking for updates…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            case .upToDate:
+                HStack(spacing: 8) {
+                    Text("Up to date (v\(checker.currentVersion))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Check Now") { runUpdateCheck() }
+                        .controlSize(.small)
+                }
+            case .unknown:
+                HStack(spacing: 8) {
+                    Text(unknownStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Check Now") { runUpdateCheck() }
+                        .controlSize(.small)
+                }
             }
         }
+    }
+
+    private var unknownStatusText: String {
+        if let last = updateChecker?.lastCheckedAt {
+            return "Last checked \(Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date()))"
+        }
+        return "Not checked yet"
     }
 
     private var diagnosticsSection: some View {
@@ -364,50 +442,12 @@ struct SettingsView: View {
         alertsHighTemp = alertManager?.highTempThreshold ?? 95
         alertsFanStuck = alertManager?.fanStuckEnabled ?? true
         updatesAutoCheck = updateChecker?.autoCheckEnabled ?? true
-        refreshUpdateStatus()
         logger.info("loadSettings: alertManager=\(self.alertManager == nil ? "nil" : "exists", privacy: .public), autoSwitcher=\(self.autoSwitcher == nil ? "nil" : "exists", privacy: .public), updateChecker=\(self.updateChecker == nil ? "nil" : "exists", privacy: .public)")
-    }
-
-    private func refreshUpdateStatus() {
-        guard let checker = updateChecker else { return }
-        switch checker.status {
-        case .unknown:
-            if let last = checker.lastCheckedAt {
-                updatesStatusText = "Last checked \(Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date()))"
-            } else {
-                updatesStatusText = "Not checked yet"
-            }
-            updateAvailable = false
-            updateReleaseURL = nil
-        case .checking:
-            updatesStatusText = "Checking for updates…"
-            updateAvailable = false
-        case .upToDate:
-            updatesStatusText = "Up to date (v\(checker.currentVersion))"
-            updateAvailable = false
-            updateReleaseURL = nil
-        case .updateAvailable(let version, let url, _, _):
-            updatesStatusText = "Update available: v\(version) (you have v\(checker.currentVersion))"
-            updateAvailable = true
-            updateAvailableVersion = version
-            updateReleaseURL = url
-        case .error(let msg):
-            updatesStatusText = "Check failed: \(msg)"
-            updateAvailable = false
-        }
     }
 
     private func runUpdateCheck() {
         guard let checker = updateChecker else { return }
-        Task {
-            await checker.checkForUpdates(silent: false)
-            refreshUpdateStatus()
-        }
-        refreshUpdateStatus()
-    }
-
-    private func openUpdateRelease() {
-        updateChecker?.openReleasePage()
+        Task { await checker.checkForUpdates(silent: false) }
     }
 
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {

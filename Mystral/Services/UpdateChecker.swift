@@ -13,6 +13,8 @@ final class UpdateChecker {
         case checking
         case upToDate
         case updateAvailable(version: String, releaseURL: URL, dmgURL: URL?, notes: String)
+        case downloading(version: String, progress: Double)
+        case installing(version: String)
         case error(String)
     }
 
@@ -20,6 +22,7 @@ final class UpdateChecker {
     private static let lastCheckedKey = "updatesLastCheckedAt"
     private static let releasesURL = URL(string: "https://api.github.com/repos/fexxdev/Mystral/releases/latest")!
     private static let minAutoCheckInterval: TimeInterval = 60 * 60 * 24
+    private static let mountPoint = "/tmp/mystral-update-mount"
 
     var status: Status = .unknown
     var lastCheckedAt: Date?
@@ -31,6 +34,9 @@ final class UpdateChecker {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 
+    private(set) var pendingUpdate: (version: String, releaseURL: URL, dmgURL: URL, notes: String)?
+    private var downloadSession: DownloadSession?
+
     init() {
         if UserDefaults.standard.object(forKey: Self.autoCheckKey) != nil {
             self.autoCheckEnabled = UserDefaults.standard.bool(forKey: Self.autoCheckKey)
@@ -41,6 +47,8 @@ final class UpdateChecker {
             self.lastCheckedAt = stored
         }
     }
+
+    // MARK: - Check for Updates
 
     func runAutoCheckIfNeeded() {
         guard autoCheckEnabled else { return }
@@ -95,6 +103,215 @@ final class UpdateChecker {
         }
     }
 
+    // MARK: - Install Update
+
+    func installUpdate() async {
+        guard case .updateAvailable(let version, let releaseURL, let dmgURL?, let notes) = status else { return }
+        pendingUpdate = (version, releaseURL, dmgURL, notes)
+
+        do {
+            let dmgPath = try await downloadDMG(url: dmgURL, version: version)
+
+            status = .installing(version: version)
+            removeQuarantine(at: dmgPath.path)
+
+            let mountPoint = try mountDMG(at: dmgPath)
+            do {
+                try replaceApp(from: mountPoint)
+            } catch {
+                unmountDMG(mountPoint: mountPoint)
+                try? FileManager.default.removeItem(at: dmgPath)
+                throw error
+            }
+
+            unmountDMG(mountPoint: mountPoint)
+            try? FileManager.default.removeItem(at: dmgPath)
+
+            relaunchAndTerminate()
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSUserCancelledError {
+            restorePendingStatus()
+        } catch is CancellationError {
+            restorePendingStatus()
+        } catch {
+            logger.error("Install failed: \(error.localizedDescription, privacy: .public)")
+            status = .error(error.localizedDescription)
+        }
+    }
+
+    func cancelInstall() {
+        downloadSession?.cancel()
+        downloadSession = nil
+        restorePendingStatus()
+    }
+
+    func retryInstall() {
+        restorePendingStatus()
+    }
+
+    private func restorePendingStatus() {
+        if let p = pendingUpdate {
+            status = .updateAvailable(version: p.version, releaseURL: p.releaseURL, dmgURL: p.dmgURL, notes: p.notes)
+        } else {
+            status = .unknown
+        }
+    }
+
+    // MARK: - Download
+
+    private func downloadDMG(url: URL, version: String) async throws -> URL {
+        status = .downloading(version: version, progress: 0)
+
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Mystral-update.dmg")
+        try? FileManager.default.removeItem(at: dest)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let session = DownloadSession(
+                url: url,
+                destination: dest,
+                onProgress: { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        self?.status = .downloading(version: version, progress: progress)
+                    }
+                },
+                onComplete: { result in
+                    continuation.resume(with: result)
+                }
+            )
+            self.downloadSession = session
+            session.start()
+        }
+    }
+
+    // MARK: - Mount / Unmount
+
+    private func mountDMG(at path: URL) throws -> String {
+        let mountPoint = Self.mountPoint
+        unmountDMG(mountPoint: mountPoint)
+        try? FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: true)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["attach", path.path, "-nobrowse", "-readonly", "-mountpoint", mountPoint]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            throw UpdateError.mountFailed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        return mountPoint
+    }
+
+    private func unmountDMG(mountPoint: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["detach", mountPoint, "-force"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+    }
+
+    // MARK: - Replace App
+
+    private func replaceApp(from mountPoint: String) throws {
+        let appPath = Bundle.main.bundlePath
+        let appName = (appPath as NSString).lastPathComponent
+        var sourcePath = "\(mountPoint)/\(appName)"
+        let backupPath = appPath + ".old"
+
+        if !FileManager.default.fileExists(atPath: sourcePath) {
+            let contents = (try? FileManager.default.contentsOfDirectory(atPath: mountPoint)) ?? []
+            guard let found = contents.first(where: { $0.hasSuffix(".app") }) else {
+                throw UpdateError.appNotFoundInDMG
+            }
+            sourcePath = "\(mountPoint)/\(found)"
+        }
+
+        let newInfoPath = "\(sourcePath)/Contents/Info.plist"
+        if let newInfo = NSDictionary(contentsOfFile: newInfoPath),
+           let newVersion = newInfo["CFBundleShortVersionString"] as? String {
+            guard Self.compareVersions(newVersion, currentVersion) == .orderedDescending else {
+                throw UpdateError.versionMismatch
+            }
+        }
+
+        let parentDir = (appPath as NSString).deletingLastPathComponent
+        let fm = FileManager.default
+
+        if fm.isWritableFile(atPath: parentDir) {
+            try? fm.removeItem(atPath: backupPath)
+            try fm.moveItem(atPath: appPath, toPath: backupPath)
+            do {
+                try fm.copyItem(atPath: sourcePath, toPath: appPath)
+            } catch {
+                try? fm.moveItem(atPath: backupPath, toPath: appPath)
+                throw error
+            }
+            removeQuarantine(at: appPath)
+            try? fm.removeItem(atPath: backupPath)
+        } else {
+            try replaceAppElevated(appPath: appPath, sourcePath: sourcePath, backupPath: backupPath)
+        }
+    }
+
+    private func replaceAppElevated(appPath: String, sourcePath: String, backupPath: String) throws {
+        let esc: (String) -> String = { $0.replacingOccurrences(of: "'", with: "'\\''") }
+        let cmd = [
+            "rm -rf '\(esc(backupPath))'",
+            "mv '\(esc(appPath))' '\(esc(backupPath))'",
+            "cp -R '\(esc(sourcePath))' '\(esc(appPath))'",
+            "xattr -rd com.apple.quarantine '\(esc(appPath))'",
+            "rm -rf '\(esc(backupPath))'",
+        ].joined(separator: " && ")
+        let script = "do shell script \"\(cmd)\" with administrator privileges"
+
+        guard let appleScript = NSAppleScript(source: script) else {
+            throw UpdateError.replaceFailed("Failed to create AppleScript")
+        }
+        var error: NSDictionary?
+        appleScript.executeAndReturnError(&error)
+        if let error {
+            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
+            if code == -128 { throw NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError) }
+            throw UpdateError.replaceFailed(
+                (error[NSAppleScript.errorMessage] as? String) ?? "Unknown error"
+            )
+        }
+    }
+
+    // MARK: - Relaunch
+
+    private func relaunchAndTerminate() {
+        let appPath = Bundle.main.bundlePath
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let escaped = appPath.replacingOccurrences(of: "'", with: "'\\''")
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; open '\(escaped)'"]
+        try? process.run()
+
+        logger.info("Relaunch script spawned, terminating for update")
+        NSApp.terminate(nil)
+    }
+
+    // MARK: - Helpers
+
+    private func removeQuarantine(at path: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        process.arguments = ["-rd", "com.apple.quarantine", path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+    }
+
     nonisolated static func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
         let aParts = a.split(separator: ".").compactMap { Int($0.prefix(while: \.isNumber)) }
         let bParts = b.split(separator: ".").compactMap { Int($0.prefix(while: \.isNumber)) }
@@ -108,11 +325,22 @@ final class UpdateChecker {
         return .orderedSame
     }
 
+    // MARK: - Types
+
     private enum UpdateError: LocalizedError {
         case badResponse(Int)
+        case mountFailed(String)
+        case appNotFoundInDMG
+        case replaceFailed(String)
+        case versionMismatch
+
         var errorDescription: String? {
             switch self {
-            case .badResponse(let code): return "GitHub returned status \(code)"
+            case .badResponse(let code): "GitHub returned status \(code)"
+            case .mountFailed(let msg): "Failed to mount DMG: \(msg)"
+            case .appNotFoundInDMG: "Mystral.app not found in the downloaded DMG"
+            case .replaceFailed(let msg): "Failed to replace app: \(msg)"
+            case .versionMismatch: "Downloaded version is not newer than current"
             }
         }
     }
@@ -126,5 +354,63 @@ final class UpdateChecker {
             let name: String
             let browser_download_url: String
         }
+    }
+}
+
+// MARK: - Download Session
+
+private final class DownloadSession: NSObject, URLSessionDownloadDelegate {
+    private var task: URLSessionDownloadTask?
+    private var session: URLSession?
+    private let destination: URL
+    private let onProgress: @Sendable (Double) -> Void
+    private let onComplete: @Sendable (Result<URL, Error>) -> Void
+    private var completed = false
+
+    init(url: URL, destination: URL,
+         onProgress: @escaping @Sendable (Double) -> Void,
+         onComplete: @escaping @Sendable (Result<URL, Error>) -> Void) {
+        self.destination = destination
+        self.onProgress = onProgress
+        self.onComplete = onComplete
+        super.init()
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 300
+        self.session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        self.task = self.session?.downloadTask(with: url)
+    }
+
+    func start() { task?.resume() }
+
+    func cancel() {
+        task?.cancel()
+        session?.invalidateAndCancel()
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {
+        guard !completed else { return }
+        completed = true
+        do {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: location, to: destination)
+            onComplete(.success(destination))
+        } catch {
+            onComplete(.failure(error))
+        }
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard !completed, let error else { return }
+        completed = true
+        onComplete(.failure(error))
     }
 }
