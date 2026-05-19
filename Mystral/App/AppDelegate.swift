@@ -136,17 +136,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return .staleOrMismatch(pid: pid)
         }
 
+        // Version matches and process is alive. Only force-restart if data
+        // has been stale for 2+ minutes, indicating a truly stuck helper.
+        // Short stalls (sleep/wake, display sleep) must not trigger a restart
+        // and the associated password prompt.
         let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath)
-        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) < 10 {
-            return .running
+        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) > 120 {
+            return .staleOrMismatch(pid: pid)
         }
-        return .staleOrMismatch(pid: pid)
+        return .running
     }
 
     private func launchAndVerifyHelper() {
         guard let execPath = Bundle.main.executablePath else { return }
         let escaped = execPath.replacingOccurrences(of: "'", with: "'\\''")
-        let script = "do shell script \"'\(escaped)' --smc-helper >/tmp/mystral-helper-stdout.log 2>/tmp/mystral-helper-stderr.log &\" with administrator privileges"
+        let script = "do shell script \"nohup '\(escaped)' --smc-helper >/tmp/mystral-helper-stdout.log 2>/tmp/mystral-helper-stderr.log &\" with administrator privileges"
         guard let appleScript = NSAppleScript(source: script) else { return }
         var error: NSDictionary?
         appleScript.executeAndReturnError(&error)

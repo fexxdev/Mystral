@@ -96,11 +96,11 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         let inGrace = now < wakeGraceDeadline
 
         guard fm.fileExists(atPath: path) else {
-            if Date().timeIntervalSince(startTime) > Self.startupGrace && !inGrace {
+            if Date().timeIntervalSince(startTime) > Self.startupGrace && !inGrace && !Self.isHelperProcessAlive() {
                 helperAlive = false
                 throw SMCProxyError.helperNotResponding
             }
-            logger.debug("refreshData — data file not yet available (startup/wake grace)")
+            logger.debug("refreshData — data file not yet available (startup/wake grace or helper alive)")
             return
         }
 
@@ -111,10 +111,21 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
                 logger.debug("refreshData — data file stale but within wake grace period")
                 return
             }
+            if Self.isHelperProcessAlive() && Date().timeIntervalSince(modDate) < 60 {
+                logger.debug("refreshData — data file stale but helper process alive, waiting for recovery")
+                return
+            }
             helperAlive = false
             logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
             throw SMCProxyError.helperNotResponding
         }
+    }
+
+    private static func isHelperProcessAlive() -> Bool {
+        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              let pid = Int32(pidStr) else { return false }
+        return kill(pid, 0) == 0
     }
 
     func notifyWake() {

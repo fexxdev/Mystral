@@ -65,6 +65,8 @@ enum SMCHelperMode {
             exit(1)
         }
 
+        signal(SIGHUP, SIG_IGN)
+
         let sigSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         signal(SIGTERM, SIG_IGN)
         sigSource.setEventHandler {

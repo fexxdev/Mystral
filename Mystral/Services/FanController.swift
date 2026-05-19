@@ -54,6 +54,10 @@ final class FanController {
             self, selector: #selector(handleWake),
             name: NSWorkspace.didWakeNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(handleWake),
+            name: NSWorkspace.screensDidWakeNotification, object: nil
+        )
     }
 
     @objc private func handleWake() {
