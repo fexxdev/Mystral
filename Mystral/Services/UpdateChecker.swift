@@ -359,7 +359,7 @@ final class UpdateChecker {
 
 // MARK: - Download Session
 
-private final class DownloadSession: NSObject, URLSessionDownloadDelegate {
+private final class DownloadSession: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private var task: URLSessionDownloadTask?
     private var session: URLSession?
     private let destination: URL
