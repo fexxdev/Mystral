@@ -30,8 +30,9 @@ struct SensorsView: View {
     var body: some View {
         Group {
             if fanController.sensors.isEmpty {
-                ContentUnavailableView("No Sensors Detected", systemImage: "thermometer.slash",
+                ContentUnavailableView("No Sensors Detected", systemImage: "exclamationmark.triangle",
                                        description: Text("Waiting for SMC helper to start. You may be prompted for your password."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 0) {
                     categoryBar

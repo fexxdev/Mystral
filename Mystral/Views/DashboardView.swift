@@ -40,31 +40,34 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                if !fanController.isHelperResponsive {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                        Text("SMC helper is not responding — fan control is inactive. Attempting to restart...")
-                        Spacer()
-                    }
-                    .font(.callout)
-                    .foregroundStyle(.white)
-                    .padding(12)
-                    .background(Color.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+        VStack(spacing: 0) {
+            if !fanController.isHelperResponsive {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("SMC helper is not responding — fan control is inactive. Attempting to restart...")
+                    Spacer()
                 }
+                .font(.callout)
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(Color.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                .padding([.horizontal, .top])
+            }
 
-                if fanController.sensors.isEmpty && fanController.fans.isEmpty {
-                    ContentUnavailableView("No SMC Data", systemImage: "exclamationmark.triangle",
-                                           description: Text("Waiting for SMC helper to start. You may be prompted for your password."))
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                } else {
-                    temperatureOverview
-                    historyChartSection
-                    fansSection
-                    profileSection
+            if fanController.sensors.isEmpty && fanController.fans.isEmpty {
+                ContentUnavailableView("No SMC Data", systemImage: "exclamationmark.triangle",
+                                       description: Text("Waiting for SMC helper to start. You may be prompted for your password."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        temperatureOverview
+                        historyChartSection
+                        fansSection
+                        profileSection
+                    }.padding()
                 }
-            }.padding()
+            }
         }.navigationTitle("Dashboard")
     }
 

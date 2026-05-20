@@ -3,16 +3,20 @@ import SwiftUI
 struct FansView: View {
     let fanController: FanController
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                ForEach(fanController.fans) { fan in
-                    FanDetailCard(fan: fan, fanController: fanController)
+        Group {
+            if fanController.fans.isEmpty {
+                ContentUnavailableView("No Fans Detected", systemImage: "fan.slash",
+                                       description: Text("Could not read fan information from SMC."))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(fanController.fans) { fan in
+                            FanDetailCard(fan: fan, fanController: fanController)
+                        }
+                    }.padding()
                 }
-                if fanController.fans.isEmpty {
-                    ContentUnavailableView("No Fans Detected", systemImage: "fan.slash",
-                                           description: Text("Could not read fan information from SMC."))
-                }
-            }.padding()
+            }
         }.navigationTitle("Fans")
     }
 }

@@ -150,7 +150,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func launchAndVerifyHelper() {
         guard let execPath = Bundle.main.executablePath else { return }
         let escaped = execPath.replacingOccurrences(of: "'", with: "'\\''")
-        let script = "do shell script \"nohup '\(escaped)' --smc-helper >/tmp/mystral-helper-stdout.log 2>/tmp/mystral-helper-stderr.log &\" with administrator privileges"
+
+        let launchScript = """
+        #!/bin/bash
+        LOG=/tmp/mystral-helper-launch.log
+        echo "=== Launch $(date) ===" >> "$LOG"
+        echo "binary: \(escaped)" >> "$LOG"
+        echo "uid: $(id -u)" >> "$LOG"
+        echo "cwd: $(pwd)" >> "$LOG"
+        export LLVM_PROFILE_FILE=/dev/null
+        cd /tmp
+        '\(escaped)' --smc-helper >>/tmp/mystral-helper-stdout.log 2>>/tmp/mystral-helper-stderr.log &
+        HPID=$!
+        echo "helper pid: $HPID" >> "$LOG"
+        sleep 2
+        if kill -0 $HPID 2>/dev/null; then
+            echo "helper alive after 2s" >> "$LOG"
+        else
+            wait $HPID 2>/dev/null
+            echo "helper DEAD exit=$?" >> "$LOG"
+        fi
+        """
+        try? launchScript.write(toFile: "/tmp/mystral-launch.sh", atomically: true, encoding: .utf8)
+        chmod("/tmp/mystral-launch.sh", 0o755)
+
+        let script = "do shell script \"bash /tmp/mystral-launch.sh\" with administrator privileges"
         guard let appleScript = NSAppleScript(source: script) else { return }
         var error: NSDictionary?
         appleScript.executeAndReturnError(&error)
@@ -161,7 +185,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
-        // Poll for PID file to confirm the helper actually started
         var verified = false
         for _ in 0..<10 {
             usleep(300_000)
