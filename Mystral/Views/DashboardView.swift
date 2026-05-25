@@ -44,8 +44,15 @@ struct DashboardView: View {
             if !fanController.isHelperResponsive {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                    Text("SMC helper is not responding — fan control is inactive. Attempting to restart...")
+                    Text("SMC helper is not responding — fan control is inactive.")
                     Spacer()
+                    Button {
+                        fanController.requestManualRestart()
+                    } label: {
+                        Label("Restart Helper", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
                 }
                 .font(.callout)
                 .foregroundStyle(.white)

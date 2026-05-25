@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var activityToken: NSObjectProtocol?
     private var helperLaunchFailures = 0
     private static let maxHelperLaunchAttempts = 3
+    private var helperGaveUpAt: Date?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("applicationDidFinishLaunching — start")
@@ -54,6 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         fanController!.helperRestarter = { [weak self] in
             self?.launchHelperAsync()
         }
+        fanController!.manualHelperRestarter = { [weak self] in
+            self?.forceRelaunchHelper()
+        }
         if UserDefaults.standard.object(forKey: "smoothingEnabled") != nil {
             fanController!.smoothingEnabled = UserDefaults.standard.bool(forKey: "smoothingEnabled")
         }
@@ -89,10 +93,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         logger.info("applicationDidFinishLaunching — complete")
     }
 
+    func forceRelaunchHelper() {
+        logger.info("Manual helper restart requested — resetting failure counter")
+        helperLaunchFailures = 0
+        helperGaveUpAt = nil
+        launchHelperAsync()
+    }
+
     private func launchHelperAsync() {
-        guard helperLaunchFailures < Self.maxHelperLaunchAttempts else {
-            logger.warning("Helper launch suppressed — \(self.helperLaunchFailures) consecutive failures, giving up until next app launch")
-            return
+        if helperLaunchFailures >= Self.maxHelperLaunchAttempts {
+            if let gaveUp = helperGaveUpAt, Date().timeIntervalSince(gaveUp) > 12 * 3600 {
+                logger.info("12 hours since helper gave up — resetting failure counter for retry")
+                helperLaunchFailures = 0
+                helperGaveUpAt = nil
+            } else {
+                if helperGaveUpAt == nil { helperGaveUpAt = Date() }
+                logger.warning("Helper launch suppressed — \(self.helperLaunchFailures) consecutive failures, retrying in 12h or on manual restart")
+                return
+            }
         }
         let helperState = checkHelper()
         switch helperState {
@@ -136,12 +154,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return .staleOrMismatch(pid: pid)
         }
 
-        // Version matches and process is alive. Only force-restart if data
-        // has been stale for 2+ minutes, indicating a truly stuck helper.
-        // Short stalls (sleep/wake, display sleep) must not trigger a restart
-        // and the associated password prompt.
         let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath)
-        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) > 120 {
+        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) > 60 {
             return .staleOrMismatch(pid: pid)
         }
         return .running

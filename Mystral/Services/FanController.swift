@@ -27,6 +27,7 @@ final class FanController {
     private var lastHelperRestartUptime: TimeInterval = 0
     private var wakeGraceUntil: TimeInterval = 0
     var helperRestarter: (() -> Void)?
+    var manualHelperRestarter: (() -> Void)?
 
     var pollingInterval: TimeInterval = 2.0 {
         didSet { if isRunning { restart() } }
@@ -238,6 +239,12 @@ final class FanController {
         let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
         guard !cpuCores.isEmpty else { return sensors.first?.temperature ?? 0 }
         return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
+    }
+
+    func requestManualRestart() {
+        consecutiveHelperFailures = 0
+        isHelperResponsive = false
+        manualHelperRestarter?()
     }
 
     func clearManualOverride(for fanId: Int) { manualOverrides.removeValue(forKey: fanId) }
