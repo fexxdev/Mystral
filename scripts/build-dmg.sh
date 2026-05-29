@@ -58,8 +58,10 @@ Installing
      - Choose "Open"
      - Click "Open" in the Gatekeeper dialog
    This is needed because Mystral is not yet signed with a Developer ID.
-4. Mystral will ask for your password once per launch to write fan settings.
-   It uses an AppleScript admin prompt - no kernel extension is required.
+4. The first time Mystral runs it asks for your password once to install a
+   small background helper (a launchd daemon) that controls the fans. After
+   that the helper starts automatically and stays running - you are never
+   asked for your password again. No kernel extension is required.
 
 Notes
 -----
@@ -67,6 +69,10 @@ Notes
   You can verify the build yourself: https://github.com/fexxdev/Mystral
 - The app stores profiles in ~/Library/Application Support/Mystral.
 - Reset everything in Settings > Reset All Settings.
+- The fan helper is a launchd daemon kept alive by macOS. To remove it
+  completely (e.g. after deleting Mystral.app), run in Terminal:
+      sudo launchctl bootout system/com.fexxdev.Mystral.helper
+      sudo rm /Library/LaunchDaemons/com.fexxdev.Mystral.helper.plist
 EOF
 
 DMG_PATH="$OUTPUT_DIR/$DMG_NAME"

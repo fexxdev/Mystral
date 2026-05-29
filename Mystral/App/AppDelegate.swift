@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var helperLaunchFailures = 0
     private static let maxHelperLaunchAttempts = 3
     private var helperGaveUpAt: Date?
+    private var didRequestUpgradeRestart = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("applicationDidFinishLaunching — start")
@@ -48,12 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let proxy = SMCProxyService()
             smcProxy = proxy
             smcService = proxy
-            launchHelperAsync()
+            ensureHelperInstalled()
         }
 
         fanController = FanController(smcService: smcService, profileManager: profileManager!)
         fanController!.helperRestarter = { [weak self] in
-            self?.launchHelperAsync()
+            self?.ensureHelperInstalled()
         }
         fanController!.manualHelperRestarter = { [weak self] in
             self?.forceRelaunchHelper()
@@ -94,129 +95,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func forceRelaunchHelper() {
-        logger.info("Manual helper restart requested — resetting failure counter")
+        logger.info("Manual helper restart requested")
         helperLaunchFailures = 0
         helperGaveUpAt = nil
-        launchHelperAsync()
+        guard smcProxy != nil, let execPath = Bundle.main.executablePath else { return }
+        if HelperDaemon.isInstalled(forExecutable: execPath) {
+            // Prompt-free: ask the running helper to recycle; the launchd daemon's
+            // KeepAlive relaunches it immediately (also picks up a new binary).
+            smcProxy?.requestRestart()
+        } else {
+            ensureHelperInstalled()
+        }
     }
 
-    private func launchHelperAsync() {
+    /// Ensures the privileged SMC helper is installed as a launchd daemon. The first
+    /// install triggers ONE admin prompt; afterwards launchd keeps the helper alive
+    /// forever, so this is a no-op on later launches. If the app was updated in place,
+    /// recycles the running helper prompt-free so launchd loads the new binary.
+    private func ensureHelperInstalled() {
+        guard smcProxy != nil, let execPath = Bundle.main.executablePath else { return }
+
+        if HelperDaemon.isInstalled(forExecutable: execPath) {
+            helperLaunchFailures = 0
+            requestUpgradeRestartIfNeeded()
+            return
+        }
+
         if helperLaunchFailures >= Self.maxHelperLaunchAttempts {
             if let gaveUp = helperGaveUpAt, Date().timeIntervalSince(gaveUp) > 12 * 3600 {
-                logger.info("12 hours since helper gave up — resetting failure counter for retry")
+                logger.info("12 hours since helper install gave up — resetting for retry")
                 helperLaunchFailures = 0
                 helperGaveUpAt = nil
             } else {
                 if helperGaveUpAt == nil { helperGaveUpAt = Date() }
-                logger.warning("Helper launch suppressed — \(self.helperLaunchFailures) consecutive failures, retrying in 12h or on manual restart")
+                logger.warning("Helper install suppressed — \(self.helperLaunchFailures) consecutive failures, retrying in 12h or on manual restart")
                 return
             }
         }
-        let helperState = checkHelper()
-        switch helperState {
-        case .running:
-            logger.info("Helper already running (version match)")
-            helperLaunchFailures = 0
-            return
-        case .staleOrMismatch(let pid):
-            logger.info("Helper version mismatch or stale — killing old helper")
-            Task.detached {
-                kill(pid, SIGTERM)
-                try? await Task.sleep(for: .milliseconds(500))
-                await self.launchAndVerifyHelper()
-            }
-            return
-        case .notRunning:
-            break
-        }
+
         Task.detached {
-            await self.launchAndVerifyHelper()
-        }
-    }
-
-    private enum HelperState {
-        case running
-        case staleOrMismatch(pid: Int32)
-        case notRunning
-    }
-
-    private func checkHelper() -> HelperState {
-        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-              let pid = Int32(pidStr),
-              kill(pid, 0) == 0 else { return .notRunning }
-
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: SMCHelperMode.dataPath)),
-              let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else {
-            return .staleOrMismatch(pid: pid)
-        }
-
-        if smcData.version != SMCHelperMode.appVersion {
-            return .staleOrMismatch(pid: pid)
-        }
-
-        let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath)
-        if let modified = attrs?[.modificationDate] as? Date, Date().timeIntervalSince(modified) > 60 {
-            return .staleOrMismatch(pid: pid)
-        }
-        return .running
-    }
-
-    private func launchAndVerifyHelper() {
-        guard let execPath = Bundle.main.executablePath else { return }
-        let escaped = execPath.replacingOccurrences(of: "'", with: "'\\''")
-
-        let launchScript = """
-        #!/bin/bash
-        LOG=/tmp/mystral-helper-launch.log
-        echo "=== Launch $(date) ===" >> "$LOG"
-        echo "binary: \(escaped)" >> "$LOG"
-        echo "uid: $(id -u)" >> "$LOG"
-        echo "cwd: $(pwd)" >> "$LOG"
-        export LLVM_PROFILE_FILE=/dev/null
-        cd /tmp
-        '\(escaped)' --smc-helper >>/tmp/mystral-helper-stdout.log 2>>/tmp/mystral-helper-stderr.log &
-        HPID=$!
-        echo "helper pid: $HPID" >> "$LOG"
-        sleep 2
-        if kill -0 $HPID 2>/dev/null; then
-            echo "helper alive after 2s" >> "$LOG"
-        else
-            wait $HPID 2>/dev/null
-            echo "helper DEAD exit=$?" >> "$LOG"
-        fi
-        """
-        try? launchScript.write(toFile: "/tmp/mystral-launch.sh", atomically: true, encoding: .utf8)
-        chmod("/tmp/mystral-launch.sh", 0o755)
-
-        let script = "do shell script \"bash /tmp/mystral-launch.sh\" with administrator privileges"
-        guard let appleScript = NSAppleScript(source: script) else { return }
-        var error: NSDictionary?
-        appleScript.executeAndReturnError(&error)
-        if let error {
-            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
-            logger.error("Helper launch failed (code=\(code, privacy: .public)): \(error, privacy: .public)")
-            helperLaunchFailures += 1
-            return
-        }
-
-        var verified = false
-        for _ in 0..<10 {
-            usleep(300_000)
-            if let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-               let pid = Int32(pidStr),
-               kill(pid, 0) == 0 {
-                verified = true
-                break
+            let ok = HelperDaemon.install(executablePath: execPath)
+            await MainActor.run {
+                if ok {
+                    self.helperLaunchFailures = 0
+                    logger.info("Helper daemon installed and running")
+                } else {
+                    self.helperLaunchFailures += 1
+                    logger.error("Helper daemon install failed (attempt \(self.helperLaunchFailures)/\(Self.maxHelperLaunchAttempts, privacy: .public))")
+                }
             }
         }
+    }
 
-        if verified {
-            logger.info("Helper launched and verified (PID file confirmed)")
-            helperLaunchFailures = 0
-        } else {
-            helperLaunchFailures += 1
-            logger.error("Helper launch appeared to succeed but process not running after 3s (attempt \(self.helperLaunchFailures)/\(Self.maxHelperLaunchAttempts, privacy: .public))")
-        }
+    /// After an in-place app update the daemon (same path) still runs the old binary.
+    /// If the running helper reports an older version on fresh data, ask it to recycle
+    /// so launchd relaunches the new on-disk binary — no admin prompt. At most once per run.
+    private func requestUpgradeRestartIfNeeded() {
+        guard !didRequestUpgradeRestart,
+              let data = try? Data(contentsOf: URL(fileURLWithPath: SMCHelperMode.dataPath)),
+              let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data),
+              let version = smcData.version, version != SMCHelperMode.appVersion,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath),
+              let modified = attrs[.modificationDate] as? Date,
+              Date().timeIntervalSince(modified) < 30 else { return }
+        logger.info("Helper version \(version, privacy: .public) != app \(SMCHelperMode.appVersion, privacy: .public) — requesting prompt-free restart")
+        didRequestUpgradeRestart = true
+        smcProxy?.requestRestart()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -225,15 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        logger.info("applicationWillTerminate — stopping fan controller and killing helper")
+        // Leave the helper running — it's a launchd daemon now and is meant to persist.
+        // fanController.stop() writes the un-force command, which the still-alive helper
+        // applies on its next tick, returning fans to auto control.
+        logger.info("applicationWillTerminate — restoring auto mode (helper daemon persists)")
         fanController?.stop()
-        killHelper()
-    }
-
-    private func killHelper() {
-        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-              let pid = Int32(pidStr) else { return }
-        kill(pid, SIGTERM)
     }
 
     func openMainWindow() {
@@ -287,4 +227,103 @@ final class FallbackSMCService: SMCServiceProtocol, @unchecked Sendable {
     func setFanSpeed(index: Int, percentage: Double) throws {}
     func setFanMode(index: Int, mode: FanMode) throws {}
     func setForcedMode(fanCount: Int, forced: Bool) throws {}
+}
+
+/// Installs and tracks the privileged SMC helper as a launchd LaunchDaemon.
+///
+/// Previously the helper was spawned as a root *orphan* via `osascript … with
+/// administrator privileges` and backgrounded. launchd (pid 1) adopts such orphans
+/// and reaps them during housekeeping (~every 20–40 min), forcing a fresh admin
+/// prompt each time. As a managed LaunchDaemon with KeepAlive, launchd instead keeps
+/// the helper alive forever and revives it in <1s on any death — one admin prompt at
+/// install, never again.
+enum HelperDaemon {
+    static let label = "com.fexxdev.Mystral.helper"
+    static let plistPath = "/Library/LaunchDaemons/\(label).plist"
+
+    /// True if the daemon plist is installed AND points at `executablePath`. A path
+    /// mismatch means the app was moved/reinstalled elsewhere and needs a repair install.
+    static func isInstalled(forExecutable executablePath: String) -> Bool {
+        guard let dict = NSDictionary(contentsOfFile: plistPath),
+              let args = dict["ProgramArguments"] as? [String],
+              let program = args.first else { return false }
+        return program == executablePath
+    }
+
+    /// Installs/repairs the daemon. Triggers ONE admin password prompt. Returns true
+    /// on success. Safe to call when already installed (re-bootstraps cleanly).
+    @discardableResult
+    static func install(executablePath: String) -> Bool {
+        let staged = "/tmp/\(label).plist"
+        guard (try? plistContents(executablePath: executablePath)
+            .write(toFile: staged, atomically: true, encoding: .utf8)) != nil else {
+            logger.error("Failed to stage daemon plist in /tmp")
+            return false
+        }
+
+        // As root: drop any prior job + stray orphan helpers, install the plist, then
+        // bootstrap/enable/kickstart so launchd starts and keeps the helper alive.
+        let installScript = """
+        #!/bin/bash
+        LOG=/tmp/mystral-daemon-install.log
+        echo "=== install $(date) uid=$(id -u) ===" >> "$LOG"
+        launchctl bootout system/\(label) 2>/dev/null || true
+        pkill -f -- '--smc-helper' 2>/dev/null || true
+        cp '\(staged)' '\(plistPath)' && chown root:wheel '\(plistPath)' && chmod 644 '\(plistPath)' || { echo "plist install FAILED" >> "$LOG"; exit 1; }
+        launchctl enable system/\(label) 2>/dev/null || true
+        launchctl bootstrap system '\(plistPath)' 2>>"$LOG" || true
+        launchctl kickstart system/\(label) 2>>"$LOG" || true
+        echo "install OK" >> "$LOG"
+        """
+        try? installScript.write(toFile: "/tmp/mystral-daemon-install.sh", atomically: true, encoding: .utf8)
+        chmod("/tmp/mystral-daemon-install.sh", 0o755)
+
+        let osa = "do shell script \"bash /tmp/mystral-daemon-install.sh\" with administrator privileges"
+        guard let script = NSAppleScript(source: osa) else { return false }
+        var error: NSDictionary?
+        script.executeAndReturnError(&error)
+        if let error {
+            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
+            logger.error("Daemon install failed (code=\(code, privacy: .public)): \(error, privacy: .public)")
+            return false
+        }
+        return isInstalled(forExecutable: executablePath)
+    }
+
+    private static func plistContents(executablePath: String) -> String {
+        let escaped = executablePath
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+        return """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>Label</key>
+            <string>\(label)</string>
+            <key>ProgramArguments</key>
+            <array>
+                <string>\(escaped)</string>
+                <string>--smc-helper</string>
+            </array>
+            <key>KeepAlive</key>
+            <true/>
+            <key>RunAtLoad</key>
+            <true/>
+            <key>ProcessType</key>
+            <string>Interactive</string>
+            <key>EnvironmentVariables</key>
+            <dict>
+                <key>LLVM_PROFILE_FILE</key>
+                <string>/dev/null</string>
+            </dict>
+            <key>StandardOutPath</key>
+            <string>/tmp/mystral-helper-stdout.log</string>
+            <key>StandardErrorPath</key>
+            <string>/tmp/mystral-helper-stderr.log</string>
+        </dict>
+        </plist>
+        """
+    }
 }

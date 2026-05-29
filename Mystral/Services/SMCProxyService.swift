@@ -147,6 +147,18 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         }
     }
 
+    /// Asks the helper to exit so the launchd daemon's KeepAlive relaunches it (used for
+    /// the manual restart button and to load a new binary after an app update). Bypasses
+    /// the `helperAlive` guard since the point is to recycle a possibly-stale helper.
+    func requestRestart() {
+        try? FileManager.default.createDirectory(atPath: SMCHelperMode.cmdDir, withIntermediateDirectories: true)
+        let cmd = SMCHelperMode.Command(action: "restart", index: 0, value: nil)
+        guard let data = try? JSONEncoder().encode(cmd) else { return }
+        let path = "\(SMCHelperMode.cmdDir)/\(UUID().uuidString).json"
+        try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        logger.info("requestRestart — wrote restart command for launchd relaunch")
+    }
+
     private func writeCommand(_ command: SMCHelperMode.Command) throws {
         guard helperAlive else {
             logger.debug("writeCommand skipped (helper dead) — action=\(command.action, privacy: .public)")

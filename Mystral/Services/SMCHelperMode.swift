@@ -202,6 +202,14 @@ enum SMCHelperMode {
                     fputs("CMD: setForcedMode forced=\(forced) fanCount=\(count)\n", stderr)
                     try smc.setForcedMode(fanCount: count, forced: forced)
                     fputs("  OK\n", stderr)
+                case "restart":
+                    // App asked us to recycle (e.g. to load a newer binary after an
+                    // app update, or via the manual restart button). Just exit — the
+                    // launchd daemon's KeepAlive relaunches us from the on-disk binary.
+                    fputs("CMD: restart — exiting for launchd to relaunch\n", stderr)
+                    logger.info("SMCHelper — restart command received, exiting for launchd relaunch")
+                    cleanup()
+                    exit(0)
                 default: break
                 }
             } catch {
