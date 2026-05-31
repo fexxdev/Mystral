@@ -36,6 +36,7 @@
 		899EF7962938FA899A4AA954 /* SMCKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DEB194BD8B7268EA696A8B /* SMCKit.swift */; };
 		8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32669FE44D66FA46AE1A940B /* MenuBarManager.swift */; };
 		8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462BE967A2BED80A410B8FD6 /* Sensor.swift */; };
+		911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */; };
 		9749F172B278C7C00382A6E3 /* SMCServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */; };
 		9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B84A99260FBBACE9652B11 /* MystralTests.swift */; };
 		AACB9F0BEBE77A4BC19B21A6 /* performance.json in Resources */ = {isa = PBXBuildFile; fileRef = 0141EF015312ABA6408CBBB5 /* performance.json */; };
@@ -49,6 +50,7 @@
 		DBB3A459CD1B613B1967C3C6 /* UpdateCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */; };
 		DFF2CDB314AE582DA1BF5566 /* StressTester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1EFCA98618725CFF71FBF44 /* StressTester.swift */; };
 		E8B5AC4AE236301F73984345 /* FanController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EA4F8C6E8D825A5768015E /* FanController.swift */; };
+		EBD1DD4A2391005EE603140D /* IOReportPower.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DA23ACC945EF50541CBE01 /* IOReportPower.swift */; };
 		F043C27F29A95684188E630A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1492F8F118B5D2787454874D /* SettingsView.swift */; };
 		F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */; };
 		FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */; };
@@ -81,6 +83,7 @@
 		3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
 		462BE967A2BED80A410B8FD6 /* Sensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensor.swift; sourceTree = "<group>"; };
 		53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManagerTests.swift; sourceTree = "<group>"; };
+		54DA23ACC945EF50541CBE01 /* IOReportPower.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPower.swift; sourceTree = "<group>"; };
 		556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		69DB5298EB34D69B0470542B /* Mystral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mystral.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -111,6 +114,7 @@
 		D9EA4F8C6E8D825A5768015E /* FanController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanController.swift; sourceTree = "<group>"; };
 		E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdvancedTests.swift; sourceTree = "<group>"; };
+		EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPowerTests.swift; sourceTree = "<group>"; };
 		F396958B870BBA4EAA4FDF95 /* SensorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorTests.swift; sourceTree = "<group>"; };
 		FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorRegistryTests.swift; sourceTree = "<group>"; };
 		FDA6F2DABB940EF0DB47624E /* Fan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fan.swift; sourceTree = "<group>"; };
@@ -169,6 +173,7 @@
 				AE7DD7E0E7A61390B45908D9 /* AlertManager.swift */,
 				D9EA4F8C6E8D825A5768015E /* FanController.swift */,
 				6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */,
+				54DA23ACC945EF50541CBE01 /* IOReportPower.swift */,
 				31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */,
 				B1704CD9C898267DFA1A539A /* ProfileManager.swift */,
 				D55974A74B43876077772D5D /* SensorRegistry.swift */,
@@ -230,6 +235,7 @@
 				53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */,
 				7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */,
 				0CCC71C9AEBA3D6DC9BB66D8 /* FanModelTests.swift */,
+				EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */,
 				6F2CB65F4FBC7DF6F26A823F /* MenuBarTests.swift */,
 				20B84A99260FBBACE9652B11 /* MystralTests.swift */,
 				E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */,
@@ -344,6 +350,7 @@
 				E8B5AC4AE236301F73984345 /* FanController.swift in Sources */,
 				20157A49BC121C0B85F8CDEC /* FansView.swift in Sources */,
 				1F17A09E0B12AFF9DDB990E1 /* HardwareInfo.swift in Sources */,
+				EBD1DD4A2391005EE603140D /* IOReportPower.swift in Sources */,
 				B81F91BB671069D90EE0FE59 /* MainView.swift in Sources */,
 				8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */,
 				759D269E2FAC5C162D35DDB4 /* MystralApp.swift in Sources */,
@@ -372,6 +379,7 @@
 				76E19A16214C1D92B7A71E92 /* AlertManagerTests.swift in Sources */,
 				3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */,
 				D67BD88E19F47CDF1635A88C /* FanModelTests.swift in Sources */,
+				911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */,
 				836D34008D53C05207B74E6A /* MenuBarTests.swift in Sources */,
 				9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */,
 				F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */,
