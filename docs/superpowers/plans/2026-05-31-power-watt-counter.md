@@ -286,9 +286,13 @@ final class PowerMonitor {
         } else {
             totalWatts = nil
         }
-        let reading = ioreport?.sample() ?? (nil, nil)
-        cpuWatts = reading.cpu
-        gpuWatts = reading.gpu
+        if let reading = ioreport?.sample() {
+            cpuWatts = reading.cpu
+            gpuWatts = reading.gpu
+        } else {
+            cpuWatts = nil
+            gpuWatts = nil
+        }
     }
 }
 ```
