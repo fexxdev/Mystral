@@ -203,8 +203,8 @@ final class IOReportPower {
         var cpuJoules = 0.0, gpuJoules = 0.0
         var sawCPU = false, sawGPU = false
         _ = iterate(delta) { [self] channel in
-            let name = chanName(channel)?.takeUnretainedValue().map(String.init) ?? ""
-            let unit = getUnit(channel)?.takeUnretainedValue().map(String.init) ?? ""
+            let name = (chanName(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
+            let unit = (getUnit(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
             let raw = simpleInt(channel, 0)
             if name == "CPU Energy" {
                 cpuJoules += IOReportPower.energyToJoules(raw: raw, unit: unit); sawCPU = true
@@ -228,7 +228,7 @@ final class IOReportPower {
 }
 ```
 
-> Note on CF memory: `Copy`/`Create` calls are +1 → `takeRetainedValue()`; `Get` accessors (`...GetChannelName`, `...GetUnitLabel`) are +0 → `takeUnretainedValue()`. `.map(String.init)` bridges the optional `CFString` to `String`.
+> Note on CF memory: `Copy`/`Create` calls are +1 → `takeRetainedValue()`; `Get` accessors (`...GetChannelName`, `...GetUnitLabel`) are +0 → `takeUnretainedValue()`. The parenthesized `(…?.takeUnretainedValue()).map { $0 as String }` bridges the optional `CFString` to `String` — the parens are required so `.map` applies to the optional, not to the non-optional `CFString` from `takeUnretainedValue()`.
 
 - [ ] **Step 2: Build**
 
