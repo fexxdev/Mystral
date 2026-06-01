@@ -49,6 +49,8 @@ final class MenuBarManager {
     private var liveFanItems: [NSMenuItem] = []
     private var liveProfileItems: [NSMenuItem] = []
 
+    private let powerMonitor = PowerMonitor()
+
     private static let displayModeKey = "menuBarDisplayMode"
     private static let tempSourceKey = "menuBarTempSource"
 
@@ -242,6 +244,7 @@ final class MenuBarManager {
     private func startUpdating() {
         let timer = Timer(timeInterval: fanController.pollingInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.powerMonitor.sample()
                 self?.syncFromDefaults()
                 self?.updateStatusItem()
                 self?.updateContextMenuItems()
@@ -282,7 +285,7 @@ final class MenuBarManager {
                 button.title = ""
             }
         case .iconAndPower, .powerOnly:
-            button.title = prefix + Self.formatTotalWatts(nil)
+            button.title = prefix + powerString()
         case .miniGraph:
             break
         }
@@ -298,6 +301,10 @@ final class MenuBarManager {
     private func rpmString() -> String {
         guard let fan = fanController.fans.first else { return "-- RPM" }
         return "\(fan.currentRPM)"
+    }
+
+    private func powerString() -> String {
+        Self.formatTotalWatts(powerMonitor.totalWatts)
     }
 
     private func currentTemperature() -> Double {
