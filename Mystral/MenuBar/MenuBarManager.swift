@@ -16,11 +16,13 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case temperatureOnly = "Temperature Only"
     case rpmOnly = "RPM Only"
     case miniGraph = "Mini Graph"
+    case iconAndPower = "Icon + Power"
+    case powerOnly = "Power Only"
 
     var showsIcon: Bool {
         switch self {
-        case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile: return true
-        case .temperatureOnly, .rpmOnly, .miniGraph: return false
+        case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile, .iconAndPower: return true
+        case .temperatureOnly, .rpmOnly, .miniGraph, .powerOnly: return false
         }
     }
 }
@@ -44,8 +46,12 @@ final class MenuBarManager {
 
     private var liveCpuItem: NSMenuItem?
     private var liveGpuItem: NSMenuItem?
+    private var livePowerItem: NSMenuItem?
+    private var livePowerBreakdownItem: NSMenuItem?
     private var liveFanItems: [NSMenuItem] = []
     private var liveProfileItems: [NSMenuItem] = []
+
+    private var powerMonitor: PowerMonitor { fanController.powerMonitor }
 
     private static let displayModeKey = "menuBarDisplayMode"
     private static let tempSourceKey = "menuBarTempSource"
@@ -143,6 +149,16 @@ final class MenuBarManager {
             liveGpuItem = item
             menu.addItem(item)
         }
+        if powerMonitor.totalWatts != nil {
+            let item = Self.infoItem("")
+            livePowerItem = item
+            menu.addItem(item)
+        }
+        if powerMonitor.cpuWatts != nil || powerMonitor.gpuWatts != nil {
+            let item = Self.infoItem("")
+            livePowerBreakdownItem = item
+            menu.addItem(item)
+        }
         liveFanItems = []
         for _ in fanController.fans {
             let item = Self.infoItem("")
@@ -181,6 +197,8 @@ final class MenuBarManager {
 
         liveCpuItem = nil
         liveGpuItem = nil
+        livePowerItem = nil
+        livePowerBreakdownItem = nil
         liveFanItems = []
         liveProfileItems = []
     }
@@ -200,6 +218,13 @@ final class MenuBarManager {
             let mx = gpuCores.map(\.temperature).max() ?? 0
             item.title = "GPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
         }
+        if let item = livePowerItem, let w = powerMonitor.totalWatts {
+            item.title = "Power  \(Int(w.rounded())) W"
+        }
+        if let item = livePowerBreakdownItem,
+           let text = Self.formatPowerBreakdown(cpu: powerMonitor.cpuWatts, gpu: powerMonitor.gpuWatts) {
+            item.title = text
+        }
         let fans = fanController.fans
         for (i, item) in liveFanItems.enumerated() where i < fans.count {
             item.title = "\(fans[i].name)  \(fans[i].currentRPM) RPM  (\(Int(fans[i].percentage))%)"
@@ -214,6 +239,18 @@ final class MenuBarManager {
         let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
+    }
+
+    nonisolated static func formatTotalWatts(_ watts: Double?) -> String {
+        guard let w = watts, w > 0 else { return "-- W" }
+        return "\(Int(w.rounded())) W"
+    }
+
+    nonisolated static func formatPowerBreakdown(cpu: Double?, gpu: Double?) -> String? {
+        var parts: [String] = []
+        if let c = cpu, c >= 0 { parts.append("CPU \(Int(c.rounded())) W") }
+        if let g = gpu, g >= 0 { parts.append("GPU \(Int(g.rounded())) W") }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
     }
 
     @objc private func selectProfile(_ sender: NSMenuItem) {
@@ -267,6 +304,8 @@ final class MenuBarManager {
             } else {
                 button.title = ""
             }
+        case .iconAndPower, .powerOnly:
+            button.title = prefix + powerString()
         case .miniGraph:
             break
         }
@@ -282,6 +321,10 @@ final class MenuBarManager {
     private func rpmString() -> String {
         guard let fan = fanController.fans.first else { return "-- RPM" }
         return "\(fan.currentRPM)"
+    }
+
+    private func powerString() -> String {
+        Self.formatTotalWatts(powerMonitor.totalWatts)
     }
 
     private func currentTemperature() -> Double {

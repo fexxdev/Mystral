@@ -6,7 +6,7 @@ final class MenuBarTests: XCTestCase {
     // MARK: - MenuBarDisplayMode
 
     func testAllCasesCount() {
-        XCTAssertEqual(MenuBarDisplayMode.allCases.count, 7)
+        XCTAssertEqual(MenuBarDisplayMode.allCases.count, 9)
     }
 
     func testShowsIconForIconModes() {
@@ -20,6 +20,27 @@ final class MenuBarTests: XCTestCase {
         XCTAssertFalse(MenuBarDisplayMode.temperatureOnly.showsIcon)
         XCTAssertFalse(MenuBarDisplayMode.rpmOnly.showsIcon)
         XCTAssertFalse(MenuBarDisplayMode.miniGraph.showsIcon)
+    }
+
+    func testShowsIconForPowerModes() {
+        XCTAssertTrue(MenuBarDisplayMode.iconAndPower.showsIcon)
+        XCTAssertFalse(MenuBarDisplayMode.powerOnly.showsIcon)
+    }
+
+    // MARK: - Power formatters
+
+    func testFormatTotalWatts() {
+        XCTAssertEqual(MenuBarManager.formatTotalWatts(nil), "-- W")
+        XCTAssertEqual(MenuBarManager.formatTotalWatts(0), "-- W")
+        XCTAssertEqual(MenuBarManager.formatTotalWatts(38.4), "38 W")
+        XCTAssertEqual(MenuBarManager.formatTotalWatts(44.6), "45 W")
+    }
+
+    func testFormatPowerBreakdown() {
+        XCTAssertEqual(MenuBarManager.formatPowerBreakdown(cpu: 17.2, gpu: 4.1), "CPU 17 W  ·  GPU 4 W")
+        XCTAssertEqual(MenuBarManager.formatPowerBreakdown(cpu: 17.0, gpu: nil), "CPU 17 W")
+        XCTAssertEqual(MenuBarManager.formatPowerBreakdown(cpu: nil, gpu: 4.0), "GPU 4 W")
+        XCTAssertNil(MenuBarManager.formatPowerBreakdown(cpu: nil, gpu: nil))
     }
 
     func testDisplayModeRawValueRoundTrip() {
