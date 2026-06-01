@@ -10,6 +10,14 @@ final class PowerMonitor {
     private(set) var cpuWatts: Double?
     private(set) var gpuWatts: Double?
 
+    /// Rolling watt history for the dashboard chart — one sample per FanController
+    /// tick, so it shares the exact polling cadence as sensor history. At the default
+    /// 2 s interval, `maxHistory` samples ≈ the last 5 minutes.
+    private(set) var totalHistory: [Double] = []
+    private(set) var cpuHistory: [Double] = []
+    private(set) var gpuHistory: [Double] = []
+    static let maxHistory = 150
+
     private let smc: SMCKit?
     private let ioreport: IOReportPower?
 
@@ -34,5 +42,16 @@ final class PowerMonitor {
             cpuWatts = nil
             gpuWatts = nil
         }
+        if let t = totalWatts { totalHistory = Self.appendCapped(t, to: totalHistory, maxHistory: Self.maxHistory) }
+        if let c = cpuWatts { cpuHistory = Self.appendCapped(c, to: cpuHistory, maxHistory: Self.maxHistory) }
+        if let g = gpuWatts { gpuHistory = Self.appendCapped(g, to: gpuHistory, maxHistory: Self.maxHistory) }
+    }
+
+    /// Append a value to a rolling history, trimming the oldest samples beyond `maxHistory`.
+    nonisolated static func appendCapped(_ value: Double, to history: [Double], maxHistory: Int) -> [Double] {
+        var h = history
+        h.append(value)
+        if h.count > maxHistory { h.removeFirst(h.count - maxHistory) }
+        return h
     }
 }

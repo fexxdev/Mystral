@@ -51,7 +51,7 @@ final class MenuBarManager {
     private var liveFanItems: [NSMenuItem] = []
     private var liveProfileItems: [NSMenuItem] = []
 
-    private let powerMonitor = PowerMonitor()
+    private var powerMonitor: PowerMonitor { fanController.powerMonitor }
 
     private static let displayModeKey = "menuBarDisplayMode"
     private static let tempSourceKey = "menuBarTempSource"
@@ -265,7 +265,6 @@ final class MenuBarManager {
     private func startUpdating() {
         let timer = Timer(timeInterval: fanController.pollingInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.powerMonitor.sample()
                 self?.syncFromDefaults()
                 self?.updateStatusItem()
                 self?.updateContextMenuItems()

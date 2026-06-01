@@ -16,6 +16,7 @@
 		2597AC1634E722BD0B0A9692 /* SensorRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */; };
 		26304EC1C1CABE9025CF9AF9 /* Fan.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA6F2DABB940EF0DB47624E /* Fan.swift */; };
 		2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044D527A57845C5CC26E4D89 /* SMCService.swift */; };
+		30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */; };
 		3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */; };
 		41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64319980C33FE2804285A28 /* UpdateChecker.swift */; };
 		46532E2210160C677CFBC603 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC93D0D514DBB473923BF1 /* Profile.swift */; };
@@ -114,6 +115,7 @@
 		D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCServiceTests.swift; sourceTree = "<group>"; };
 		D9EA4F8C6E8D825A5768015E /* FanController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanController.swift; sourceTree = "<group>"; };
+		DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitorTests.swift; sourceTree = "<group>"; };
 		E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdvancedTests.swift; sourceTree = "<group>"; };
 		EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPowerTests.swift; sourceTree = "<group>"; };
@@ -241,6 +243,7 @@
 				EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */,
 				6F2CB65F4FBC7DF6F26A823F /* MenuBarTests.swift */,
 				20B84A99260FBBACE9652B11 /* MystralTests.swift */,
+				DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */,
 				E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */,
 				A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */,
 				95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */,
@@ -386,6 +389,7 @@
 				911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */,
 				836D34008D53C05207B74E6A /* MenuBarTests.swift in Sources */,
 				9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */,
+				30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */,
 				F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */,
 				83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */,
 				FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */,

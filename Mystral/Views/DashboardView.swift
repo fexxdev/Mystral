@@ -39,6 +39,8 @@ struct DashboardView: View {
         return cores.map(\.temperature).reduce(0, +) / Double(cores.count)
     }
 
+    private var power: PowerMonitor { fanController.powerMonitor }
+
     var body: some View {
         VStack(spacing: 0) {
             if !fanController.isHelperResponsive {
@@ -69,6 +71,7 @@ struct DashboardView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         temperatureOverview
+                        powerSection
                         historyChartSection
                         fansSection
                         profileSection
@@ -228,6 +231,87 @@ struct DashboardView: View {
         }
     }
 
+    @ViewBuilder
+    private var powerSection: some View {
+        if power.totalWatts != nil || power.cpuWatts != nil || power.gpuWatts != nil {
+            VStack(spacing: 16) {
+                PowerCard(total: power.totalWatts, cpu: power.cpuWatts, gpu: power.gpuWatts)
+                powerHistoryChart
+            }
+        }
+    }
+
+    private struct PowerPoint: Identifiable {
+        let id: String
+        let series: String
+        let secondsAgo: Double
+        let value: Double
+    }
+
+    private var powerHistorySamples: [PowerPoint] {
+        let interval = fanController.pollingInterval
+        var pts: [PowerPoint] = []
+        func add(_ history: [Double], _ series: String) {
+            let n = history.count
+            guard n > 0 else { return }
+            for (i, v) in history.enumerated() {
+                pts.append(PowerPoint(id: "\(series)-\(i)", series: series,
+                                      secondsAgo: -Double(n - 1 - i) * interval, value: v))
+            }
+        }
+        add(power.totalHistory, "Total")
+        add(power.cpuHistory, "CPU")
+        add(power.gpuHistory, "GPU")
+        return pts
+    }
+
+    private var powerHistoryChart: some View {
+        let samples = powerHistorySamples
+        let maxW = samples.map(\.value).max() ?? 0
+        let upper = Swift.max(10, (maxW * 1.15).rounded(.up))
+        return GroupBox("Power — Last 5 Minutes") {
+            if samples.count < 2 {
+                Text("Collecting samples…").font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                Chart(samples) { p in
+                    LineMark(
+                        x: .value("Time", p.secondsAgo),
+                        y: .value("Watts", p.value)
+                    )
+                    .foregroundStyle(by: .value("Series", p.series))
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartForegroundStyleScale([
+                    "Total": Color.teal,
+                    "CPU": Color.orange,
+                    "GPU": Color.purple
+                ])
+                .chartYScale(domain: 0...upper)
+                .chartXAxis {
+                    AxisMarks(values: [-300, -240, -180, -120, -60, 0]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let s = value.as(Double.self) {
+                                Text(s == 0 ? "now" : "\(Int(-s / 60))m")
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) { Text("\(Int(v))W") }
+                        }
+                    }
+                }
+                .frame(height: 160)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
     private var fansSection: some View {
         GroupBox("Fans") {
             if fanController.fans.isEmpty {
@@ -323,5 +407,75 @@ struct FanGaugeView: View {
             ProgressView(value: fan.percentage / 100.0).tint(.blue)
             Text("\(Int(fan.percentage))%").font(.caption).foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity)
+    }
+}
+
+struct PowerCard: View {
+    let total: Double?
+    let cpu: Double?
+    let gpu: Double?
+
+    private var showBreakdown: Bool {
+        guard let total, total > 0 else { return false }
+        return cpu != nil || gpu != nil
+    }
+
+    var body: some View {
+        GroupBox {
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Power").font(.headline)
+                    Spacer()
+                    Text("total system").font(.caption2).foregroundStyle(.tertiary)
+                }
+                Text(total.map { "\(Int($0.rounded())) W" } ?? "-- W")
+                    .font(.system(size: 48, weight: .medium, design: .rounded))
+                if showBreakdown, let total {
+                    let other = PowerCard.otherWatts(total: total, cpu: cpu, gpu: gpu)
+                    PowerBar(cpu: cpu ?? 0, gpu: gpu ?? 0, other: other)
+                        .frame(height: 10)
+                    HStack(spacing: 16) {
+                        if cpu != nil { legend(.orange, "CPU", cpu) }
+                        if gpu != nil { legend(.purple, "GPU", gpu) }
+                        legend(.gray.opacity(0.5), "Other", other)
+                    }
+                    .font(.caption)
+                }
+            }.padding()
+        }.frame(maxWidth: .infinity)
+    }
+
+    private func legend(_ color: Color, _ label: String, _ value: Double?) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(value.map { "\(label) \(Int($0.rounded())) W" } ?? "\(label) --")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Power not attributable to CPU/GPU (RAM, display, SSD, etc.). Clamped at 0:
+    /// total (SMC) and CPU/GPU (IOReport) come from different sources sampled a beat
+    /// apart and can momentarily disagree.
+    static func otherWatts(total: Double, cpu: Double?, gpu: Double?) -> Double {
+        Swift.max(0, total - (cpu ?? 0) - (gpu ?? 0))
+    }
+}
+
+struct PowerBar: View {
+    let cpu: Double
+    let gpu: Double
+    let other: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = Swift.max(geo.size.width, 1)
+            let denom = Swift.max(cpu + gpu + other, 0.0001)
+            HStack(spacing: 0) {
+                Rectangle().fill(Color.orange).frame(width: w * cpu / denom)
+                Rectangle().fill(Color.purple).frame(width: w * gpu / denom)
+                Rectangle().fill(Color.gray.opacity(0.5)).frame(width: w * other / denom)
+            }
+        }
+        .clipShape(Capsule())
     }
 }

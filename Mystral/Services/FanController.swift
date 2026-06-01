@@ -19,6 +19,11 @@ final class FanController {
     private let profileManager: ProfileManager
     private var timer: Timer?
 
+    /// Power readings, sampled once per tick so their history shares the polling
+    /// cadence with sensor history (consumed by the dashboard's power chart and the
+    /// menu bar). Sampling lives here, in the single authoritative poll loop.
+    let powerMonitor = PowerMonitor()
+
     private(set) var sensors: [Sensor] = []
     private(set) var fans: [Fan] = []
     private(set) var isRunning = false
@@ -120,6 +125,7 @@ final class FanController {
     }
 
     private func tick() {
+        powerMonitor.sample()
         do {
             var newSensors = try smcService.getAllSensors()
             let historyMap = Dictionary(uniqueKeysWithValues: sensors.map { ($0.id, $0.history) })
