@@ -456,7 +456,7 @@ struct PowerCard: View {
     /// Power not attributable to CPU/GPU (RAM, display, SSD, etc.). Clamped at 0:
     /// total (SMC) and CPU/GPU (IOReport) come from different sources sampled a beat
     /// apart and can momentarily disagree.
-    static func otherWatts(total: Double, cpu: Double?, gpu: Double?) -> Double {
+    nonisolated static func otherWatts(total: Double, cpu: Double?, gpu: Double?) -> Double {
         Swift.max(0, total - (cpu ?? 0) - (gpu ?? 0))
     }
 }
