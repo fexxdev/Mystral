@@ -46,6 +46,8 @@ final class MenuBarManager {
 
     private var liveCpuItem: NSMenuItem?
     private var liveGpuItem: NSMenuItem?
+    private var livePowerItem: NSMenuItem?
+    private var livePowerBreakdownItem: NSMenuItem?
     private var liveFanItems: [NSMenuItem] = []
     private var liveProfileItems: [NSMenuItem] = []
 
@@ -147,6 +149,16 @@ final class MenuBarManager {
             liveGpuItem = item
             menu.addItem(item)
         }
+        if powerMonitor.totalWatts != nil {
+            let item = Self.infoItem("")
+            livePowerItem = item
+            menu.addItem(item)
+        }
+        if powerMonitor.cpuWatts != nil || powerMonitor.gpuWatts != nil {
+            let item = Self.infoItem("")
+            livePowerBreakdownItem = item
+            menu.addItem(item)
+        }
         liveFanItems = []
         for _ in fanController.fans {
             let item = Self.infoItem("")
@@ -185,6 +197,8 @@ final class MenuBarManager {
 
         liveCpuItem = nil
         liveGpuItem = nil
+        livePowerItem = nil
+        livePowerBreakdownItem = nil
         liveFanItems = []
         liveProfileItems = []
     }
@@ -203,6 +217,13 @@ final class MenuBarManager {
             let avg = gpuCores.map(\.temperature).reduce(0, +) / Double(gpuCores.count)
             let mx = gpuCores.map(\.temperature).max() ?? 0
             item.title = "GPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
+        }
+        if let item = livePowerItem, let w = powerMonitor.totalWatts {
+            item.title = "Power  \(Int(w.rounded())) W"
+        }
+        if let item = livePowerBreakdownItem,
+           let text = Self.formatPowerBreakdown(cpu: powerMonitor.cpuWatts, gpu: powerMonitor.gpuWatts) {
+            item.title = text
         }
         let fans = fanController.fans
         for (i, item) in liveFanItems.enumerated() where i < fans.count {
