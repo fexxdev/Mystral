@@ -16,11 +16,13 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case temperatureOnly = "Temperature Only"
     case rpmOnly = "RPM Only"
     case miniGraph = "Mini Graph"
+    case iconAndPower = "Icon + Power"
+    case powerOnly = "Power Only"
 
     var showsIcon: Bool {
         switch self {
-        case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile: return true
-        case .temperatureOnly, .rpmOnly, .miniGraph: return false
+        case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile, .iconAndPower: return true
+        case .temperatureOnly, .rpmOnly, .miniGraph, .powerOnly: return false
         }
     }
 }
@@ -216,6 +218,18 @@ final class MenuBarManager {
         return item
     }
 
+    nonisolated static func formatTotalWatts(_ watts: Double?) -> String {
+        guard let w = watts, w > 0 else { return "-- W" }
+        return "\(Int(w.rounded())) W"
+    }
+
+    nonisolated static func formatPowerBreakdown(cpu: Double?, gpu: Double?) -> String? {
+        var parts: [String] = []
+        if let c = cpu, c >= 0 { parts.append("CPU \(Int(c.rounded())) W") }
+        if let g = gpu, g >= 0 { parts.append("GPU \(Int(g.rounded())) W") }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
+
     @objc private func selectProfile(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
         profileManager.activeProfileId = id
@@ -267,6 +281,8 @@ final class MenuBarManager {
             } else {
                 button.title = ""
             }
+        case .iconAndPower, .powerOnly:
+            button.title = prefix + Self.formatTotalWatts(nil)
         case .miniGraph:
             break
         }
