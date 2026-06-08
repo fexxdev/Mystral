@@ -70,7 +70,9 @@ Concrete `SMCService` (used by the helper) conforms to `SMCServiceProtocol`.
 
 ### 2. IOKit system-power registration
 
-`import IOKit.pwr_mgt` (and `IOKit.IOMessage` for the message constants).
+`import IOKit.pwr_mgt` (for `IORegisterForSystemPower`/`IOAllowPowerChange`/
+`IONotificationPortSetDispatchQueue`) and `import IOKit` (for the `kIOMessage*`
+constants from `IOMessage.h`).
 
 In `run()`, after the SMC is opened and the dispatch `queue` is created, register
 for power notifications and bind delivery to the **same `queue`** the helper's
@@ -94,11 +96,14 @@ if rootPort != 0, let notifyPort {
 `IORegisterForSystemPower`'s callback is a C function pointer and cannot capture
 context, so the bits it needs are held in file-scope static storage on
 `SMCHelperMode`, set once in `run()`. They are `fileprivate` (not `private`) so the
-same-file C callback can read them:
+same-file C callback can read them, and `nonisolated(unsafe)` because the project
+builds in **Swift 6 language mode** (mutable statics are otherwise rejected as
+nonisolated global shared mutable state). Safe here: written once at startup, read
+only from the callback, which runs on the helper's serial `queue`:
 
 ```swift
-fileprivate static var rootPowerPort: io_connect_t = 0
-fileprivate static var powerSMC: SMCServiceProtocol?
+nonisolated(unsafe) fileprivate static var rootPowerPort: io_connect_t = 0
+nonisolated(unsafe) fileprivate static var powerSMC: SMCServiceProtocol?
 ```
 
 ### 3. The callback (C-compatible, file-private free function)
