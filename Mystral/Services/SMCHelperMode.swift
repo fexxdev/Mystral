@@ -1,4 +1,6 @@
 import Foundation
+import IOKit
+import IOKit.pwr_mgt
 import os
 
 private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SMCHelper")
@@ -7,6 +9,11 @@ enum SMCHelperMode {
     static let dataPath = "/tmp/mystral-smc-data.json"
     static let cmdDir = "/tmp/mystral-cmds"
     static let pidPath = "/tmp/mystral-helper.pid"
+
+    /// State the C system-power callback needs (it can't capture context). Set once in
+    /// run(); read only from the callback, which runs on the helper's serial queue.
+    nonisolated(unsafe) fileprivate static var rootPowerPort: io_connect_t = 0
+    nonisolated(unsafe) fileprivate static var powerSMC: SMCServiceProtocol?
 
     static var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
@@ -74,8 +81,7 @@ enum SMCHelperMode {
         signal(SIGTERM, SIG_IGN)
         sigSource.setEventHandler {
             logger.info("SMCHelper — SIGTERM received, restoring auto mode and cleaning up")
-            let count = (try? smc.getAllFans().count) ?? 2
-            try? smc.setForcedMode(fanCount: count, forced: false)
+            restoreAutoMode(smc: smc)
             cleanup()
             exit(0)
         }
@@ -113,8 +119,54 @@ enum SMCHelperMode {
         }
         timer.resume()
 
+        registerForSleepNotifications(smc: smc, queue: queue)
+
         withExtendedLifetime(activityToken) {
             dispatchMain()
+        }
+    }
+
+    /// Registers the helper for system-power notifications so it restores auto fan mode
+    /// just before the Mac sleeps (issue #2). Delivery is bound to the helper's serial
+    /// `queue`, so the callback never races the polling timer's SMC access.
+    private static func registerForSleepNotifications(smc: SMCServiceProtocol, queue: DispatchQueue) {
+        powerSMC = smc
+        var notifyPort: IONotificationPortRef?
+        var notifier: io_object_t = 0
+        let port = IORegisterForSystemPower(nil, &notifyPort, mystralSleepWakeCallback, &notifier)
+        guard port != 0, let notifyPort else {
+            logger.error("SMCHelper — IORegisterForSystemPower failed; sleep auto-restore disabled")
+            return
+        }
+        rootPowerPort = port
+        IONotificationPortSetDispatchQueue(notifyPort, queue)
+        logger.info("SMCHelper — registered for system sleep/wake power notifications")
+    }
+
+    /// Hand fan control back to macOS auto mode (releases the forced setpoint the SMC
+    /// otherwise holds). Used both on SIGTERM and when the system is about to sleep so
+    /// the firmware idles the fans instead of whining at the last forced RPM (issue #2).
+    static func restoreAutoMode(smc: SMCServiceProtocol) {
+        let count = (try? smc.getAllFans().count) ?? 2
+        try? smc.setForcedMode(fanCount: count, forced: false)
+    }
+
+    /// Routes a system-power message to its fan action: on "will sleep" it hands fans
+    /// back to macOS auto so the firmware idles them (issue #2); other messages leave
+    /// fans alone (wake re-apply is the app's `handleWake`). Returns whether the message
+    /// is a sleep query/notification the caller must acknowledge with `IOAllowPowerChange`
+    /// — failing to ack stalls sleep ~30s. IOKit-free so it's unit-testable.
+    @discardableResult
+    static func handlePowerMessage(_ messageType: UInt32, smc: SMCServiceProtocol?) -> Bool {
+        switch messageType {
+        case kMystralMsgSystemWillSleep:
+            logger.info("SMCHelper — system will sleep, restoring auto fan mode")
+            if let smc { restoreAutoMode(smc: smc) }
+            return true
+        case kMystralMsgCanSystemSleep:
+            return true // never veto idle sleep; ack only
+        default:
+            return false // e.g. kIOMessageSystemHasPoweredOn — app's handleWake re-applies
         }
     }
 
@@ -222,5 +274,24 @@ enum SMCHelperMode {
         try? FileManager.default.removeItem(atPath: pidPath)
         try? FileManager.default.removeItem(atPath: dataPath)
         try? FileManager.default.removeItem(atPath: cmdDir)
+    }
+}
+
+// IOKit's kIOMessage* power constants are nested function-like C macros
+// (`iokit_common_msg(x)` = `(UInt32)(sys_iokit | x)`, with `sys_iokit = 0x38 << 26`)
+// that Swift's importer can't translate, so reconstruct the two we handle.
+// See <IOKit/IOMessage.h>.
+private let kMystralMsgCanSystemSleep: UInt32 = (0x38 << 26) | 0x270  // 0xE0000270
+private let kMystralMsgSystemWillSleep: UInt32 = (0x38 << 26) | 0x280 // 0xE0000280
+
+/// C-compatible (`@convention(c)`) system-power callback — captures nothing, so it reads
+/// the SMC handle and root port from `SMCHelperMode`'s static storage and delegates the
+/// (unit-tested) routing to `handlePowerMessage`. Its only job here is the IOKit ack.
+private func mystralSleepWakeCallback(_ refcon: UnsafeMutableRawPointer?,
+                                      _ service: io_service_t,
+                                      _ messageType: UInt32,
+                                      _ messageArgument: UnsafeMutableRawPointer?) {
+    if SMCHelperMode.handlePowerMessage(messageType, smc: SMCHelperMode.powerSMC) {
+        IOAllowPowerChange(SMCHelperMode.rootPowerPort, Int(bitPattern: messageArgument))
     }
 }
