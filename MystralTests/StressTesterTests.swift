@@ -43,4 +43,10 @@ final class StressTesterTests: XCTestCase {
             XCTFail("Expected finished state")
         }
     }
+
+    func testInvalidDurationIsRejected() {
+        XCTAssertFalse(StressTester.isValidDuration(0))
+        XCTAssertFalse(StressTester.isValidDuration(3601))
+        XCTAssertTrue(StressTester.isValidDuration(30))
+    }
 }

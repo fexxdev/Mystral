@@ -11,6 +11,7 @@ protocol SMCServiceProtocol: Sendable {
     func setFanSpeed(index: Int, percentage: Double) throws
     func setFanMode(index: Int, mode: FanMode) throws
     func setForcedMode(fanCount: Int, forced: Bool) throws
+    func heartbeat() throws
 }
 
 final class SMCService: SMCServiceProtocol, @unchecked Sendable {
@@ -36,7 +37,7 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
 
     func close() {
         if ftstUnlocked {
-            try? smc.tryWriteUInt8(key: "Ftst", value: 0)
+            _ = try? smc.tryWriteUInt8(key: "Ftst", value: 0)
             ftstUnlocked = false
         }
         smc.close()
@@ -122,6 +123,8 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
             }
         }
     }
+
+    func heartbeat() throws {}
 
     func notifyWake() {
         ftstUnlocked = false

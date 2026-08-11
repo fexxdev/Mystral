@@ -40,9 +40,8 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 
 1. **Download** the latest `Mystral-x.x.x.dmg` from [Releases](https://github.com/fexxdev/Mystral/releases/latest).
 2. **Open** the DMG and drag **Mystral.app** into the **Applications** folder.
-3. **First launch:** right-click `Mystral.app` in `/Applications` → **Open** → click **Open** in the dialog.
-   *(This step is needed because the app is not yet signed with a paid Apple Developer ID. Subsequent launches don't require it.)*
-4. The app will ask for your password once per session to control the fans (no kernel extension required).
+3. **First launch:** Developer ID releases open normally. Ad-hoc builds need a right-click on `Mystral.app` in `/Applications`, then **Open**, then **Open** again in the dialog.
+4. The app asks for your password to install its root-owned launchd helper. It asks again only when the helper build changes. It does not need a kernel extension.
 
 That's it. Profiles live in `~/Library/Application Support/Mystral`.
 
@@ -53,7 +52,9 @@ brew install xcodegen
 git clone https://github.com/fexxdev/Mystral.git
 cd Mystral
 xcodegen generate
-./scripts/build-dmg.sh        # produces dist/Mystral-x.x.x.dmg
+./scripts/build-dmg.sh        # ad-hoc DMG in dist/Mystral-x.x.x.dmg
+# for a Developer ID release:
+MYSTRAL_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build-dmg.sh
 # or for development:
 open Mystral.xcodeproj
 ```
@@ -77,7 +78,7 @@ open Mystral.xcodeproj
 
 ## Privacy
 
-Mystral runs entirely offline. No telemetry, no network access, no data collection.
+Mystral collects no telemetry or usage data. It checks GitHub Releases only when update checks are enabled.
 
 ## License
 

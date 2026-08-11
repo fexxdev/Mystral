@@ -143,6 +143,7 @@ struct SettingsView: View {
             .onChange(of: pollingInterval) { _, newValue in
                 fanController.pollingInterval = newValue
                 UserDefaults.standard.set(newValue, forKey: "pollingInterval")
+                NotificationCenter.default.post(name: .pollingIntervalChanged, object: nil)
             }
         }
     }
@@ -473,6 +474,11 @@ struct SettingsView: View {
         deadbandPercent = 3.0
         minimumFanPct = 0
         aggressiveOverride = true
+        alertsEnabled = true
+        alertsHighTemp = 95
+        alertsFanStuck = true
+        autoSwitchEnabled = true
+        updatesAutoCheck = true
 
         fanController.pollingInterval = 2.0
         fanController.smoothingEnabled = true
@@ -482,12 +488,15 @@ struct SettingsView: View {
         fanController.aggressiveOverrideEnabled = true
         fanController.clearAllManualOverrides()
 
-        for key in ["menuBarDisplayMode", "menuBarTempSource", "pollingInterval",
-                     "smoothingEnabled", "smoothingAlpha", "deadbandPercent",
-                     "minimumFanPercentage", "aggressiveOverrideEnabled"] {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+        alertManager?.enabled = true
+        alertManager?.highTempThreshold = 95
+        alertManager?.fanStuckEnabled = true
+        autoSwitcher?.enabled = true
+        updateChecker?.autoCheckEnabled = true
+
+        AppSettings.reset()
 
         NotificationCenter.default.post(name: .menuBarSettingsChanged, object: nil)
+        NotificationCenter.default.post(name: .pollingIntervalChanged, object: nil)
     }
 }

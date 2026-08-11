@@ -56,6 +56,10 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         try writeCommand(SMCHelperMode.Command(action: "setForcedMode", index: fanCount, value: forced ? 1 : 0))
     }
 
+    func heartbeat() throws {
+        try writeCommand(SMCHelperMode.Command(action: "heartbeat", index: 0, value: nil))
+    }
+
     private func refreshData() throws {
         let fm = FileManager.default
         let path = SMCHelperMode.dataPath
@@ -71,12 +75,22 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
 
         let url = URL(fileURLWithPath: path)
         guard let data = try? Data(contentsOf: url) else {
+            if isWithinGracePeriod() {
+                logger.debug("refreshData — data file not yet available during grace period")
+                return
+            }
             logger.warning("refreshData — failed to read data file at \(path, privacy: .public)")
-            return
+            helperAlive = false
+            throw SMCProxyError.helperNotResponding
         }
         guard let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data) else {
+            if isWithinGracePeriod() {
+                logger.debug("refreshData — data file is not valid during grace period")
+                return
+            }
             logger.warning("refreshData — failed to decode SMCData (size=\(data.count, privacy: .public) bytes)")
-            return
+            helperAlive = false
+            throw SMCProxyError.helperNotResponding
         }
 
         cachedSensors = smcData.sensors.map {
@@ -93,14 +107,14 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
 
     private func checkHelperHealth(fm: FileManager, path: String) throws {
         let now = ProcessInfo.processInfo.systemUptime
-        let inGrace = now < wakeGraceDeadline
+        let inGrace = now < wakeGraceDeadline || Date().timeIntervalSince(startTime) <= Self.startupGrace
 
         guard fm.fileExists(atPath: path) else {
-            if Date().timeIntervalSince(startTime) > Self.startupGrace && !inGrace && !Self.isHelperProcessAlive() {
+            if !inGrace {
                 helperAlive = false
                 throw SMCProxyError.helperNotResponding
             }
-            logger.debug("refreshData — data file not yet available (startup/wake grace or helper alive)")
+            logger.debug("refreshData — data file not yet available (startup/wake grace)")
             return
         }
 
@@ -111,21 +125,15 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
                 logger.debug("refreshData — data file stale but within wake grace period")
                 return
             }
-            if Self.isHelperProcessAlive() && Date().timeIntervalSince(modDate) < 60 {
-                logger.debug("refreshData — data file stale but helper process alive, waiting for recovery")
-                return
-            }
             helperAlive = false
             logger.warning("refreshData — data file is stale (age=\(Int(Date().timeIntervalSince(modDate)))s)")
             throw SMCProxyError.helperNotResponding
         }
     }
 
-    private static func isHelperProcessAlive() -> Bool {
-        guard let pidStr = try? String(contentsOfFile: SMCHelperMode.pidPath, encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-              let pid = Int32(pidStr) else { return false }
-        return kill(pid, 0) == 0
+    private func isWithinGracePeriod() -> Bool {
+        ProcessInfo.processInfo.systemUptime < wakeGraceDeadline
+            || Date().timeIntervalSince(startTime) <= Self.startupGrace
     }
 
     func notifyWake() {
@@ -151,23 +159,26 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
     /// the manual restart button and to load a new binary after an app update). Bypasses
     /// the `helperAlive` guard since the point is to recycle a possibly-stale helper.
     func requestRestart() {
-        try? FileManager.default.createDirectory(atPath: SMCHelperMode.cmdDir, withIntermediateDirectories: true)
+        try? SMCIPC.prepareForApp()
         let cmd = SMCHelperMode.Command(action: "restart", index: 0, value: nil)
         guard let data = try? JSONEncoder().encode(cmd) else { return }
         let path = "\(SMCHelperMode.cmdDir)/\(UUID().uuidString).json"
         try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        _ = chmod(path, 0o600)
         logger.info("requestRestart — wrote restart command for launchd relaunch")
     }
 
     private func writeCommand(_ command: SMCHelperMode.Command) throws {
+        guard command.isValid else { throw SMCProxyError.helperNotResponding }
         guard helperAlive else {
             logger.debug("writeCommand skipped (helper dead) — action=\(command.action, privacy: .public)")
-            return
+            throw SMCProxyError.helperNotResponding
         }
-        try? FileManager.default.createDirectory(atPath: SMCHelperMode.cmdDir, withIntermediateDirectories: true)
+        try SMCIPC.prepareForApp()
         let data = try JSONEncoder().encode(command)
         let path = "\(SMCHelperMode.cmdDir)/\(UUID().uuidString).json"
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        guard chmod(path, 0o600) == 0 else { throw SMCIPC.IPCError.permissionDenied(path) }
         logger.debug("writeCommand — action=\(command.action, privacy: .public), index=\(command.index, privacy: .public), value=\(command.value ?? -1, privacy: .public)")
     }
 }

@@ -48,4 +48,18 @@ final class SensorRegistryTests: XCTestCase {
         XCTAssertTrue(dump.contains("Tp01"))
         XCTAssertTrue(dump.contains("1500"))
     }
+
+    func testCpuMaximumFallsBackToSummarySensor() {
+        let sensors = [Sensor(id: "TCMz", name: "CPU Max", temperature: 88)]
+        XCTAssertEqual(SensorRegistry.cpuMaximumTemperature(from: sensors), 88)
+    }
+
+    func testStoppedFanStillCountsAsFanControl() {
+        let sensors = [
+            Sensor(id: "Tp01", name: "P1", temperature: 60),
+            Sensor(id: "TCMz", name: "CPU Max", temperature: 65)
+        ]
+        let fans = [Fan(id: 0, name: "Fan", currentRPM: 0, targetRPM: 0, minRPM: 1000, maxRPM: 5000, mode: .auto)]
+        XCTAssertTrue(SensorRegistry.detectChip(sensors: sensors, fans: fans).hasFanControl)
+    }
 }

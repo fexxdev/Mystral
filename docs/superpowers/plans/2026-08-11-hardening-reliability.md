@@ -8,6 +8,8 @@
 
 **Tech Stack:** Swift 6, SwiftUI, AppKit, XCTest, XcodeGen, IOKit, `codesign`, Bash, GitHub Actions.
 
+**Status:** Implemented and verified on 2026-08-11. Local DMGs remain ad-hoc signed until a Developer ID identity is supplied.
+
 ## Global Constraints
 
 - Support macOS 14.0+ and Apple Silicon.
@@ -34,10 +36,10 @@
 - Modify: `MystralTests/MenuBarTests.swift`
 - Modify: `MystralTests/SettingsDefaultsTests.swift`
 
-- [ ] Add tests for private IPC paths, heartbeat timeout, command validation, trusted GitHub asset URLs, and rejection of ad-hoc bundle metadata.
-- [ ] Add tests for the `/Applications` installation-path policy and stale helper-plist detection.
-- [ ] Add tests for CPU-summary fallback, stopped-fan detection, invalid stress duration, failed profile writes, full settings reset, and five-minute history trimming.
-- [ ] Run the focused test targets and confirm the new tests fail for the current implementation.
+- [x] Add tests for private IPC paths, heartbeat timeout, command validation, trusted GitHub asset URLs, and rejection of ad-hoc bundle metadata.
+- [x] Add tests for the `/Applications` installation-path policy and stale helper-plist detection.
+- [x] Add tests for CPU-summary fallback, stopped-fan detection, invalid stress duration, failed profile writes, full settings reset, and five-minute history trimming.
+- [x] Run the focused test targets and confirm the new tests fail for the current implementation.
 
 Required test-facing interfaces:
 
@@ -75,14 +77,14 @@ Interfaces:
 - `SMCServiceProtocol.heartbeat() throws` is a no-op for direct SMC and a JSON command for the proxy.
 - `SMCHelperMode.shouldRestoreForHeartbeat(lastHeartbeat:now:timeout:)` remains pure and hardware-independent.
 
-- [ ] Add app-side IPC directory creation and ownership/mode validation.
-- [ ] Pass IPC path and UID through the LaunchDaemon plist.
-- [ ] Reject unsafe helper IPC directories and keep command/data files inside the private directory.
-- [ ] Add heartbeat to `SMCServiceProtocol`, proxy, mock, and fan-controller tick.
-- [ ] Add helper startup restore, heartbeat timeout restore, SMC-error restore, and command-queue cleanup.
-- [ ] Make missing data unhealthy after the startup and wake grace periods, even when the helper PID exists.
-- [ ] Make auto-mode restoration report write failures instead of swallowing them.
-- [ ] Run the focused helper and SMC tests and confirm they pass.
+- [x] Add app-side IPC directory creation and ownership/mode validation.
+- [x] Pass IPC path and UID through the LaunchDaemon plist.
+- [x] Reject unsafe helper IPC directories and keep command/data files inside the private directory.
+- [x] Add heartbeat to `SMCServiceProtocol`, proxy, mock, and fan-controller tick.
+- [x] Add helper startup restore, heartbeat timeout restore, SMC-error restore, and command-queue cleanup.
+- [x] Make missing data unhealthy after the startup and wake grace periods, even when the helper PID exists.
+- [x] Make auto-mode restoration report write failures instead of swallowing them.
+- [x] Run the focused helper and SMC tests and confirm they pass.
 
 ### Task 3: Harden privileged helper installation
 
@@ -92,17 +94,19 @@ Interfaces:
 
 Interfaces:
 
-- `HelperDaemon.isAllowedExecutablePath(_:) -> Bool` rejects paths outside `/Applications` and user-writable bundle executables.
-- `HelperDaemon.isInstalled(forExecutable:ipcDirectoryPath:) -> Bool` requires matching `ProgramArguments` and IPC environment values.
-- `HelperDaemon.install(executablePath:ipcDirectoryPath:) -> Bool` performs all privileged work in one verified command and never writes a root script to a shared directory.
+- `HelperDaemon.isAllowedExecutablePath(_:) -> Bool` rejects paths outside `/Applications` and unsafe bundle executables.
+- `HelperDaemon.isInstalled(forExecutable:ipcDirectoryPath:) -> Bool` requires a secure root-owned helper tool, matching build metadata, IPC environment values, and a live `launchd` job.
+- `HelperDaemon.install(executablePath:ipcDirectoryPath:) -> Bool` copies the helper to `/Library/PrivilegedHelperTools`, performs all privileged work in one verified command, and never writes a root script to a shared directory.
 
-- [ ] Remove staged `/tmp` plist and `/tmp` shell script creation.
-- [ ] Validate the application path is under `/Applications`, root-owned, and not group/world-writable.
-- [ ] Generate the plist in memory and send it to the privileged command through Base64.
-- [ ] Make `launchctl bootstrap`, `kickstart`, and `print` failures visible.
-- [ ] Make installation status include the expected IPC configuration.
-- [ ] Treat a plist without the new IPC environment values as stale and replace it during upgrade.
-- [ ] Run the helper installation tests and the full unit suite.
+- [x] Remove staged `/tmp` plist and `/tmp` shell script creation.
+- [x] Validate the application path is under `/Applications` and not group/world-writable; accept standard Finder ownership by root or the current user.
+- [x] Copy the helper to a root-owned privileged tool path and refresh it when the helper build changes.
+- [x] Generate the plist in memory and send it to the privileged command through Base64.
+- [x] Run `launchctl bootstrap` before `enable`, then make `kickstart` and `print` failures visible.
+- [x] Make installation status include the expected IPC configuration.
+- [x] Make installation status reject a valid plist when the live `launchd` job is absent.
+- [x] Treat a plist without the new IPC environment values as stale and replace it during upgrade.
+- [x] Run the helper installation tests and the full unit suite.
 
 ### Task 4: Harden automatic updates
 
@@ -117,14 +121,14 @@ Interfaces:
 - `UpdateChecker.isValidBundleMetadata(at:currentVersion:) -> Bool` checks bundle identifier, package type, and version.
 - `UpdateChecker.verifyCodeSignature(at:) throws` requires a strict valid signature and `Developer ID Application` authority.
 
-- [ ] Add strict GitHub repository URL validation.
-- [ ] Use unique private download and mount paths.
-- [ ] Validate bundle identifier, package type, and increasing version before replacement.
-- [ ] Verify nested code signature and require a Developer ID Application authority.
-- [ ] Validate HTTP download responses.
-- [ ] Remove quarantine only after validation.
-- [ ] Clear completed update state and keep the release-page fallback.
-- [ ] Run update tests and the full test suite.
+- [x] Add strict GitHub repository URL validation.
+- [x] Use unique private download and mount paths.
+- [x] Validate bundle identifier, package type, and increasing version before replacement.
+- [x] Verify nested code signature and require a Developer ID Application authority.
+- [x] Validate HTTP download responses.
+- [x] Remove quarantine only after validation.
+- [x] Clear completed update state and keep the release-page fallback.
+- [x] Run update tests and the full test suite.
 
 ### Task 5: Fix settings and profile persistence
 
@@ -142,12 +146,12 @@ Interfaces:
 - `ProfileManager.saveCustomProfile(_:)` changes `customProfiles` only after the atomic write succeeds.
 - `ProfileManager.deleteCustomProfile(id:)` changes `customProfiles` only after deletion succeeds or the file is already absent.
 
-- [ ] Centralize all resettable UserDefaults keys.
-- [ ] Reset manager state and UI state for alerts, auto-switch, updates, monitoring, and menu-bar settings.
-- [ ] Write profile data before changing memory.
-- [ ] Treat deletion as successful only after the file operation succeeds or the file is already absent.
-- [ ] Show profile operation failures in the UI.
-- [ ] Run persistence and settings tests.
+- [x] Centralize all resettable UserDefaults keys.
+- [x] Reset manager state and UI state for alerts, auto-switch, updates, monitoring, and menu-bar settings.
+- [x] Write profile data before changing memory.
+- [x] Treat deletion as successful only after the file operation succeeds or the file is already absent.
+- [x] Show profile operation failures in the UI.
+- [x] Run persistence and settings tests.
 
 ### Task 6: Fix sensor, alert, stress-test, and history behavior
 
@@ -174,12 +178,12 @@ Interfaces:
 - `PowerMonitor.sample(maxHistory:)` applies the same rolling-window limit to power history.
 - `Notification.Name.pollingIntervalChanged` restarts the menu-bar timer after settings change.
 
-- [ ] Use CPU summary sensors as fallback for alerts and stress testing.
-- [ ] Report fan availability from detected fan metadata, not current RPM.
-- [ ] Reject non-positive and excessive stress-test durations.
-- [ ] Trim sensor and power history to five minutes for 2, 5, and 10 second polling.
-- [ ] Restart the menu-bar timer when polling interval changes.
-- [ ] Run focused functional tests.
+- [x] Use CPU summary sensors as fallback for alerts and stress testing.
+- [x] Report fan availability from detected fan metadata, not current RPM.
+- [x] Reject non-positive and excessive stress-test durations.
+- [x] Trim sensor and power history to five minutes for 2, 5, and 10 second polling.
+- [x] Restart the menu-bar timer when polling interval changes.
+- [x] Run focused functional tests.
 
 ### Task 7: Clean warnings, CI, build script, and documentation
 
@@ -190,24 +194,29 @@ Interfaces:
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 - Modify: `docs/superpowers/specs/2026-04-29-mystral-design.md`
+- Modify: `Mystral/Views/MainView.swift`
+- Modify: `Mystral/Views/ProfilesView.swift`
+- Modify: `MystralTests/ViewConstructionTests.swift`
 
-- [ ] Fix the unused `try?` result warning.
-- [ ] Add CI checks for ShellCheck, plist/JSON validation, unsigned Debug/Release build, tests, and a 10% application coverage gate.
-- [ ] Store the test result bundle and run `xcrun xccov view --report --json` to reject application line coverage below `0.10`.
-- [ ] Allow a configured Developer ID identity in the DMG script and fail on signing errors.
-- [ ] Document optional update network access and ad-hoc manual installation.
-- [ ] Align version and architecture documentation with the implemented code.
-- [ ] Run all static checks.
+- [x] Fix the unused `try?` result warning.
+- [x] Add CI checks for ShellCheck, plist/JSON validation, unsigned Debug/Release build, tests, and a 10% application coverage gate.
+- [x] Store the test result bundle and run `xcrun xccov view --report --json` to reject application line coverage below `0.10`.
+- [x] Allow a configured Developer ID identity in the DMG script and fail on signing errors.
+- [x] Document optional update network access and ad-hoc manual installation.
+- [x] Align version and architecture documentation with the implemented code.
+- [x] Keep both sidebar widths fixed and use one custom toggle in a stable toolbar position.
+- [x] Keep the main window at least 1200 by 640 points so Profiles does not force column negotiation.
+- [x] Run all static checks.
 
 ### Task 8: Full verification and review
 
 **Files:**
 - Verify: all changed files and generated Xcode project.
 
-- [ ] Run `xcodegen generate`.
-- [ ] Run full Debug build.
-- [ ] Run full Release build with signing disabled.
-- [ ] Run the complete test suite with coverage.
-- [ ] Run ShellCheck, Bash syntax, plist validation, JSON validation, secret scan, and `git diff --check`.
-- [ ] Inspect the final diff for scope, security regressions, and unused code.
-- [ ] Report any remaining limitation, especially the need for a real Developer ID release identity.
+- [x] Run `xcodegen generate`.
+- [x] Run full Debug build.
+- [x] Run full Release build with signing disabled.
+- [x] Run the complete test suite with coverage.
+- [x] Run ShellCheck, Bash syntax, plist validation, JSON validation, secret scan, and `git diff --check`.
+- [x] Inspect the final diff for scope, security regressions, and unused code.
+- [x] Report any remaining limitation, especially the need for a real Developer ID release identity.

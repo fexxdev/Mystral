@@ -1,12 +1,14 @@
 # Mystral Implementation Plan
 
+> **Historical scaffold:** The implementation now uses a LaunchDaemon with private JSON IPC. The current hardening work is documented in `docs/superpowers/specs/2026-08-11-hardening-reliability-design.md` and `docs/superpowers/plans/2026-08-11-hardening-reliability.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a native macOS menu bar app that reads temperature sensors and controls fan speeds on Apple Silicon Macs via SMC.
 
-**Architecture:** SwiftUI app with AppKit integration for NSStatusItem. IOKit bridge for SMC read/write. Protocol-based service layer for testability. XPC privileged helper for fan write operations. JSON file storage for profiles.
+**Architecture:** SwiftUI app with AppKit integration for NSStatusItem. IOKit bridge for SMC read/write. Protocol-based service layer for testability. LaunchDaemon with private JSON IPC for fan write operations. JSON file storage for profiles.
 
-**Tech Stack:** Swift 6, SwiftUI, AppKit (NSStatusItem), IOKit (SMC), XPC Services, Swift Charts, XcodeGen
+**Tech Stack:** Swift 6, SwiftUI, AppKit (NSStatusItem), IOKit (SMC), LaunchDaemon, private JSON IPC, Swift Charts, XcodeGen
 
 **Spec:** `docs/superpowers/specs/2026-04-29-mystral-design.md`
 
@@ -34,7 +36,9 @@ Mystral/
 │   │   ├── Sensor.swift           — Sensor model
 │   │   └── Fan.swift              — Fan, FanMode models
 │   ├── Services/
-│   │   ├── SMCKit.swift           — Low-level IOKit SMC bridge
+│   │   ├── AppSettings.swift      — Resettable UserDefaults keys
+│   │   ├── SMCIPC.swift           — Private IPC paths and permissions
+│   │   ├── SMCHelperMode.swift    — LaunchDaemon command loop and safety lease
 │   │   ├── SMCService.swift       — High-level SMC read/write (protocol-based)
 │   │   ├── FanController.swift    — Polling loop, curve interpolation
 │   │   └── ProfileManager.swift   — Profile CRUD, JSON storage
@@ -51,11 +55,6 @@ Mystral/
 │       ├── balanced.json
 │       ├── performance.json
 │       └── fullblast.json
-├── MystralHelper/
-│   ├── Info.plist
-│   ├── MystralHelper.entitlements
-│   ├── main.swift                 — XPC listener entry
-│   └── HelperProtocol.swift       — XPC protocol definition
 ├── MystralTests/
 │   ├── CurveInterpolationTests.swift
 │   ├── ProfileManagerTests.swift
@@ -3182,7 +3181,7 @@ Build and run in Xcode (⌘R).
 
 ## Privacy
 
-Mystral runs entirely offline. No telemetry, no network access, no data collection.
+Mystral collects no telemetry or usage data. It checks GitHub Releases only when update checks are enabled.
 
 ## License
 

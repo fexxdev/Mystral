@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a Release Mystral.app, ad-hoc sign it, and package it as a DMG.
+# Build a Release Mystral.app and package it as a DMG.
 # Usage: ./scripts/build-dmg.sh [output_dir]
+# Set MYSTRAL_SIGNING_IDENTITY to a Developer ID identity for a distributable release.
 #
 # Requirements: Xcode command line tools, hdiutil (built-in), create-dmg optional.
 
@@ -12,6 +13,17 @@ BUILD_DIR="$PROJECT_ROOT/.build-dmg"
 APP_NAME="Mystral"
 SCHEME="Mystral"
 CONFIG="Release"
+SIGNING_IDENTITY="${MYSTRAL_SIGNING_IDENTITY:--}"
+
+if [[ "$SIGNING_IDENTITY" == "-" ]]; then
+    SIGNING_MODE="ad-hoc"
+    GATEKEEPER_NOTE="Ad-hoc builds need a right-click on Mystral.app, then Open, on first launch."
+    RELEASE_NOTE="This build is ad-hoc signed. Use a Developer ID identity for release distribution."
+else
+    SIGNING_MODE="Developer ID"
+    GATEKEEPER_NOTE="This build is signed with ${SIGNING_IDENTITY}."
+    RELEASE_NOTE="This build is signed with ${SIGNING_IDENTITY}. Notarize it before broad distribution."
+fi
 
 mkdir -p "$OUTPUT_DIR"
 rm -rf "$BUILD_DIR"
@@ -21,12 +33,13 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJE
 DMG_NAME="${APP_NAME}-${VERSION}.dmg"
 
 echo "==> Building ${APP_NAME} (${CONFIG}) v${VERSION}"
+echo "==> Signing mode: ${SIGNING_MODE}"
 xcodebuild \
     -project "$PROJECT_ROOT/${APP_NAME}.xcodeproj" \
     -scheme "$SCHEME" \
     -configuration "$CONFIG" \
     -derivedDataPath "$BUILD_DIR/dd" \
-    CODE_SIGN_IDENTITY="-" \
+    CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
     CODE_SIGNING_REQUIRED=YES \
     CODE_SIGNING_ALLOWED=YES \
     build | tail -3
@@ -37,8 +50,8 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
-echo "==> Ad-hoc re-signing (recursive, deep)"
-codesign --force --deep --sign - "$APP_PATH"
+echo "==> Signing app (${SIGNING_MODE})"
+codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
 STAGING="$BUILD_DIR/staging"
@@ -46,7 +59,7 @@ mkdir -p "$STAGING"
 cp -R "$APP_PATH" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
 
-cat > "$STAGING/READ ME FIRST.txt" <<'EOF'
+cat > "$STAGING/READ ME FIRST.txt" <<EOF
 Mystral - Fan control for Apple Silicon Macs
 
 Installing
@@ -54,19 +67,16 @@ Installing
 1. Drag Mystral.app into the Applications folder.
 2. Eject this DMG.
 3. The first time you launch Mystral:
-     - Right-click Mystral.app in /Applications
-     - Choose "Open"
-     - Click "Open" in the Gatekeeper dialog
-   This is needed because Mystral is not yet signed with a Developer ID.
-4. The first time Mystral runs it asks for your password once to install a
-   small background helper (a launchd daemon) that controls the fans. After
-   that the helper starts automatically and stays running - you are never
-   asked for your password again. No kernel extension is required.
+     - ${GATEKEEPER_NOTE}
+4. The first time Mystral runs it asks for your password to install a
+   root-owned background helper (a launchd daemon) that controls the fans.
+   It asks again only when the helper build changes. No kernel extension is
+   required.
 
 Notes
 -----
-- This is open-source software shipped without an Apple Developer ID.
-  You can verify the build yourself: https://github.com/fexxdev/Mystral
+- ${RELEASE_NOTE}
+  You can verify the source and release process: https://github.com/fexxdev/Mystral
 - The app stores profiles in ~/Library/Application Support/Mystral.
 - Reset everything in Settings > Reset All Settings.
 - The fan helper is a launchd daemon kept alive by macOS. To remove it
@@ -85,7 +95,9 @@ hdiutil create \
     -ov -format UDZO \
     "$DMG_PATH"
 
-codesign --force --sign - "$DMG_PATH" || true
+echo "==> Signing DMG (${SIGNING_MODE})"
+codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+codesign --verify --strict --verbose=2 "$DMG_PATH"
 
 rm -rf "$BUILD_DIR"
 
@@ -94,4 +106,4 @@ echo "==> Done"
 echo "DMG:  $DMG_PATH"
 echo "Size: $(du -h "$DMG_PATH" | cut -f1)"
 echo
-echo "Tell users: right-click → Open the first time to bypass Gatekeeper."
+echo "$GATEKEEPER_NOTE"

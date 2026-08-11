@@ -57,4 +57,14 @@ final class ProfileManagerTests: XCTestCase {
         XCTAssertEqual(manager.customProfiles.count, 10)
         XCTAssertThrowsError(try manager.saveCustomProfile(Profile(name: "Extra", curvePoints: [CurvePoint(temperature: 50, fanPercentage: 50)])))
     }
+
+    func testFailedProfileWriteDoesNotChangeInMemoryProfiles() throws {
+        let fileInsteadOfDirectory = tempDir.appendingPathComponent("not-a-directory")
+        XCTAssertTrue(FileManager.default.createFile(atPath: fileInsteadOfDirectory.path, contents: Data()))
+        let brokenManager = ProfileManager(storageDirectory: fileInsteadOfDirectory)
+        let profile = Profile(name: "Should Not Persist", curvePoints: [CurvePoint(temperature: 50, fanPercentage: 50)])
+
+        XCTAssertThrowsError(try brokenManager.saveCustomProfile(profile))
+        XCTAssertTrue(brokenManager.customProfiles.isEmpty)
+    }
 }

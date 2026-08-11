@@ -115,21 +115,25 @@ final class ProfileManager {
     }
 
     func saveCustomProfile(_ profile: Profile) throws {
+        let data = try JSONEncoder().encode(profile)
+        let url = storageDirectory.appendingPathComponent("\(profile.id.uuidString).json")
+
         if let index = customProfiles.firstIndex(where: { $0.id == profile.id }) {
+            try data.write(to: url, options: .atomic)
             customProfiles[index] = profile
         } else {
             guard customProfiles.count < Self.maxCustomProfiles else { throw ProfileError.maxProfilesReached }
+            try data.write(to: url, options: .atomic)
             customProfiles.append(profile)
         }
-        let data = try JSONEncoder().encode(profile)
-        let url = storageDirectory.appendingPathComponent("\(profile.id.uuidString).json")
-        try data.write(to: url)
     }
 
     func deleteCustomProfile(id: UUID) throws {
         guard let index = customProfiles.firstIndex(where: { $0.id == id }) else { throw ProfileError.profileNotFound }
         let url = storageDirectory.appendingPathComponent("\(id.uuidString).json")
-        try? FileManager.default.removeItem(at: url)
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
         customProfiles.remove(at: index)
         if activeProfileId == id { activeProfileId = presets.first { $0.name == "Balanced" }?.id }
     }

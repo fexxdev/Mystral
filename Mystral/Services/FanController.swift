@@ -38,6 +38,11 @@ final class FanController {
         didSet { if isRunning { restart() } }
     }
 
+    nonisolated static func historyLimit(forPollingInterval interval: TimeInterval) -> Int {
+        let safeInterval = max(0.1, interval)
+        return max(2, Int(ceil(300 / safeInterval)) + 1)
+    }
+
     var manualOverrides: [Int: Double] = [:]
 
     var smoothingAlpha: Double = 0.3
@@ -125,7 +130,8 @@ final class FanController {
     }
 
     private func tick() {
-        powerMonitor.sample()
+        let historyLimit = Self.historyLimit(forPollingInterval: pollingInterval)
+        powerMonitor.sample(maxHistory: historyLimit)
         do {
             var newSensors = try smcService.getAllSensors()
             let historyMap = Dictionary(uniqueKeysWithValues: sensors.map { ($0.id, $0.history) })
@@ -133,10 +139,11 @@ final class FanController {
                 if let existingHistory = historyMap[newSensors[i].id] {
                     newSensors[i].history = existingHistory
                 }
-                newSensors[i].recordTemperature(newSensors[i].temperature)
+                newSensors[i].recordTemperature(newSensors[i].temperature, maxHistory: historyLimit)
             }
             sensors = newSensors
             fans = try smcService.getAllFans()
+            try smcService.heartbeat()
             logger.debug("tick — sensors=\(newSensors.count, privacy: .public), fans=\(self.fans.count, privacy: .public)")
 
             if consecutiveHelperFailures > 0 {

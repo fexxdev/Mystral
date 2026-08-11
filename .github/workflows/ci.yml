@@ -15,25 +15,59 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Install xcodegen
-        run: brew install xcodegen
+      - name: Install build tools
+        run: brew install xcodegen shellcheck jq
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          git diff --exit-code -- Mystral.xcodeproj/project.pbxproj
 
-      - name: Build
+      - name: Validate metadata and scripts
+        run: |
+          plutil -lint Mystral/Info.plist
+          for file in Mystral/Presets/*.json; do
+            jq empty "$file"
+          done
+          shellcheck scripts/build-dmg.sh
+
+      - name: Build Debug
         run: |
           xcodebuild \
             -project Mystral.xcodeproj \
             -scheme Mystral \
             -configuration Debug \
             -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             build
 
-      - name: Test
+      - name: Build Release
+        run: |
+          xcodebuild \
+            -project Mystral.xcodeproj \
+            -scheme Mystral \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Test with coverage
         run: |
           xcodebuild test \
             -project Mystral.xcodeproj \
             -scheme Mystral \
             -destination 'platform=macOS' \
-            -enableCodeCoverage YES
+            -enableCodeCoverage YES \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/mystral.xcresult" \
+            -derivedDataPath "$RUNNER_TEMP/mystral-derived-data" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Enforce coverage floor
+        run: |
+          coverage=$(xcrun xccov view --report --json "$RUNNER_TEMP/mystral.xcresult" | jq -er '.targets[] | select(.name == "Mystral.app") | .lineCoverage')
+          echo "Mystral.app line coverage: ${coverage}"
+          awk -v coverage="$coverage" 'BEGIN { if (coverage < 0.10) { print "Coverage is below 10%"; exit 1 } }'

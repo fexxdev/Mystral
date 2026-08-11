@@ -57,8 +57,7 @@ final class AlertManager {
 
     func evaluate(sensors: [Sensor], fans: [Fan], expectedFanPercent: [Int: Double]) {
         guard enabled else { return }
-        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
-        let cpuMax = cpuCores.map(\.temperature).max() ?? 0
+        let cpuMax = SensorRegistry.cpuMaximumTemperature(from: sensors)
         logger.debug("evaluate — cpuMax=\(Int(cpuMax), privacy: .public)°, threshold=\(Int(self.highTempThreshold), privacy: .public)°, fans=\(fans.count, privacy: .public)")
         if cpuMax >= highTempThreshold {
             tryFire(key: "highTemp", lastFire: lastHighTempAlert) {

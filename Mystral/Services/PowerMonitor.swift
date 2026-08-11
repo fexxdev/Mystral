@@ -29,7 +29,8 @@ final class PowerMonitor {
         ioreport = IOReportPower()
     }
 
-    func sample() {
+    func sample(maxHistory: Int = PowerMonitor.maxHistory) {
+        let historyLimit = max(1, maxHistory)
         if let smc, let watts = try? smc.readFloat(key: "PSTR"), watts > 0 {
             totalWatts = watts
         } else {
@@ -42,9 +43,9 @@ final class PowerMonitor {
             cpuWatts = nil
             gpuWatts = nil
         }
-        if let t = totalWatts { totalHistory = Self.appendCapped(t, to: totalHistory, maxHistory: Self.maxHistory) }
-        if let c = cpuWatts { cpuHistory = Self.appendCapped(c, to: cpuHistory, maxHistory: Self.maxHistory) }
-        if let g = gpuWatts { gpuHistory = Self.appendCapped(g, to: gpuHistory, maxHistory: Self.maxHistory) }
+        if let t = totalWatts { totalHistory = Self.appendCapped(t, to: totalHistory, maxHistory: historyLimit) }
+        if let c = cpuWatts { cpuHistory = Self.appendCapped(c, to: cpuHistory, maxHistory: historyLimit) }
+        if let g = gpuWatts { gpuHistory = Self.appendCapped(g, to: gpuHistory, maxHistory: historyLimit) }
     }
 
     /// Append a value to a rolling history, trimming the oldest samples beyond `maxHistory`.

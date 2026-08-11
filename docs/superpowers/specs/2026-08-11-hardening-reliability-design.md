@@ -26,7 +26,7 @@ The proxy treats fresh data as the health signal. A live PID without a data file
 
 ### Helper installation
 
-Do not stage executable shell files in `/tmp`. Generate the plist in memory, encode it as Base64, and pass it to one short privileged shell command. Require the app executable to be inside `/Applications`, root-owned, and not group/world-writable. Require `launchctl bootstrap`, `kickstart`, and `print` to succeed.
+Do not stage executable shell files in `/tmp`. Generate the plist in memory, encode it as Base64, and pass it to one short privileged shell command. Require the source app executable to be inside `/Applications`, with standard Finder ownership and no group/world write access. Copy it during the authorized install to the root-owned `/Library/PrivilegedHelperTools` path, then point the LaunchDaemon at that copy. Run `launchctl bootstrap` before `enable`, then require `kickstart` and `print` to succeed. Treat the helper as installed only when the live `launchd` job is loaded and its plist matches the current build. Re-copy the helper when its build changes.
 
 ### Updater
 
@@ -36,7 +36,7 @@ Use unique private temporary directories for the DMG and mount point. Validate t
 
 ### Application correctness
 
-Reset all persisted settings and in-memory managers. Make profile writes atomic and update memory only after a successful write. Surface profile operation errors. Use CPU summary sensors as fallback for alerts and stress tests. Detect fans from metadata, even when RPM is zero. Validate stress-test duration. Keep chart history at five minutes for every polling interval. Restart the menu-bar timer when the polling interval changes.
+Reset all persisted settings and in-memory managers. Make profile writes atomic and update memory only after a successful write. Surface profile operation errors. Use CPU summary sensors as fallback for alerts and stress tests. Detect fans from metadata, even when RPM is zero. Validate stress-test duration. Keep chart history at five minutes for every polling interval. Restart the menu-bar timer when the polling interval changes. Keep the main sidebar at 200 points and the Profiles sidebar at 260 points. Use one custom toggle in a fixed toolbar position. Keep the main layout as explicit fixed-width columns, including Profiles. Enforce a 1200 by 640 point minimum window.
 
 ### Verification and release process
 

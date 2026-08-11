@@ -5,7 +5,7 @@
 Mystral is a native macOS menu bar app for controlling fan curves on Apple Silicon Macs (M1–M5). It reads temperature sensors and fan RPM via SMC, lets users define custom fan curves per profile, and runs as a persistent background service with a menu bar presence.
 
 **Target:** macOS 14+ on Apple Silicon (M1, M2, M3, M4, M5).
-**Distribution:** Open source on GitHub, notarized release binaries.
+**Distribution:** Open source on GitHub. Release DMGs use Developer ID signing when release credentials are available; local builds are ad-hoc signed.
 **Languages:** English (default) + Italian localization.
 
 ## Architecture
@@ -18,7 +18,7 @@ Mystral.app
 ├── FanController         — Polling loop, applies active curve
 ├── ProfileManager        — Load/save profiles, preset management
 ├── SMCService            — Swift wrapper over SMC read/write
-└── SMCHelper (XPC)       — Privileged helper for fan write access
+└── SMCHelper (LaunchDaemon + private IPC) — Privileged helper for fan write access
 ```
 
 ### Component Responsibilities
@@ -52,7 +52,7 @@ Mystral.app
 - `setFanSpeed(index: Int, percentage: Double)` — set fan speed (via helper)
 - `setFanMode(index: Int, mode: FanMode)` — auto or forced
 
-**SMC Helper (XPC)** — A privileged helper tool installed via `SMAppService.daemon(plistName:)` (macOS 13+). Runs with elevated privileges to write fan speed values to SMC. The main app communicates with it over XPC. The helper only exposes fan write operations — no other root access. Falls back to `SMJobBless` for macOS 14 if `SMAppService.daemon` is unavailable.
+**SMC Helper (LaunchDaemon)** — A root LaunchDaemon writes fan speed values to SMC. The app and helper exchange JSON files in a private per-user IPC directory. The helper validates the directory owner, permissions, command whitelist, finite numeric values, and a session heartbeat before applying commands. It restores automatic fan control after heartbeat loss, SMC errors, sleep, or termination.
 
 ## Data Model
 
@@ -131,6 +131,9 @@ Mystral/
 │   │   ├── Sensor.swift
 │   │   └── Fan.swift
 │   ├── Services/
+│   │   ├── AppSettings.swift
+│   │   ├── SMCIPC.swift
+│   │   ├── SMCHelperMode.swift
 │   │   ├── SMCService.swift
 │   │   ├── FanController.swift
 │   │   └── ProfileManager.swift
@@ -141,16 +144,12 @@ Mystral/
 │       ├── balanced.json
 │       ├── performance.json
 │       └── fullblast.json
-├── MystralHelper/                 — Privileged XPC helper
-│   ├── main.swift
-│   ├── HelperProtocol.swift
-│   └── Info.plist
 ├── MystralTests/
 ├── README.md
 ├── LICENSE                        — MIT
 └── .github/
     └── workflows/
-        └── release.yml            — Build + notarize on tag
+        └── ci.yml                 — Generate, build, test, lint, and measure coverage
 ```
 
 ## SMC Access on Apple Silicon
@@ -165,9 +164,9 @@ The SMCService will enumerate available keys at startup rather than hardcoding, 
 
 ## Security & Permissions
 
-- **No entitlements sandboxing** — needed for IOKit SMC access. Distributed as notarized DMG outside App Store.
-- **Privileged helper** — only operation requiring root is writing fan speed. The XPC helper is minimal: validates caller identity, only exposes `setFanSpeed` and `setFanMode`.
-- **No network access** — the app never phones home. Update checks via GitHub releases (Sparkle framework, optional).
+- **No App Sandbox** — needed for IOKit SMC access. Release DMGs require Developer ID signing before automatic updates can install them.
+- **Privileged helper** — only fan control requires root. The LaunchDaemon accepts only validated JSON commands from the private IPC directory.
+- **Network use is limited** — the app collects no telemetry. Optional update checks read GitHub Releases and accept only trusted, signed bundles.
 
 ## Future Architecture Hooks
 

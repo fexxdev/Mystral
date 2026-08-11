@@ -34,4 +34,10 @@ final class PowerMonitorTests: XCTestCase {
     func testOtherWattsHandlesNilComponents() {
         XCTAssertEqual(PowerCard.otherWatts(total: 30, cpu: nil, gpu: 4), 26, accuracy: 0.0001)
     }
+
+    func testHistoryLimitKeepsFiveMinutesAtEachPollingInterval() {
+        XCTAssertEqual(FanController.historyLimit(forPollingInterval: 2), 151)
+        XCTAssertEqual(FanController.historyLimit(forPollingInterval: 5), 61)
+        XCTAssertEqual(FanController.historyLimit(forPollingInterval: 10), 31)
+    }
 }

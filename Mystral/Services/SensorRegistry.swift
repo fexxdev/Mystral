@@ -190,6 +190,15 @@ enum SensorRegistry {
         sensors.filter { categoryForKey($0.id) == .cpuSummary }
     }
 
+    static func cpuMaximumTemperature(from sensors: [Sensor]) -> Double {
+        if let maximumCore = cpuCoreSensors(from: sensors).map(\.temperature).max() {
+            return maximumCore
+        }
+        return ["TCMz", "TCMb"].compactMap { key in
+            sensors.first(where: { $0.id == key })?.temperature
+        }.max() ?? 0
+    }
+
     static let defaultCpuSensorKey = "TCMz"
     static let defaultGpuSensorKey = ""
 
@@ -206,7 +215,7 @@ enum SensorRegistry {
         let cpuCores = cpuCoreSensors(from: sensors).count
         let gpuCores = gpuCoreSensors(from: sensors).count
         let hasSummary = keys.contains("TCMz") || keys.contains("TCMb")
-        let hasFanControl = fans.contains { $0.currentRPM > 0 || $0.targetRPM > 0 }
+        let hasFanControl = fans.contains { $0.maxRPM > $0.minRPM }
 
         let sysName = HardwareInfo.chipName()
         let chipName = sysName.isEmpty ? (cpuCores > 0 ? "Apple Silicon" : "Unknown") : sysName

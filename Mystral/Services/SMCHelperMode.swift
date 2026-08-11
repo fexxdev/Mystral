@@ -6,9 +6,11 @@ import os
 private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "SMCHelper")
 
 enum SMCHelperMode {
-    static let dataPath = "/tmp/mystral-smc-data.json"
-    static let cmdDir = "/tmp/mystral-cmds"
-    static let pidPath = "/tmp/mystral-helper.pid"
+    static let helperVersionEnvironmentKey = "MYSTRAL_HELPER_VERSION"
+    static let helperRevisionEnvironmentKey = "MYSTRAL_HELPER_REVISION"
+    static var dataPath: String { SMCIPC.dataPath }
+    static var cmdDir: String { SMCIPC.commandDirectoryPath }
+    static var pidPath: String { SMCIPC.pidPath }
 
     /// State the C system-power callback needs (it can't capture context). Set once in
     /// run(); read only from the callback, which runs on the helper's serial queue.
@@ -16,7 +18,15 @@ enum SMCHelperMode {
     nonisolated(unsafe) fileprivate static var powerSMC: SMCServiceProtocol?
 
     static var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+        ProcessInfo.processInfo.environment[helperVersionEnvironmentKey]
+            ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "0"
+    }
+
+    static var helperRevision: String {
+        ProcessInfo.processInfo.environment[helperRevisionEnvironmentKey]
+            ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+            ?? appVersion
     }
 
     struct SMCData: Codable {
@@ -43,20 +53,44 @@ enum SMCHelperMode {
         let action: String
         let index: Int
         let value: Double?
+
+        var isValid: Bool {
+            switch action {
+            case "heartbeat":
+                return index == 0 && value == nil
+            case "setFanSpeed":
+                guard let value else { return false }
+                return index >= 0 && index < 8 && value.isFinite && (0...100).contains(value)
+            case "setFanMode":
+                guard let value else { return false }
+                return index >= 0 && index < 8 && value.isFinite && (value == 0 || value == 1)
+            case "setForcedMode":
+                guard let value else { return false }
+                return index >= 1 && index <= 8 && value.isFinite && (value == 0 || value == 1)
+            case "restart":
+                return index == 0 && value == nil
+            default:
+                return false
+            }
+        }
+    }
+
+    static func shouldRestoreForHeartbeat(lastHeartbeat: Date?, now: Date, timeout: TimeInterval) -> Bool {
+        guard let lastHeartbeat else { return false }
+        return now.timeIntervalSince(lastHeartbeat) >= timeout
     }
 
     static func run() -> Never {
         fputs("SMCHelper: starting pid=\(getpid()) version=\(appVersion)\n", stderr)
 
-        // Root's cwd is / which is read-only on macOS — LLVM profiling (Debug builds)
-        // crashes writing default.profraw there
-        FileManager.default.changeCurrentDirectoryPath("/tmp")
+        guard SMCIPC.validateForHelper() else {
+            fputs("SMCHelper: refusing unsafe or missing IPC directory\n", stderr)
+            exit(1)
+        }
 
         logger.info("SMCHelper starting — pid=\(getpid()), version=\(appVersion)")
         fputs("SMCHelper: writing PID file\n", stderr)
         try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
-        try? FileManager.default.createDirectory(atPath: cmdDir, withIntermediateDirectories: true)
-        chmod(cmdDir, 0o733)
 
         // Prevent macOS from throttling/coalescing our timer during display sleep
         let activityToken = ProcessInfo.processInfo.beginActivity(
@@ -75,9 +109,14 @@ enum SMCHelperMode {
             exit(1)
         }
 
+        // A helper restart must never inherit the previous forced setpoint.
+        _ = restoreAutoMode(smc: smc)
+
+        let queue = DispatchQueue(label: "com.fexxdev.Mystral.helper", qos: .userInitiated)
+
         signal(SIGHUP, SIG_IGN)
 
-        let sigSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        let sigSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: queue)
         signal(SIGTERM, SIG_IGN)
         sigSource.setEventHandler {
             logger.info("SMCHelper — SIGTERM received, restoring auto mode and cleaning up")
@@ -90,11 +129,18 @@ enum SMCHelperMode {
         dumpDiagnostics(smc: smc)
 
         var consecutiveErrors = 0
-        let queue = DispatchQueue(label: "com.fexxdev.Mystral.helper", qos: .userInitiated)
+        var lastHeartbeat: Date?
+        var restoredAfterReadFailure = false
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: 2.0, leeway: .milliseconds(100))
         timer.setEventHandler {
-            processCommands(smc: smc)
+            processCommands(smc: smc, lastHeartbeat: &lastHeartbeat)
+            if shouldRestoreForHeartbeat(lastHeartbeat: lastHeartbeat, now: Date(), timeout: 8) {
+                logger.warning("SMCHelper — app heartbeat timed out; restoring automatic fan control")
+                purgeCommandFiles()
+                _ = restoreAutoMode(smc: smc)
+                lastHeartbeat = nil
+            }
             do {
                 let sensors = try smc.getAllSensors()
                 let fans = try smc.getAllFans()
@@ -111,10 +157,17 @@ enum SMCHelperMode {
                     logger.info("SMCHelper — recovered after \(consecutiveErrors) errors")
                     consecutiveErrors = 0
                 }
+                restoredAfterReadFailure = false
             } catch {
                 consecutiveErrors += 1
                 logger.error("SMCHelper — SMC read error (#\(consecutiveErrors)): \(error.localizedDescription)")
                 fputs("SMC read error (#\(consecutiveErrors)): \(error)\n", stderr)
+                if consecutiveErrors >= 3 && !restoredAfterReadFailure {
+                    purgeCommandFiles()
+                    _ = restoreAutoMode(smc: smc)
+                    lastHeartbeat = nil
+                    restoredAfterReadFailure = true
+                }
             }
         }
         timer.resume()
@@ -146,9 +199,16 @@ enum SMCHelperMode {
     /// Hand fan control back to macOS auto mode (releases the forced setpoint the SMC
     /// otherwise holds). Used both on SIGTERM and when the system is about to sleep so
     /// the firmware idles the fans instead of whining at the last forced RPM (issue #2).
-    static func restoreAutoMode(smc: SMCServiceProtocol) {
-        let count = (try? smc.getAllFans().count) ?? 2
-        try? smc.setForcedMode(fanCount: count, forced: false)
+    @discardableResult
+    static func restoreAutoMode(smc: SMCServiceProtocol) -> Bool {
+        do {
+            let count = try smc.getAllFans().count
+            try smc.setForcedMode(fanCount: max(1, count), forced: false)
+            return true
+        } catch {
+            logger.error("SMCHelper — failed to restore automatic fan control: \(error.localizedDescription)")
+            return false
+        }
     }
 
     /// Routes a system-power message to its fan action: on "will sleep" it hands fans
@@ -171,7 +231,7 @@ enum SMCHelperMode {
     }
 
     private static func dumpDiagnostics(smc: SMCService) {
-        let diagPath = "/tmp/mystral-diagnostics.log"
+        let diagPath = SMCIPC.diagnosticPath
         var log = "=== Mystral SMC Diagnostics ===\n"
         log += "Running as uid: \(getuid())\n"
         log += "Date: \(Date())\n\n"
@@ -216,16 +276,23 @@ enum SMCHelperMode {
         fputs("Diagnostics written to \(diagPath)\n", stderr)
     }
 
-    private static func processCommands(smc: SMCService) {
+    private static func processCommands(smc: SMCService, lastHeartbeat: inout Date?) {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: cmdDir) else { return }
         for file in files where file.hasSuffix(".json") {
             let path = "\(cmdDir)/\(file)"
             defer { try? fm.removeItem(atPath: path) }
+            guard isTrustedCommandFile(path: path) else { continue }
             guard let data = fm.contents(atPath: path),
                   let cmd = try? JSONDecoder().decode(Command.self, from: data) else { continue }
+            guard cmd.isValid else {
+                fputs("CMD: rejected invalid command\n", stderr)
+                continue
+            }
             do {
                 switch cmd.action {
+                case "heartbeat":
+                    lastHeartbeat = Date()
                 case "setFanSpeed":
                     let pct = cmd.value ?? 0
                     guard cmd.index >= 0 && cmd.index < 8 && pct >= 0 && pct <= 100 else {
@@ -273,7 +340,28 @@ enum SMCHelperMode {
     private static func cleanup() {
         try? FileManager.default.removeItem(atPath: pidPath)
         try? FileManager.default.removeItem(atPath: dataPath)
-        try? FileManager.default.removeItem(atPath: cmdDir)
+        purgeCommandFiles()
+    }
+
+    private static func purgeCommandFiles() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: cmdDir) else { return }
+        for file in files where file.hasSuffix(".json") {
+            try? fm.removeItem(atPath: URL(fileURLWithPath: cmdDir).appendingPathComponent(file).path)
+        }
+    }
+
+    private static func isTrustedCommandFile(path: String) -> Bool {
+        let url = URL(fileURLWithPath: path)
+        guard url.path == url.resolvingSymlinksInPath().path,
+              let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+              (attributes[.type] as? FileAttributeType) == .typeRegular else {
+            return false
+        }
+        let expectedUID = UInt32(ProcessInfo.processInfo.environment[SMCIPC.uidEnvironmentKey] ?? "")
+        let ownerUID = (attributes[.ownerAccountID] as? NSNumber)?.uint32Value
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o777
+        return ownerUID == expectedUID && (permissions & 0o022) == 0
     }
 }
 

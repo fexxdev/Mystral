@@ -22,7 +22,6 @@ final class UpdateChecker {
     private static let lastCheckedKey = "updatesLastCheckedAt"
     private static let releasesURL = URL(string: "https://api.github.com/repos/fexxdev/Mystral/releases/latest")!
     private static let minAutoCheckInterval: TimeInterval = 60 * 60 * 24
-    private static let mountPoint = "/tmp/mystral-update-mount"
 
     var status: Status = .unknown
     var lastCheckedAt: Date?
@@ -79,7 +78,9 @@ final class UpdateChecker {
             UserDefaults.standard.set(lastCheckedAt, forKey: Self.lastCheckedKey)
 
             if Self.compareVersions(latestVersion, currentVersion) == .orderedDescending {
-                let dmgURL = release.assets.first(where: { $0.name.hasSuffix(".dmg") }).flatMap { URL(string: $0.browser_download_url) }
+                let dmgURL = release.assets.first(where: { $0.name.hasSuffix(".dmg") })
+                    .flatMap { URL(string: $0.browser_download_url) }
+                    .flatMap { Self.isTrustedReleaseURL($0) ? $0 : nil }
                 let pageURL = URL(string: release.html_url) ?? Self.releasesURL
                 status = .updateAvailable(version: latestVersion, releaseURL: pageURL, dmgURL: dmgURL, notes: release.body ?? "")
                 logger.info("Update available: \(latestVersion, privacy: .public)")
@@ -113,20 +114,22 @@ final class UpdateChecker {
             let dmgPath = try await downloadDMG(url: dmgURL, version: version)
 
             status = .installing(version: version)
-            removeQuarantine(at: dmgPath.path)
 
             let mountPoint = try mountDMG(at: dmgPath)
             do {
                 try replaceApp(from: mountPoint)
             } catch {
                 unmountDMG(mountPoint: mountPoint)
+                try? FileManager.default.removeItem(atPath: mountPoint)
                 try? FileManager.default.removeItem(at: dmgPath)
                 throw error
             }
 
             unmountDMG(mountPoint: mountPoint)
+            try? FileManager.default.removeItem(atPath: mountPoint)
             try? FileManager.default.removeItem(at: dmgPath)
 
+            pendingUpdate = nil
             relaunchAndTerminate()
         } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSUserCancelledError {
             restorePendingStatus()
@@ -159,9 +162,11 @@ final class UpdateChecker {
     // MARK: - Download
 
     private func downloadDMG(url: URL, version: String) async throws -> URL {
+        guard Self.isTrustedReleaseURL(url) else { throw UpdateError.untrustedURL }
         status = .downloading(version: version, progress: 0)
 
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("Mystral-update.dmg")
+        let dest = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Mystral-update-\(UUID().uuidString).dmg")
         try? FileManager.default.removeItem(at: dest)
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -185,9 +190,9 @@ final class UpdateChecker {
     // MARK: - Mount / Unmount
 
     private func mountDMG(at path: URL) throws -> String {
-        let mountPoint = Self.mountPoint
-        unmountDMG(mountPoint: mountPoint)
-        try? FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: true)
+        let mountPoint = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Mystral-update-mount-\(UUID().uuidString)", isDirectory: true).path
+        try FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: false)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
@@ -232,13 +237,10 @@ final class UpdateChecker {
             sourcePath = "\(mountPoint)/\(found)"
         }
 
-        let newInfoPath = "\(sourcePath)/Contents/Info.plist"
-        if let newInfo = NSDictionary(contentsOfFile: newInfoPath),
-           let newVersion = newInfo["CFBundleShortVersionString"] as? String {
-            guard Self.compareVersions(newVersion, currentVersion) == .orderedDescending else {
-                throw UpdateError.versionMismatch
-            }
+        guard Self.isValidBundleMetadata(at: sourcePath, currentVersion: currentVersion) else {
+            throw UpdateError.invalidBundleMetadata
         }
+        try Self.verifyCodeSignature(at: sourcePath)
 
         let parentDir = (appPath as NSString).deletingLastPathComponent
         let fm = FileManager.default
@@ -325,6 +327,50 @@ final class UpdateChecker {
         return .orderedSame
     }
 
+    nonisolated static func isTrustedReleaseURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == "github.com",
+              url.path.hasPrefix("/fexxdev/Mystral/releases/download/"),
+              url.pathExtension.lowercased() == "dmg" else { return false }
+        return true
+    }
+
+    nonisolated static func hasDeveloperIDSignature(_ output: String) -> Bool {
+        output.contains("Authority=Developer ID Application:") && output.contains("TeamIdentifier=")
+    }
+
+    nonisolated static func isValidBundleMetadata(at appPath: String, currentVersion: String) -> Bool {
+        let infoPath = URL(fileURLWithPath: appPath).appendingPathComponent("Contents/Info.plist").path
+        guard let info = NSDictionary(contentsOfFile: infoPath),
+              info["CFBundleIdentifier"] as? String == "com.fexxdev.Mystral",
+              info["CFBundlePackageType"] as? String == "APPL",
+              let version = info["CFBundleShortVersionString"] as? String else { return false }
+        return compareVersions(version, currentVersion) == .orderedDescending
+    }
+
+    nonisolated static func verifyCodeSignature(at appPath: String) throws {
+        let verification = try runCodesign(arguments: ["--verify", "--deep", "--strict", "--verbose=2", appPath])
+        guard verification.status == 0 else { throw UpdateError.signatureInvalid }
+
+        let details = try runCodesign(arguments: ["-dv", "--verbose=4", appPath])
+        guard details.status == 0, hasDeveloperIDSignature(details.output) else {
+            throw UpdateError.signatureInvalid
+        }
+    }
+
+    private nonisolated static func runCodesign(arguments: [String]) throws -> (status: Int32, output: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = arguments
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+        let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return (process.terminationStatus, text)
+    }
+
     // MARK: - Types
 
     private enum UpdateError: LocalizedError {
@@ -333,6 +379,9 @@ final class UpdateChecker {
         case appNotFoundInDMG
         case replaceFailed(String)
         case versionMismatch
+        case untrustedURL
+        case invalidBundleMetadata
+        case signatureInvalid
 
         var errorDescription: String? {
             switch self {
@@ -341,6 +390,9 @@ final class UpdateChecker {
             case .appNotFoundInDMG: "Mystral.app not found in the downloaded DMG"
             case .replaceFailed(let msg): "Failed to replace app: \(msg)"
             case .versionMismatch: "Downloaded version is not newer than current"
+            case .untrustedURL: "Update download URL is not a trusted Mystral GitHub release"
+            case .invalidBundleMetadata: "Downloaded app metadata is not a valid newer Mystral release"
+            case .signatureInvalid: "Downloaded app has no valid Developer ID signature"
             }
         }
     }
@@ -392,6 +444,12 @@ private final class DownloadSession: NSObject, URLSessionDownloadDelegate, @unch
                     didFinishDownloadingTo location: URL) {
         guard !completed else { return }
         completed = true
+        guard let response = downloadTask.response as? HTTPURLResponse,
+              (200..<300).contains(response.statusCode) else {
+            onComplete(.failure(NSError(domain: "Mystral.Update", code: 1,
+                                        userInfo: [NSLocalizedDescriptionKey: "Update download returned an invalid HTTP response"])))
+            return
+        }
         do {
             try? FileManager.default.removeItem(at: destination)
             try FileManager.default.moveItem(at: location, to: destination)

@@ -18,7 +18,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var helperLaunchFailures = 0
     private static let maxHelperLaunchAttempts = 3
     private var helperGaveUpAt: Date?
-    private var didRequestUpgradeRestart = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("applicationDidFinishLaunching — start")
@@ -46,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         } else {
             logger.info("Running as user — using SMCProxyService")
+            do {
+                try SMCIPC.prepareForApp()
+            } catch {
+                logger.error("Cannot secure helper IPC directory: \(error.localizedDescription, privacy: .public)")
+            }
             let proxy = SMCProxyService()
             smcProxy = proxy
             smcService = proxy
@@ -99,25 +103,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         helperLaunchFailures = 0
         helperGaveUpAt = nil
         guard smcProxy != nil, let execPath = Bundle.main.executablePath else { return }
-        if HelperDaemon.isInstalled(forExecutable: execPath) {
+        if HelperDaemon.isInstalled(forExecutable: execPath, helperVersion: SMCHelperMode.helperRevision) {
             // Prompt-free: ask the running helper to recycle; the launchd daemon's
-            // KeepAlive relaunches it immediately (also picks up a new binary).
+            // KeepAlive relaunches the root-owned helper immediately.
             smcProxy?.requestRestart()
         } else {
             ensureHelperInstalled()
         }
     }
 
-    /// Ensures the privileged SMC helper is installed as a launchd daemon. The first
-    /// install triggers ONE admin prompt; afterwards launchd keeps the helper alive
-    /// forever, so this is a no-op on later launches. If the app was updated in place,
-    /// recycles the running helper prompt-free so launchd loads the new binary.
+    /// Ensures the privileged SMC helper is installed as a root-owned launchd daemon.
+    /// The first install and each helper build update require administrator approval.
     private func ensureHelperInstalled() {
         guard smcProxy != nil, let execPath = Bundle.main.executablePath else { return }
 
-        if HelperDaemon.isInstalled(forExecutable: execPath) {
+        if HelperDaemon.isInstalled(forExecutable: execPath, helperVersion: SMCHelperMode.helperRevision) {
             helperLaunchFailures = 0
-            requestUpgradeRestartIfNeeded()
             return
         }
 
@@ -134,7 +135,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         Task.detached {
-            let ok = HelperDaemon.install(executablePath: execPath)
+            let ok = HelperDaemon.install(
+                executablePath: execPath,
+                helperVersion: SMCHelperMode.helperRevision
+            )
             await MainActor.run {
                 if ok {
                     self.helperLaunchFailures = 0
@@ -145,22 +149,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             }
         }
-    }
-
-    /// After an in-place app update the daemon (same path) still runs the old binary.
-    /// If the running helper reports an older version on fresh data, ask it to recycle
-    /// so launchd relaunches the new on-disk binary — no admin prompt. At most once per run.
-    private func requestUpgradeRestartIfNeeded() {
-        guard !didRequestUpgradeRestart,
-              let data = try? Data(contentsOf: URL(fileURLWithPath: SMCHelperMode.dataPath)),
-              let smcData = try? JSONDecoder().decode(SMCHelperMode.SMCData.self, from: data),
-              let version = smcData.version, version != SMCHelperMode.appVersion,
-              let attrs = try? FileManager.default.attributesOfItem(atPath: SMCHelperMode.dataPath),
-              let modified = attrs[.modificationDate] as? Date,
-              Date().timeIntervalSince(modified) < 30 else { return }
-        logger.info("Helper version \(version, privacy: .public) != app \(SMCHelperMode.appVersion, privacy: .public) — requesting prompt-free restart")
-        didRequestUpgradeRestart = true
-        smcProxy?.requestRestart()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -199,6 +187,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
+        window.contentMinSize = NSSize(width: 1200, height: 640)
         window.title = "Mystral"
         window.contentView = NSHostingView(rootView: contentView)
         window.center()
@@ -227,6 +216,7 @@ final class FallbackSMCService: SMCServiceProtocol, @unchecked Sendable {
     func setFanSpeed(index: Int, percentage: Double) throws {}
     func setFanMode(index: Int, mode: FanMode) throws {}
     func setForcedMode(fanCount: Int, forced: Bool) throws {}
+    func heartbeat() throws {}
 }
 
 /// Installs and tracks the privileged SMC helper as a launchd LaunchDaemon.
@@ -234,51 +224,78 @@ final class FallbackSMCService: SMCServiceProtocol, @unchecked Sendable {
 /// Previously the helper was spawned as a root *orphan* via `osascript … with
 /// administrator privileges` and backgrounded. launchd (pid 1) adopts such orphans
 /// and reaps them during housekeeping (~every 20–40 min), forcing a fresh admin
-/// prompt each time. As a managed LaunchDaemon with KeepAlive, launchd instead keeps
-/// the helper alive forever and revives it in <1s on any death — one admin prompt at
-/// install, never again.
+/// prompt each time. The managed LaunchDaemon now runs a root-owned copy from
+/// `/Library/PrivilegedHelperTools` and revives it in <1s on any death.
 enum HelperDaemon {
     static let label = "com.fexxdev.Mystral.helper"
     static let plistPath = "/Library/LaunchDaemons/\(label).plist"
+    static let helperToolPath = "/Library/PrivilegedHelperTools/\(label)"
+    static let installationFileCheckCommand = "/bin/test"
+    private static let sourceEnvironmentKey = "MYSTRAL_HELPER_SOURCE"
 
-    /// True if the daemon plist is installed AND points at `executablePath`. A path
-    /// mismatch means the app was moved/reinstalled elsewhere and needs a repair install.
-    static func isInstalled(forExecutable executablePath: String) -> Bool {
+    /// True if the daemon and its root-owned helper tool match the current app build.
+    static func isInstalled(
+        forExecutable executablePath: String,
+        ipcDirectoryPath: String = SMCIPC.directoryPath,
+        appVersion: String = SMCHelperMode.appVersion,
+        helperVersion: String = SMCHelperMode.helperRevision
+    ) -> Bool {
+        guard isAllowedExecutablePath(executablePath),
+              isSecureHelperTool(),
+              FileManager.default.fileExists(atPath: plistPath),
+              isLaunchdJobLoaded() else { return false }
         guard let dict = NSDictionary(contentsOfFile: plistPath),
               let args = dict["ProgramArguments"] as? [String],
-              let program = args.first else { return false }
-        return program == executablePath
+              let program = args.first,
+              let environment = dict["EnvironmentVariables"] as? [String: String] else { return false }
+        return program == helperToolPath
+            && args.dropFirst().first == "--smc-helper"
+            && environment[SMCIPC.directoryEnvironmentKey] == ipcDirectoryPath
+            && environment[SMCIPC.uidEnvironmentKey] == String(getuid())
+            && environment[sourceEnvironmentKey] == executablePath
+            && environment[SMCHelperMode.helperVersionEnvironmentKey] == appVersion
+            && environment[SMCHelperMode.helperRevisionEnvironmentKey] == helperVersion
     }
 
-    /// Installs/repairs the daemon. Triggers ONE admin password prompt. Returns true
-    /// on success. Safe to call when already installed (re-bootstraps cleanly).
+    /// Installs or repairs the root-owned helper and daemon. It prompts for an
+    /// administrator password on first install and when the helper build changes.
     @discardableResult
-    static func install(executablePath: String) -> Bool {
-        let staged = "/tmp/\(label).plist"
-        guard (try? plistContents(executablePath: executablePath)
-            .write(toFile: staged, atomically: true, encoding: .utf8)) != nil else {
-            logger.error("Failed to stage daemon plist in /tmp")
+    static func install(
+        executablePath: String,
+        ipcDirectoryPath: String = SMCIPC.directoryPath,
+        appVersion: String = SMCHelperMode.appVersion,
+        helperVersion: String = SMCHelperMode.helperRevision
+    ) -> Bool {
+        guard isAllowedExecutablePath(executablePath),
+              SMCIPC.isSecureDirectory(path: ipcDirectoryPath, expectedOwnerUID: getuid()),
+              SMCIPC.isSecureDirectory(path: URL(fileURLWithPath: ipcDirectoryPath).appendingPathComponent("commands").path, expectedOwnerUID: getuid()) else {
+            logger.error("Refusing helper install: executable or IPC directory is not trusted")
             return false
         }
 
-        // As root: drop any prior job + stray orphan helpers, install the plist, then
-        // bootstrap/enable/kickstart so launchd starts and keeps the helper alive.
-        let installScript = """
-        #!/bin/bash
-        LOG=/tmp/mystral-daemon-install.log
-        echo "=== install $(date) uid=$(id -u) ===" >> "$LOG"
-        launchctl bootout system/\(label) 2>/dev/null || true
-        pkill -f -- '--smc-helper' 2>/dev/null || true
-        cp '\(staged)' '\(plistPath)' && chown root:wheel '\(plistPath)' && chmod 644 '\(plistPath)' || { echo "plist install FAILED" >> "$LOG"; exit 1; }
-        launchctl enable system/\(label) 2>/dev/null || true
-        launchctl bootstrap system '\(plistPath)' 2>>"$LOG" || true
-        launchctl kickstart system/\(label) 2>>"$LOG" || true
-        echo "install OK" >> "$LOG"
-        """
-        try? installScript.write(toFile: "/tmp/mystral-daemon-install.sh", atomically: true, encoding: .utf8)
-        chmod("/tmp/mystral-daemon-install.sh", 0o755)
-
-        let osa = "do shell script \"bash /tmp/mystral-daemon-install.sh\" with administrator privileges"
+        let plist = plistContents(
+            sourceExecutablePath: executablePath,
+            ipcDirectoryPath: ipcDirectoryPath,
+            appVersion: appVersion,
+            helperVersion: helperVersion
+        )
+        let encoded = Data(plist.utf8).base64EncodedString()
+        let installCommands = [
+            "/bin/mkdir -p /Library/PrivilegedHelperTools",
+            "/usr/sbin/chown root:wheel /Library/PrivilegedHelperTools",
+            "/bin/chmod 755 /Library/PrivilegedHelperTools",
+            "/usr/bin/install -o root -g wheel -m 755 \(shellQuote(executablePath)) \(shellQuote(helperToolPath))",
+            "/bin/launchctl bootout system/\(label) 2>/dev/null || true",
+            "/usr/bin/printf '%s' \(shellQuote(encoded)) | /usr/bin/base64 -D > \(shellQuote(plistPath))",
+            "\(installationFileCheckCommand) -s \(shellQuote(plistPath))",
+            "/usr/sbin/chown root:wheel \(shellQuote(plistPath))",
+            "/bin/chmod 644 \(shellQuote(plistPath))"
+        ] + launchdLifecycleCommands()
+        let installScript = installCommands.joined(separator: " && ")
+        let appleScriptQuote: (String) -> String = { value in
+            "\"\(value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
+        }
+        let osa = "do shell script \(appleScriptQuote(installScript)) with administrator privileges"
         guard let script = NSAppleScript(source: osa) else { return false }
         var error: NSDictionary?
         script.executeAndReturnError(&error)
@@ -287,14 +304,137 @@ enum HelperDaemon {
             logger.error("Daemon install failed (code=\(code, privacy: .public)): \(error, privacy: .public)")
             return false
         }
-        return isInstalled(forExecutable: executablePath)
+        return isInstalled(
+            forExecutable: executablePath,
+            ipcDirectoryPath: ipcDirectoryPath,
+            appVersion: appVersion,
+            helperVersion: helperVersion
+        )
     }
 
-    private static func plistContents(executablePath: String) -> String {
-        let escaped = executablePath
+    static func launchdLifecycleCommands(plistPath: String = HelperDaemon.plistPath) -> [String] {
+        let quotedPlistPath = shellQuote(plistPath)
+        return [
+            "/bin/launchctl bootstrap system \(quotedPlistPath)",
+            "/bin/launchctl enable system/\(label)",
+            "/bin/launchctl kickstart -k system/\(label)",
+            "/bin/launchctl print system/\(label) >/dev/null"
+        ]
+    }
+
+    private static func shellQuote(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
+    private static func isLaunchdJobLoaded() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["print", "system/\(label)"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
+    private static func isSecureHelperTool() -> Bool {
+        let url = URL(fileURLWithPath: helperToolPath)
+        guard url.path == url.resolvingSymlinksInPath().path,
+              let attributes = try? FileManager.default.attributesOfItem(atPath: helperToolPath),
+              (attributes[.type] as? FileAttributeType) == .typeRegular,
+              (attributes[.ownerAccountID] as? NSNumber)?.uint32Value == 0 else {
+            return false
+        }
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o777
+        return (permissions & 0o022) == 0
+    }
+
+    static func isAllowedExecutablePath(_ executablePath: String) -> Bool {
+        let url = URL(fileURLWithPath: executablePath)
+        let resolved = url.resolvingSymlinksInPath()
+        guard resolved.path == url.standardizedFileURL.path,
+              resolved.path.hasPrefix("/Applications/"),
+              resolved.path.contains("/Contents/MacOS/"),
+              let applicationsAttributes = try? FileManager.default.attributesOfItem(atPath: "/Applications"),
+              (applicationsAttributes[.type] as? FileAttributeType) == .typeDirectory else {
+            return false
+        }
+
+        let appURL = resolved.deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        guard appURL.pathExtension == "app",
+              appURL.deletingLastPathComponent().path == "/Applications" else { return false }
+
+        let contentsURL = appURL.appendingPathComponent("Contents", isDirectory: true)
+        let macOSURL = contentsURL.appendingPathComponent("MacOS", isDirectory: true)
+        let paths = ["/Applications", appURL.path, contentsURL.path, macOSURL.path, resolved.path]
+        let attributes = paths.compactMap { try? FileManager.default.attributesOfItem(atPath: $0) }
+        guard attributes.count == paths.count,
+              (attributes[0][.ownerAccountID] as? NSNumber)?.uint32Value == 0,
+              (attributes[1][.type] as? FileAttributeType) == .typeDirectory,
+              (attributes[2][.type] as? FileAttributeType) == .typeDirectory,
+              (attributes[3][.type] as? FileAttributeType) == .typeDirectory,
+              (attributes[4][.type] as? FileAttributeType) == .typeRegular,
+              let applicationsPermissions = (attributes[0][.posixPermissions] as? NSNumber)?.intValue,
+              (applicationsPermissions & 0o002) == 0,
+              attributes.dropFirst().allSatisfy({
+                  let permissions = ($0[.posixPermissions] as? NSNumber)?.intValue ?? 0o777
+                  return (permissions & 0o022) == 0
+              }),
+              let appOwner = (attributes[1][.ownerAccountID] as? NSNumber)?.uint32Value,
+              let executableOwner = (attributes[4][.ownerAccountID] as? NSNumber)?.uint32Value,
+              let appPermissions = (attributes[1][.posixPermissions] as? NSNumber)?.intValue,
+              let executablePermissions = (attributes[4][.posixPermissions] as? NSNumber)?.intValue else {
+            return false
+        }
+
+        return isAllowedExecutableMetadata(
+            appOwnerUID: appOwner,
+            executableOwnerUID: executableOwner,
+            currentUID: getuid(),
+            appPermissions: appPermissions,
+            executablePermissions: executablePermissions
+        )
+    }
+
+    /// Finder commonly installs an app in /Applications with the current user's
+    /// ownership. Accept that layout when no group or other user can modify it.
+    static func isAllowedExecutableMetadata(
+        appOwnerUID: UInt32,
+        executableOwnerUID: UInt32,
+        currentUID: UInt32,
+        appPermissions: Int,
+        executablePermissions: Int
+    ) -> Bool {
+        let ownerIsTrusted = appOwnerUID == executableOwnerUID
+            && (appOwnerUID == 0 || appOwnerUID == currentUID)
+        return ownerIsTrusted
+            && (appPermissions & 0o022) == 0
+            && (executablePermissions & 0o022) == 0
+    }
+
+    private static func plistContents(
+        sourceExecutablePath: String,
+        ipcDirectoryPath: String,
+        appVersion: String,
+        helperVersion: String
+    ) -> String {
+        let xmlEscape: (String) -> String = { value in
+            value
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        let escapedSourceExecutable = xmlEscape(sourceExecutablePath)
+        let escapedIPC = xmlEscape(ipcDirectoryPath)
+        let escapedAppVersion = xmlEscape(appVersion)
+        let escapedHelperVersion = xmlEscape(helperVersion)
         return """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -304,7 +444,7 @@ enum HelperDaemon {
             <string>\(label)</string>
             <key>ProgramArguments</key>
             <array>
-                <string>\(escaped)</string>
+                <string>\(helperToolPath)</string>
                 <string>--smc-helper</string>
             </array>
             <key>KeepAlive</key>
@@ -317,11 +457,21 @@ enum HelperDaemon {
             <dict>
                 <key>LLVM_PROFILE_FILE</key>
                 <string>/dev/null</string>
+                <key>\(SMCIPC.directoryEnvironmentKey)</key>
+                <string>\(escapedIPC)</string>
+                <key>\(SMCIPC.uidEnvironmentKey)</key>
+                <string>\(getuid())</string>
+                <key>\(sourceEnvironmentKey)</key>
+                <string>\(escapedSourceExecutable)</string>
+                <key>\(SMCHelperMode.helperVersionEnvironmentKey)</key>
+                <string>\(escapedAppVersion)</string>
+                <key>\(SMCHelperMode.helperRevisionEnvironmentKey)</key>
+                <string>\(escapedHelperVersion)</string>
             </dict>
             <key>StandardOutPath</key>
-            <string>/tmp/mystral-helper-stdout.log</string>
+            <string>\(escapedIPC)/helper-stdout.log</string>
             <key>StandardErrorPath</key>
-            <string>/tmp/mystral-helper-stderr.log</string>
+            <string>\(escapedIPC)/helper-stderr.log</string>
         </dict>
         </plist>
         """

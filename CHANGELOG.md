@@ -6,6 +6,25 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-08-11
+
+### Added
+- Private per-user IPC between the app and the privileged SMC helper.
+- Automatic helper recovery after heartbeat loss, SMC errors, sleep, or termination.
+- CI checks for project generation, Debug and Release builds, tests, coverage, plist and JSON validity, and shell syntax.
+
+### Fixed
+- The helper installer now uses valid macOS tool paths and verifies the live `launchd` job after installation.
+- Helper installation now accepts standard user-owned apps copied into `/Applications` and runs a root-owned helper tool.
+- The updater accepts only trusted GitHub DMGs with valid metadata and Developer ID signatures.
+- Settings and profiles now reset and write transactionally. Sensor and history fallbacks are deterministic.
+- The main sidebar and Profiles layout no longer reflow when navigating between sections.
+- The sidebar toggle stays in one position and appears only once.
+
+### Improved
+- The main sidebar uses a fixed 200-point column. The Profiles sidebar uses a fixed 260-point column.
+- The main window enforces a 1200-by-640-point minimum size for the Profiles editor.
+
 ## [1.0.9] — 2026-05-16
 
 ### Fixed
@@ -22,7 +41,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 ## [1.0.6] — 2026-05-06
 
 ### Fixed
-- **Helper crash on Debug builds**: the root helper's working directory was `/` (read-only on modern macOS), causing LLVM profiling to abort the process with `Failed to write file "default.profraw": Read-only file system`. Helper now sets its cwd to `/tmp` on startup.
+- **Helper crash on Debug builds**: the root helper's working directory was `/` (read-only on modern macOS), causing LLVM profiling to abort the process with `Failed to write file "default.profraw": Read-only file system`. Helper now sends profiling output to `/dev/null` and does not depend on its working directory.
 - **Stale data after helper death**: when the SMC helper process died, the app silently showed frozen temperatures and queued fan commands that were never executed. `SMCProxyService` now detects missing or stale data files (>10 s) and throws `helperNotResponding`.
 - **No automatic recovery**: added helper health monitoring with auto-restart after 3 consecutive failures (30 s cooldown). Orphaned command files are purged before restarting.
 

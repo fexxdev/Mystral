@@ -20,14 +20,15 @@ curve (already handled).
   (`setForcedMode(forced: true)`) and writes curve-driven speeds each tick.
 - The app cannot write the SMC itself — only the **root helper daemon**
   (`SMCHelperMode`, a KeepAlive LaunchDaemon) can. The app sends commands to the
-  helper via JSON files in `/tmp/mystral-cmds`, which the helper drains on its own
+  helper via JSON files in the private per-user IPC directory, which the helper drains on its own
   2 s `DispatchSource` timer.
 - On system sleep both timers are suspended. The SMC keeps honoring the last
   `setForcedMode(true)` + last `setFanSpeed`, so the fan holds that RPM → whine.
 - Wake is already handled: `FanController.handleWake` (`didWakeNotification`)
   resets `forcedModeSet = false` and grants a 15 s helper grace, so the next tick
   re-asserts forced mode + curve.
-- There is **no `willSleep` handling anywhere** today.
+- `SMCHelperMode` now registers for system-power notifications and restores auto
+  mode on `kIOMessageSystemWillSleep` before acknowledging the sleep request.
 
 ## Why the helper (not the app) must do this — chosen approach
 

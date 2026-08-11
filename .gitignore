@@ -16,6 +16,7 @@ build/
 *.app
 *.ipa
 *.dSYM
+.build-verify/
 
 # DMG / release outputs
 dist/

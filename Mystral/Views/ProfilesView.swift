@@ -1,12 +1,15 @@
 import SwiftUI
 
 struct ProfilesView: View {
+    static let sidebarWidth: CGFloat = 260
+
     let fanController: FanController
     let profileManager: ProfileManager
     @State private var selectedProfileId: UUID?
     @State private var showDeleteConfirmation = false
     @State private var profileToDelete: Profile?
     @State private var saveTask: Task<Void, Never>?
+    @State private var operationError: String?
 
     private var selectedProfile: Profile? {
         guard let id = selectedProfileId else { return nil }
@@ -16,13 +19,12 @@ struct ProfilesView: View {
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 260)
+                .frame(width: Self.sidebarWidth, alignment: .leading)
                 .background(Color(nsColor: .windowBackgroundColor))
             Divider()
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle("Profiles")
         .onAppear {
             if selectedProfileId == nil {
                 selectedProfileId = profileManager.activeProfileId ?? profileManager.allProfiles.first?.id
@@ -31,12 +33,24 @@ struct ProfilesView: View {
         .alert("Delete Profile", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 if let p = profileToDelete {
-                    try? profileManager.deleteCustomProfile(id: p.id)
-                    if selectedProfileId == p.id { selectedProfileId = profileManager.activeProfileId }
+                    do {
+                        try profileManager.deleteCustomProfile(id: p.id)
+                        if selectedProfileId == p.id { selectedProfileId = profileManager.activeProfileId }
+                    } catch {
+                        operationError = error.localizedDescription
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Are you sure you want to delete \"\(profileToDelete?.name ?? "")\"?") }
+        .alert("Profile Error", isPresented: Binding(
+            get: { operationError != nil },
+            set: { if !$0 { operationError = nil } }
+        )) {
+            Button("OK") { operationError = nil }
+        } message: {
+            Text(operationError ?? "Profile operation failed")
+        }
     }
 
     // MARK: - Sidebar
@@ -56,8 +70,12 @@ struct ProfilesView: View {
                         CurvePoint(temperature: 60, fanPercentage: 50),
                         CurvePoint(temperature: 90, fanPercentage: 100)
                     ])
-                    try? profileManager.saveCustomProfile(newP)
-                    selectedProfileId = newP.id
+                    do {
+                        try profileManager.saveCustomProfile(newP)
+                        selectedProfileId = newP.id
+                    } catch {
+                        operationError = error.localizedDescription
+                    }
                 } label: {
                     Label("New Profile", systemImage: "plus")
                         .font(.callout)
@@ -113,8 +131,11 @@ struct ProfilesView: View {
             }
             if isPreset {
                 Button("Duplicate as Custom") {
-                    if let copy = try? profileManager.duplicateAsCustom(profile) {
+                    do {
+                        let copy = try profileManager.duplicateAsCustom(profile)
                         selectedProfileId = copy.id
+                    } catch {
+                        operationError = error.localizedDescription
                     }
                 }
             } else {
@@ -241,10 +262,16 @@ struct ProfilesView: View {
         let trimmed = sanitized.name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { sanitized.name = "Untitled Profile" } else { sanitized.name = trimmed }
         saveTask?.cancel()
-        saveTask = Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled else { return }
-            try? profileManager.saveCustomProfile(sanitized)
+        saveTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(400))
+                guard !Task.isCancelled else { return }
+                try profileManager.saveCustomProfile(sanitized)
+            } catch is CancellationError {
+                return
+            } catch {
+                operationError = error.localizedDescription
+            }
         }
     }
 }

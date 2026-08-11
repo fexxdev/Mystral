@@ -23,20 +23,53 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 }
 
 struct MainView: View {
+    static let sidebarWidth: CGFloat = 200
+
     let fanController: FanController
     let profileManager: ProfileManager
     let alertManager: AlertManager?
     let autoSwitcher: ProfileAutoSwitcher?
     let updateChecker: UpdateChecker?
     @State private var selectedItem: SidebarItem = .dashboard
+    @State private var isSidebarVisible = true
 
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
+            HStack(spacing: 0) {
+                if isSidebarVisible {
+                    sidebar
+                    Divider()
+                }
+
+                detailView
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle(selectedItem.localizedName)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isSidebarVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .help("Toggle Sidebar")
+                .accessibilityLabel("Toggle Sidebar")
+            }
+        }
+        .frame(minWidth: 1200, minHeight: 640)
+    }
+
+    private var sidebar: some View {
+        VStack(spacing: 0) {
             List(SidebarItem.allCases, selection: $selectedItem) { item in
                 Label(item.localizedName, systemImage: item.icon).tag(item)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+            .frame(maxHeight: .infinity)
 
             Divider()
 
@@ -49,17 +82,22 @@ struct MainView: View {
                     ForEach(profileManager.allProfiles) { profile in
                         Label(profile.name, systemImage: profile.icon).tag(Optional(profile.id))
                     }
-                }.labelsHidden()
-            }.padding()
-        } detail: {
-            switch selectedItem {
-            case .dashboard: DashboardView(fanController: fanController, profileManager: profileManager)
-            case .sensors: SensorsView(fanController: fanController)
-            case .fans: FansView(fanController: fanController)
-            case .profiles: ProfilesView(fanController: fanController, profileManager: profileManager)
-            case .settings: SettingsView(fanController: fanController, profileManager: profileManager, alertManager: alertManager, autoSwitcher: autoSwitcher, updateChecker: updateChecker)
+                }
+                .labelsHidden()
             }
+            .padding()
         }
-        .frame(minWidth: 1100, minHeight: 640)
+        .frame(width: Self.sidebarWidth)
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch selectedItem {
+        case .dashboard: DashboardView(fanController: fanController, profileManager: profileManager)
+        case .sensors: SensorsView(fanController: fanController)
+        case .fans: FansView(fanController: fanController)
+        case .profiles: ProfilesView(fanController: fanController, profileManager: profileManager)
+        case .settings: SettingsView(fanController: fanController, profileManager: profileManager, alertManager: alertManager, autoSwitcher: autoSwitcher, updateChecker: updateChecker)
+        }
     }
 }

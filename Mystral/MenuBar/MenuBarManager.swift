@@ -6,6 +6,7 @@ private let logger = Logger(subsystem: "com.fexxdev.Mystral", category: "MenuBar
 
 extension Notification.Name {
     static let menuBarSettingsChanged = Notification.Name("com.fexxdev.Mystral.menuBarSettingsChanged")
+    static let pollingIntervalChanged = Notification.Name("com.fexxdev.Mystral.pollingIntervalChanged")
 }
 
 enum MenuBarDisplayMode: String, CaseIterable, Codable {
@@ -72,6 +73,11 @@ final class MenuBarManager {
                 logger.info("Received .menuBarSettingsChanged notification, self is \(self == nil ? "nil" : "alive", privacy: .public)")
                 self?.syncFromDefaults()
                 self?.updateStatusItem()
+            }
+        }
+        NotificationCenter.default.addObserver(forName: .pollingIntervalChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.restartUpdating()
             }
         }
     }
@@ -272,6 +278,11 @@ final class MenuBarManager {
         }
         RunLoop.main.add(timer, forMode: .common)
         updateTimer = timer
+    }
+
+    private func restartUpdating() {
+        updateTimer?.invalidate()
+        startUpdating()
     }
 
     private func updateStatusItem() {

@@ -18,7 +18,8 @@ enum HardwareInfo {
         guard size > 0 else { return "" }
         var buffer = [CChar](repeating: 0, count: size)
         sysctlbyname(name, &buffer, &size, nil, 0)
-        return String(cString: buffer)
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     /// Models where Apple firmware-locks SMC fan control on macOS Sequoia+.

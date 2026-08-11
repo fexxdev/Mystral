@@ -24,8 +24,12 @@ final class StressTester {
     private(set) var state: State = .idle
     private var task: Task<Void, Never>?
 
+    nonisolated static func isValidDuration(_ durationSeconds: Int) -> Bool {
+        (1...3600).contains(durationSeconds)
+    }
+
     func runStressTest(durationSeconds: Int = 30, fanController: FanController) {
-        guard task == nil else { return }
+        guard task == nil, Self.isValidDuration(durationSeconds) else { return }
         let baselineTemp = currentMaxCpuTemp(fanController: fanController)
         let baselineRPM = fanController.fans.map { $0.currentRPM }.max() ?? 0
 
@@ -73,7 +77,7 @@ final class StressTester {
     }
 
     private static func maxCpuTemp(sensors: [Sensor]) -> Double {
-        SensorRegistry.cpuCoreSensors(from: sensors).map(\.temperature).max() ?? 0
+        SensorRegistry.cpuMaximumTemperature(from: sensors)
     }
 
     private static func spawnBurner() -> Task<Void, Never> {
