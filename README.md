@@ -43,6 +43,8 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 3. **First launch:** Developer ID releases open normally. Ad-hoc builds need a right-click on `Mystral.app` in `/Applications`, then **Open**, then **Open** again in the dialog.
 4. The app asks for your password to install its root-owned launchd helper. It asks again only when the helper build changes. It does not need a kernel extension.
 
+The built-in updater accepts strict code-signed release DMGs. Developer ID signing is recommended for public distribution; the repository script creates strict ad-hoc builds when no identity is configured.
+
 That's it. Profiles live in `~/Library/Application Support/Mystral`.
 
 ### Build from Source

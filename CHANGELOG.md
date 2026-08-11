@@ -6,6 +6,14 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.1.3] — 2026-08-11
+
+### Fixed
+- Release apps now declare the required `APPL` bundle type, so the built-in updater accepts their metadata.
+- The updater accepts strict ad-hoc signatures from the repository build script and strict Developer ID signatures.
+- DMG mounting, signature checks, and app replacement no longer block the main UI. Mounting and cleanup now have timeouts.
+- Update downloads and temporary mount points are cleaned up after success or failure.
+
 ## [1.1.2] — 2026-08-11
 
 ### Added

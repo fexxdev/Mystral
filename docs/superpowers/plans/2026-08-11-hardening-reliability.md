@@ -4,7 +4,7 @@
 
 **Goal:** Harden the privileged helper and updater, fix the reviewed application bugs, and add regression coverage without changing the public fan-control model.
 
-**Architecture:** Keep the existing LaunchDaemon and JSON command protocol. Move IPC to a private per-user directory, add session heartbeats, and make helper installation verify every privileged step. Gate automatic updates on repository URL validation and a Developer ID code signature. Fix the remaining state, persistence, sensor, history, CI and documentation defects in focused changes.
+**Architecture:** Keep the existing LaunchDaemon and JSON command protocol. Move IPC to a private per-user directory, add session heartbeats, and make helper installation verify every privileged step. Gate automatic updates on repository URL validation and a strict code signature. Prefer Developer ID signing for public distribution. Fix the remaining state, persistence, sensor, history, CI and documentation defects in focused changes.
 
 **Tech Stack:** Swift 6, SwiftUI, AppKit, XCTest, XcodeGen, IOKit, `codesign`, Bash, GitHub Actions.
 
@@ -17,7 +17,7 @@
 - Keep profile JSON compatibility.
 - Do not add third-party runtime dependencies.
 - Do not use shared predictable `/tmp` paths for helper control or installation.
-- Do not install an update without a valid Developer ID signature.
+- Do not install an update without a valid strict code signature.
 - Write tests before production changes for every behavior change.
 - Do not create a branch or worktree in the shared personal repository.
 
@@ -119,12 +119,12 @@ Interfaces:
 
 - `UpdateChecker.isTrustedReleaseURL(_:) -> Bool` accepts only the Mystral GitHub release asset host and path.
 - `UpdateChecker.isValidBundleMetadata(at:currentVersion:) -> Bool` checks bundle identifier, package type, and version.
-- `UpdateChecker.verifyCodeSignature(at:) throws` requires a strict valid signature and `Developer ID Application` authority.
+- `UpdateChecker.verifyCodeSignature(at:) throws` requires a strict valid signature. Developer ID authority is accepted when present.
 
 - [x] Add strict GitHub repository URL validation.
 - [x] Use unique private download and mount paths.
 - [x] Validate bundle identifier, package type, and increasing version before replacement.
-- [x] Verify nested code signature and require a Developer ID Application authority.
+- [x] Verify the nested code signature and accept strict ad-hoc or Developer ID release builds.
 - [x] Validate HTTP download responses.
 - [x] Remove quarantine only after validation.
 - [x] Clear completed update state and keep the release-page fallback.

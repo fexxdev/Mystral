@@ -164,9 +164,9 @@ The SMCService will enumerate available keys at startup rather than hardcoding, 
 
 ## Security & Permissions
 
-- **No App Sandbox** — needed for IOKit SMC access. Release DMGs require Developer ID signing before automatic updates can install them.
+- **No App Sandbox** — needed for IOKit SMC access. Release DMGs require a strict code signature before automatic updates can install them. Developer ID signing is recommended for public distribution.
 - **Privileged helper** — only fan control requires root. The LaunchDaemon accepts only validated JSON commands from the private IPC directory.
-- **Network use is limited** — the app collects no telemetry. Optional update checks read GitHub Releases and accept only trusted, signed bundles.
+- **Network use is limited** — the app collects no telemetry. Optional update checks read GitHub Releases and accept only trusted, strictly signed bundles.
 
 ## Future Architecture Hooks
 

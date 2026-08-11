@@ -111,23 +111,39 @@ final class UpdateChecker {
         pendingUpdate = (version, releaseURL, dmgURL, notes)
 
         do {
+            defer { downloadSession = nil }
             let dmgPath = try await downloadDMG(url: dmgURL, version: version)
+            defer { try? FileManager.default.removeItem(at: dmgPath) }
 
             status = .installing(version: version)
+            let appPath = Bundle.main.bundlePath
+            let installedVersion = currentVersion
+            logger.info("Mounting update DMG for v\(version, privacy: .public)")
 
-            let mountPoint = try mountDMG(at: dmgPath)
+            let mountPoint = try await Task.detached(priority: .userInitiated) {
+                try Self.mountDMG(at: dmgPath)
+            }.value
             do {
-                try replaceApp(from: mountPoint)
+                logger.info("Replacing app with update v\(version, privacy: .public)")
+                try await Task.detached(priority: .userInitiated) {
+                    try Self.replaceApp(
+                        from: mountPoint,
+                        appPath: appPath,
+                        currentVersion: installedVersion
+                    )
+                }.value
             } catch {
-                unmountDMG(mountPoint: mountPoint)
+                await Task.detached(priority: .utility) {
+                    Self.unmountDMG(mountPoint: mountPoint)
+                }.value
                 try? FileManager.default.removeItem(atPath: mountPoint)
-                try? FileManager.default.removeItem(at: dmgPath)
                 throw error
             }
 
-            unmountDMG(mountPoint: mountPoint)
+            await Task.detached(priority: .utility) {
+                Self.unmountDMG(mountPoint: mountPoint)
+            }.value
             try? FileManager.default.removeItem(atPath: mountPoint)
-            try? FileManager.default.removeItem(at: dmgPath)
 
             pendingUpdate = nil
             relaunchAndTerminate()
@@ -189,7 +205,7 @@ final class UpdateChecker {
 
     // MARK: - Mount / Unmount
 
-    private func mountDMG(at path: URL) throws -> String {
+    private nonisolated static func mountDMG(at path: URL) throws -> String {
         let mountPoint = FileManager.default.temporaryDirectory
             .appendingPathComponent("Mystral-update-mount-\(UUID().uuidString)", isDirectory: true).path
         try FileManager.default.createDirectory(atPath: mountPoint, withIntermediateDirectories: false)
@@ -200,31 +216,41 @@ final class UpdateChecker {
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
-        try process.run()
-        process.waitUntilExit()
+        do {
+            try process.run()
+            guard waitForProcess(process, timeout: 30) else {
+                throw UpdateError.operationTimedOut("mounting the update DMG")
+            }
 
-        guard process.terminationStatus == 0 else {
-            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            throw UpdateError.mountFailed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+            guard process.terminationStatus == 0 else {
+                let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                throw UpdateError.mountFailed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        } catch {
+            try? FileManager.default.removeItem(atPath: mountPoint)
+            throw error
         }
 
         return mountPoint
     }
 
-    private func unmountDMG(mountPoint: String) {
+    private nonisolated static func unmountDMG(mountPoint: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
         process.arguments = ["detach", mountPoint, "-force"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try? process.run()
-        process.waitUntilExit()
+        _ = waitForProcess(process, timeout: 15)
     }
 
     // MARK: - Replace App
 
-    private func replaceApp(from mountPoint: String) throws {
-        let appPath = Bundle.main.bundlePath
+    private nonisolated static func replaceApp(
+        from mountPoint: String,
+        appPath: String,
+        currentVersion: String
+    ) throws {
         let appName = (appPath as NSString).lastPathComponent
         var sourcePath = "\(mountPoint)/\(appName)"
         let backupPath = appPath + ".old"
@@ -237,10 +263,10 @@ final class UpdateChecker {
             sourcePath = "\(mountPoint)/\(found)"
         }
 
-        guard Self.isValidBundleMetadata(at: sourcePath, currentVersion: currentVersion) else {
+        guard isValidBundleMetadata(at: sourcePath, currentVersion: currentVersion) else {
             throw UpdateError.invalidBundleMetadata
         }
-        try Self.verifyCodeSignature(at: sourcePath)
+        try verifyCodeSignature(at: sourcePath)
 
         let parentDir = (appPath as NSString).deletingLastPathComponent
         let fm = FileManager.default
@@ -261,7 +287,7 @@ final class UpdateChecker {
         }
     }
 
-    private func replaceAppElevated(appPath: String, sourcePath: String, backupPath: String) throws {
+    private nonisolated static func replaceAppElevated(appPath: String, sourcePath: String, backupPath: String) throws {
         let esc: (String) -> String = { $0.replacingOccurrences(of: "'", with: "'\\''") }
         let cmd = [
             "rm -rf '\(esc(backupPath))'",
@@ -304,14 +330,14 @@ final class UpdateChecker {
 
     // MARK: - Helpers
 
-    private func removeQuarantine(at path: String) {
+    private nonisolated static func removeQuarantine(at path: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         process.arguments = ["-rd", "com.apple.quarantine", path]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try? process.run()
-        process.waitUntilExit()
+        _ = waitForProcess(process, timeout: 15)
     }
 
     nonisolated static func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
@@ -339,6 +365,10 @@ final class UpdateChecker {
         output.contains("Authority=Developer ID Application:") && output.contains("TeamIdentifier=")
     }
 
+    nonisolated static func hasAcceptableCodeSignature(_ output: String) -> Bool {
+        output.contains("Signature=adhoc") || hasDeveloperIDSignature(output)
+    }
+
     nonisolated static func isValidBundleMetadata(at appPath: String, currentVersion: String) -> Bool {
         let infoPath = URL(fileURLWithPath: appPath).appendingPathComponent("Contents/Info.plist").path
         guard let info = NSDictionary(contentsOfFile: infoPath),
@@ -353,9 +383,20 @@ final class UpdateChecker {
         guard verification.status == 0 else { throw UpdateError.signatureInvalid }
 
         let details = try runCodesign(arguments: ["-dv", "--verbose=4", appPath])
-        guard details.status == 0, hasDeveloperIDSignature(details.output) else {
+        guard details.status == 0, hasAcceptableCodeSignature(details.output) else {
             throw UpdateError.signatureInvalid
         }
+    }
+
+    private nonisolated static func waitForProcess(_ process: Process, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        guard process.isRunning else { return true }
+        process.terminate()
+        process.waitUntilExit()
+        return false
     }
 
     private nonisolated static func runCodesign(arguments: [String]) throws -> (status: Int32, output: String) {
@@ -366,7 +407,9 @@ final class UpdateChecker {
         process.standardOutput = output
         process.standardError = output
         try process.run()
-        process.waitUntilExit()
+        guard waitForProcess(process, timeout: 20) else {
+            throw UpdateError.operationTimedOut("verifying the update signature")
+        }
         let text = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         return (process.terminationStatus, text)
     }
@@ -382,6 +425,7 @@ final class UpdateChecker {
         case untrustedURL
         case invalidBundleMetadata
         case signatureInvalid
+        case operationTimedOut(String)
 
         var errorDescription: String? {
             switch self {
@@ -392,7 +436,8 @@ final class UpdateChecker {
             case .versionMismatch: "Downloaded version is not newer than current"
             case .untrustedURL: "Update download URL is not a trusted Mystral GitHub release"
             case .invalidBundleMetadata: "Downloaded app metadata is not a valid newer Mystral release"
-            case .signatureInvalid: "Downloaded app has no valid Developer ID signature"
+            case .signatureInvalid: "Downloaded app has no valid code signature"
+            case .operationTimedOut(let operation): "Timed out while \(operation)"
             }
         }
     }

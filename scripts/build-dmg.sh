@@ -50,6 +50,12 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
+BUNDLE_TYPE=$(/usr/libexec/PlistBuddy -c "Print :CFBundlePackageType" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)
+if [[ "$BUNDLE_TYPE" != "APPL" ]]; then
+    echo "Built app has invalid CFBundlePackageType: ${BUNDLE_TYPE:-missing}"
+    exit 1
+fi
+
 echo "==> Signing app (${SIGNING_MODE})"
 codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
