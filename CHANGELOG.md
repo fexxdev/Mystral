@@ -6,6 +6,15 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## ⚠️ [1.1.4] — 2026-08-11 — MANUAL REINSTALL REQUIRED
+
+> **IMPORTANT: Mystral 1.1.4 must be installed manually.** Download `Mystral-1.1.4.dmg`, replace `Mystral.app` in `/Applications`, and launch it. Do not use the in-app updater for this first installation. This bootstrap step is required for users coming from the affected 1.1.1 build.
+
+### Fixed
+- Restored strict update validation for trusted Mystral GitHub release DMGs.
+- The updater now checks the bundle identifier, `APPL` package type, newer version, and strict ad-hoc or Developer ID code signatures before replacing the app.
+- DMG mounting, signature checks, and app replacement remain asynchronous and have cleanup and timeout handling.
+
 ## [1.1.3] — 2026-08-11
 
 ### Fixed

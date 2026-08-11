@@ -33,10 +33,10 @@ final class UpdateCheckerTests: XCTestCase {
     }
 
     func testTrustedReleaseURLRequiresTheMystralGitHubRepository() {
-        XCTAssertTrue(UpdateChecker.isTrustedReleaseURL(URL(string: "https://github.com/fexxdev/Mystral/releases/download/v1.1.3/Mystral-1.1.3.dmg")!))
-        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "http://github.com/fexxdev/Mystral/releases/download/v1.1.3/Mystral-1.1.3.dmg")!))
-        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "https://evil.example/Mystral-1.1.3.dmg")!))
-        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "https://github.com/other/repo/releases/download/v1.1.3/Mystral-1.1.3.dmg")!))
+        XCTAssertTrue(UpdateChecker.isTrustedReleaseURL(URL(string: "https://github.com/fexxdev/Mystral/releases/download/v1.1.4/Mystral-1.1.4.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "http://github.com/fexxdev/Mystral/releases/download/v1.1.4/Mystral-1.1.4.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "https://evil.example/Mystral-1.1.4.dmg")!))
+        XCTAssertFalse(UpdateChecker.isTrustedReleaseURL(URL(string: "https://github.com/other/repo/releases/download/v1.1.4/Mystral-1.1.4.dmg")!))
     }
 
     func testDeveloperIDSignatureOutputDistinguishesSignatureTypes() {
@@ -58,7 +58,7 @@ final class UpdateCheckerTests: XCTestCase {
         let info: NSDictionary = [
             "CFBundleIdentifier": "com.fexxdev.Mystral",
             "CFBundlePackageType": "APPL",
-            "CFBundleShortVersionString": "1.1.3"
+            "CFBundleShortVersionString": "1.1.4"
         ]
         XCTAssertTrue(info.write(to: contents.appendingPathComponent("Info.plist"), atomically: true))
         XCTAssertTrue(UpdateChecker.isValidBundleMetadata(at: root.path, currentVersion: "1.1.1"))
@@ -69,7 +69,7 @@ final class UpdateCheckerTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: missingTypeRoot) }
         let missingTypeInfo: NSDictionary = [
             "CFBundleIdentifier": "com.fexxdev.Mystral",
-            "CFBundleShortVersionString": "1.1.3"
+            "CFBundleShortVersionString": "1.1.4"
         ]
         XCTAssertTrue(missingTypeInfo.write(to: missingTypeContents.appendingPathComponent("Info.plist"), atomically: true))
         XCTAssertFalse(UpdateChecker.isValidBundleMetadata(at: missingTypeRoot.path, currentVersion: "1.1.1"))

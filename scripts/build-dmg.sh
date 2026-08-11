@@ -31,6 +31,11 @@ mkdir -p "$BUILD_DIR"
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_ROOT/Mystral/Info.plist" 2>/dev/null || echo "1.0.0")
 DMG_NAME="${APP_NAME}-${VERSION}.dmg"
+REINSTALL_NOTE=""
+if [[ "$VERSION" == "1.1.4" ]]; then
+    REINSTALL_NOTE="IMPORTANT — MANUAL REINSTALL REQUIRED
+This release must be installed manually. Replace the existing Mystral.app in /Applications before using the in-app updater again."
+fi
 
 echo "==> Building ${APP_NAME} (${CONFIG}) v${VERSION}"
 echo "==> Signing mode: ${SIGNING_MODE}"
@@ -67,6 +72,8 @@ ln -s /Applications "$STAGING/Applications"
 
 cat > "$STAGING/READ ME FIRST.txt" <<EOF
 Mystral - Fan control for Apple Silicon Macs
+
+${REINSTALL_NOTE}
 
 Installing
 ----------
