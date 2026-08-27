@@ -6,6 +6,15 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.1.5] — 2026-08-27
+
+### Fixed
+- Prevented a crash after wake when thermal or workspace notifications arrive off the main actor.
+- Wake callbacks now reapply fan control on the main actor.
+
+### Added
+- Regression tests for thermal and screen-wake notifications delivered from a background queue.
+
 ## ⚠️ [1.1.4] — 2026-08-11 — MANUAL REINSTALL REQUIRED
 
 > **IMPORTANT: Mystral 1.1.4 must be installed manually.** Download `Mystral-1.1.4.dmg`, replace `Mystral.app` in `/Applications`, and launch it. Do not use the in-app updater for this first installation. This bootstrap step is required for users coming from the affected 1.1.1 build.

@@ -71,7 +71,11 @@ final class FanController {
         )
     }
 
-    @objc private func handleWake() {
+    @objc nonisolated private func handleWake() {
+        Task { @MainActor in self.handleWakeOnMainActor() }
+    }
+
+    private func handleWakeOnMainActor() {
         logger.info("System woke — re-applying forced fan mode on next tick, granting helper 15s grace")
         forcedModeSet = false
         consecutiveHelperFailures = 0

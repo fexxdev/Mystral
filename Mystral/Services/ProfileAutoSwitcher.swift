@@ -79,8 +79,8 @@ final class ProfileAutoSwitcher {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
-    @objc private func handleThermalChange() { Task { @MainActor in self.evaluate() } }
-    @objc private func handleAppChange() { Task { @MainActor in self.evaluate() } }
+    @objc nonisolated private func handleThermalChange() { Task { @MainActor in self.evaluate() } }
+    @objc nonisolated private func handleAppChange() { Task { @MainActor in self.evaluate() } }
 
     func evaluate() {
         guard enabled else {
