@@ -24,6 +24,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Mystral/Mystral.entitlements
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         GENERATE_INFOPLIST_FILE: false
+        ENABLE_HARDENED_RUNTIME: YES
       configs:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: -O
