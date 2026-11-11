@@ -6,6 +6,14 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Security
+- The root helper no longer has launchd write its stdout/stderr into the user-owned IPC directory. Existing installs are detected as stale and reinstalled once (one administrator prompt), and the old log files are then removed.
+- The helper now reads, writes and deletes IPC files only through directory descriptors whose ownership and mode it has checked, with `O_NOFOLLOW`. Swapping the IPC or `commands` directory, or a file in them, for a symlink can no longer redirect root writes or deletions.
+- Command files larger than 4 KB are ignored.
+
+### Fixed
+- The helper logged two stderr lines for every fan command and never rotated them, which grew the log file without bound. Successful commands are no longer logged; failures and rejections go to the unified log (`log show --predicate 'subsystem == "com.fexxdev.Mystral"'`).
+
 ## [1.1.5] — 2026-08-27
 
 ### Fixed
