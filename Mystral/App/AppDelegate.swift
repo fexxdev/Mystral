@@ -119,6 +119,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         if HelperDaemon.isInstalled(forExecutable: execPath, helperVersion: SMCHelperMode.helperRevision) {
             helperLaunchFailures = 0
+            // Only once the current plist is live: the old daemon would keep writing to an unlinked file.
+            SMCIPC.removeLegacyHelperLogs()
             return
         }
 
@@ -142,6 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             await MainActor.run {
                 if ok {
                     self.helperLaunchFailures = 0
+                    SMCIPC.removeLegacyHelperLogs()
                     logger.info("Helper daemon installed and running")
                 } else {
                     self.helperLaunchFailures += 1
@@ -250,6 +253,8 @@ enum HelperDaemon {
               let environment = dict["EnvironmentVariables"] as? [String: String] else { return false }
         return program == helperToolPath
             && args.dropFirst().first == "--smc-helper"
+            && dict["StandardOutPath"] == nil
+            && dict["StandardErrorPath"] == nil
             && environment[SMCIPC.directoryEnvironmentKey] == ipcDirectoryPath
             && environment[SMCIPC.uidEnvironmentKey] == String(getuid())
             && environment[sourceEnvironmentKey] == executablePath
@@ -418,7 +423,9 @@ enum HelperDaemon {
             && (executablePermissions & 0o022) == 0
     }
 
-    private static func plistContents(
+    /// No StandardOutPath/StandardErrorPath: launchd would open them as root inside the
+    /// user-owned IPC directory. The helper logs through os.Logger instead.
+    static func plistContents(
         sourceExecutablePath: String,
         ipcDirectoryPath: String,
         appVersion: String,
@@ -468,10 +475,6 @@ enum HelperDaemon {
                 <key>\(SMCHelperMode.helperRevisionEnvironmentKey)</key>
                 <string>\(escapedHelperVersion)</string>
             </dict>
-            <key>StandardOutPath</key>
-            <string>\(escapedIPC)/helper-stdout.log</string>
-            <key>StandardErrorPath</key>
-            <string>\(escapedIPC)/helper-stderr.log</string>
         </dict>
         </plist>
         """

@@ -106,6 +106,101 @@ final class SMCServiceTests: XCTestCase {
         XCTAssertFalse(SMCIPC.isSecureDirectory(path: link.path, expectedOwnerUID: getuid()))
     }
 
+    private func makeIPCDirectory() throws -> (root: URL, ipc: URL, commands: URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MystralHelperIPCTests-\(UUID().uuidString)", isDirectory: true)
+        let ipc = root.appendingPathComponent("ipc", isDirectory: true)
+        let commands = ipc.appendingPathComponent("commands", isDirectory: true)
+        try FileManager.default.createDirectory(at: commands, withIntermediateDirectories: true)
+        XCTAssertEqual(chmod(ipc.path, 0o700), 0)
+        XCTAssertEqual(chmod(commands.path, 0o700), 0)
+        return (root, ipc, commands)
+    }
+
+    private func writeCommand(_ text: String, to url: URL, mode: mode_t = 0o600) throws {
+        try Data(text.utf8).write(to: url)
+        XCTAssertEqual(chmod(url.path, mode), 0)
+    }
+
+    func testHelperIPCReadsOnlyTrustedCommandFiles() throws {
+        let (root, ipc, commands) = try makeIPCDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let outside = root.appendingPathComponent("outside.json")
+        try writeCommand(#"{"action":"heartbeat","index":0}"#, to: outside)
+
+        try writeCommand(#"{"action":"heartbeat","index":0}"#, to: commands.appendingPathComponent("a.json"))
+        try writeCommand(#"{"action":"heartbeat","index":0}"#, to: commands.appendingPathComponent("b.json"), mode: 0o622)
+        try writeCommand(String(repeating: " ", count: HelperIPCDirectory.maxCommandBytes + 1), to: commands.appendingPathComponent("c.json"))
+        try FileManager.default.createSymbolicLink(at: commands.appendingPathComponent("d.json"), withDestinationURL: outside)
+        try writeCommand("ignored", to: commands.appendingPathComponent("e.txt"))
+
+        let handle = try XCTUnwrap(HelperIPCDirectory(path: ipc.path, expectedOwnerUID: getuid()))
+        XCTAssertEqual(handle.commandFileNames(), ["a.json", "b.json", "c.json", "d.json"])
+        XCTAssertNotNil(handle.readCommand(named: "a.json"))
+        XCTAssertNil(handle.readCommand(named: "b.json"), "group/world-writable file")
+        XCTAssertNil(handle.readCommand(named: "c.json"), "oversized file")
+        XCTAssertNil(handle.readCommand(named: "d.json"), "symlink")
+        XCTAssertNil(handle.readCommand(named: "../outside.json"))
+
+        handle.purgeCommands()
+        XCTAssertTrue(handle.commandFileNames().isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path), "purging a symlink must not touch its target")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: commands.appendingPathComponent("e.txt").path))
+    }
+
+    func testHelperIPCRejectsUnsafeDirectories() throws {
+        let (root, ipc, commands) = try makeIPCDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertNil(HelperIPCDirectory(path: ipc.path, expectedOwnerUID: getuid() + 1), "foreign owner")
+
+        let link = root.appendingPathComponent("link", isDirectory: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: ipc)
+        XCTAssertNil(HelperIPCDirectory(path: link.path, expectedOwnerUID: getuid()), "symlinked IPC directory")
+
+        XCTAssertEqual(chmod(commands.path, 0o755), 0)
+        XCTAssertNil(HelperIPCDirectory(path: ipc.path, expectedOwnerUID: getuid()), "world-readable commands")
+
+        try FileManager.default.removeItem(at: commands)
+        let elsewhere = root.appendingPathComponent("elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        XCTAssertEqual(chmod(elsewhere.path, 0o700), 0)
+        try FileManager.default.createSymbolicLink(at: commands, withDestinationURL: elsewhere)
+        XCTAssertNil(HelperIPCDirectory(path: ipc.path, expectedOwnerUID: getuid()), "symlinked commands directory")
+    }
+
+    func testHelperIPCAtomicWriteReplacesPlantedSymlinkWithoutFollowingIt() throws {
+        let (root, ipc, _) = try makeIPCDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let victim = root.appendingPathComponent("victim.txt")
+        try Data("original".utf8).write(to: victim)
+        let data = ipc.appendingPathComponent(SMCIPC.dataFileName)
+        try FileManager.default.createSymbolicLink(at: data, withDestinationURL: victim)
+
+        let handle = try XCTUnwrap(HelperIPCDirectory(path: ipc.path, expectedOwnerUID: getuid()))
+        XCTAssertTrue(handle.writeAtomically(Data("fresh".utf8), named: SMCIPC.dataFileName))
+
+        XCTAssertEqual(try String(contentsOf: victim, encoding: .utf8), "original")
+        XCTAssertEqual(try String(contentsOf: data, encoding: .utf8), "fresh")
+        let type = try FileManager.default.attributesOfItem(atPath: data.path)[.type] as? FileAttributeType
+        XCTAssertEqual(type, .typeRegular)
+
+        handle.removeFile(named: SMCIPC.dataFileName)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: data.path))
+        XCTAssertFalse(handle.writeAtomically(Data(), named: "../escape"))
+    }
+
+    func testHelperPlistDoesNotRedirectRootOutputIntoUserDirectory() {
+        let plist = HelperDaemon.plistContents(
+            sourceExecutablePath: "/Applications/Mystral.app/Contents/MacOS/Mystral",
+            ipcDirectoryPath: "/Users/test/Library/Application Support/Mystral/ipc",
+            appVersion: "1.0",
+            helperVersion: "1"
+        )
+        XCTAssertFalse(plist.contains("StandardOutPath"))
+        XCTAssertFalse(plist.contains("StandardErrorPath"))
+    }
+
     func testHeartbeatTimeoutRequiresAnActiveSession() {
         let now = Date()
         XCTAssertFalse(SMCHelperMode.shouldRestoreForHeartbeat(lastHeartbeat: nil, now: now, timeout: 8))

@@ -81,16 +81,13 @@ enum SMCHelperMode {
     }
 
     static func run() -> Never {
-        fputs("SMCHelper: starting pid=\(getpid()) version=\(appVersion)\n", stderr)
-
-        guard SMCIPC.validateForHelper() else {
-            fputs("SMCHelper: refusing unsafe or missing IPC directory\n", stderr)
+        guard let ipc = SMCIPC.openForHelper() else {
+            logger.error("SMCHelper — refusing unsafe or missing IPC directory")
             exit(1)
         }
 
-        logger.info("SMCHelper starting — pid=\(getpid()), version=\(appVersion)")
-        fputs("SMCHelper: writing PID file\n", stderr)
-        try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
+        logger.info("SMCHelper starting — pid=\(getpid(), privacy: .public), version=\(appVersion, privacy: .public)")
+        ipc.writeAtomically(Data("\(getpid())".utf8), named: SMCIPC.pidFileName)
 
         // Prevent macOS from throttling/coalescing our timer during display sleep
         let activityToken = ProcessInfo.processInfo.beginActivity(
@@ -104,8 +101,7 @@ enum SMCHelperMode {
             smc = try SMCService()
             logger.info("SMCHelper — SMC opened successfully")
         } catch {
-            logger.error("SMCHelper — SMC open failed: \(error.localizedDescription)")
-            fputs("SMC open failed: \(error)\n", stderr)
+            logger.error("SMCHelper — SMC open failed: \(error.localizedDescription, privacy: .public)")
             exit(1)
         }
 
@@ -126,18 +122,27 @@ enum SMCHelperMode {
         }
         sigSource.resume()
 
-        dumpDiagnostics(smc: smc)
+        dumpDiagnostics(smc: smc, ipc: ipc)
 
         var consecutiveErrors = 0
         var lastHeartbeat: Date?
         var restoredAfterReadFailure = false
+        var ipcUnavailable = false
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: 2.0, leeway: .milliseconds(100))
         timer.setEventHandler {
-            processCommands(smc: smc, lastHeartbeat: &lastHeartbeat)
+            // Reopened every tick so a recreated directory is picked up and re-validated.
+            let ipc = SMCIPC.openForHelper()
+            if ipc == nil, !ipcUnavailable {
+                logger.error("SMCHelper — IPC directory missing or unsafe; skipping commands and data")
+            }
+            ipcUnavailable = ipc == nil
+            if let ipc {
+                processCommands(smc: smc, ipc: ipc, lastHeartbeat: &lastHeartbeat)
+            }
             if shouldRestoreForHeartbeat(lastHeartbeat: lastHeartbeat, now: Date(), timeout: 8) {
                 logger.warning("SMCHelper — app heartbeat timed out; restoring automatic fan control")
-                purgeCommandFiles()
+                ipc?.purgeCommands()
                 _ = restoreAutoMode(smc: smc)
                 lastHeartbeat = nil
             }
@@ -152,7 +157,7 @@ enum SMCHelperMode {
                                            maxRPM: $0.maxRPM, mode: $0.mode.rawValue) }
                 )
                 let json = try JSONEncoder().encode(data)
-                try json.write(to: URL(fileURLWithPath: dataPath), options: .atomic)
+                ipc?.writeAtomically(json, named: SMCIPC.dataFileName)
                 if consecutiveErrors > 0 {
                     logger.info("SMCHelper — recovered after \(consecutiveErrors) errors")
                     consecutiveErrors = 0
@@ -160,10 +165,9 @@ enum SMCHelperMode {
                 restoredAfterReadFailure = false
             } catch {
                 consecutiveErrors += 1
-                logger.error("SMCHelper — SMC read error (#\(consecutiveErrors)): \(error.localizedDescription)")
-                fputs("SMC read error (#\(consecutiveErrors)): \(error)\n", stderr)
+                logger.error("SMCHelper — SMC read error (#\(consecutiveErrors)): \(error.localizedDescription, privacy: .public)")
                 if consecutiveErrors >= 3 && !restoredAfterReadFailure {
-                    purgeCommandFiles()
+                    ipc?.purgeCommands()
                     _ = restoreAutoMode(smc: smc)
                     lastHeartbeat = nil
                     restoredAfterReadFailure = true
@@ -230,8 +234,7 @@ enum SMCHelperMode {
         }
     }
 
-    private static func dumpDiagnostics(smc: SMCService) {
-        let diagPath = SMCIPC.diagnosticPath
+    private static func dumpDiagnostics(smc: SMCService, ipc: HelperIPCDirectory) {
         var log = "=== Mystral SMC Diagnostics ===\n"
         log += "Running as uid: \(getuid())\n"
         log += "Date: \(Date())\n\n"
@@ -272,96 +275,53 @@ enum SMCHelperMode {
             }
         }
 
-        try? log.write(toFile: diagPath, atomically: true, encoding: .utf8)
-        fputs("Diagnostics written to \(diagPath)\n", stderr)
+        ipc.writeAtomically(Data(log.utf8), named: SMCIPC.diagnosticFileName)
     }
 
-    private static func processCommands(smc: SMCService, lastHeartbeat: inout Date?) {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: cmdDir) else { return }
-        for file in files where file.hasSuffix(".json") {
-            let path = "\(cmdDir)/\(file)"
-            defer { try? fm.removeItem(atPath: path) }
-            guard isTrustedCommandFile(path: path) else { continue }
-            guard let data = fm.contents(atPath: path),
-                  let cmd = try? JSONDecoder().decode(Command.self, from: data) else { continue }
+    private static func processCommands(smc: SMCService, ipc: HelperIPCDirectory, lastHeartbeat: inout Date?) {
+        for name in ipc.commandFileNames() {
+            defer { ipc.removeCommand(named: name) }
+            guard let data = ipc.readCommand(named: name),
+                  let cmd = try? JSONDecoder().decode(Command.self, from: data) else {
+                logger.warning("SMCHelper — ignored untrusted or unreadable command file")
+                continue
+            }
             guard cmd.isValid else {
-                fputs("CMD: rejected invalid command\n", stderr)
+                logger.warning("SMCHelper — rejected invalid command \(cmd.action, privacy: .public)")
                 continue
             }
             do {
+                // isValid already bounds index and value for every action.
                 switch cmd.action {
                 case "heartbeat":
                     lastHeartbeat = Date()
                 case "setFanSpeed":
-                    let pct = cmd.value ?? 0
-                    guard cmd.index >= 0 && cmd.index < 8 && pct >= 0 && pct <= 100 else {
-                        fputs("CMD: setFanSpeed REJECTED — out of range fan=\(cmd.index) pct=\(pct)\n", stderr)
-                        continue
-                    }
-                    fputs("CMD: setFanSpeed fan=\(cmd.index) pct=\(pct)\n", stderr)
-                    try smc.setFanSpeed(index: cmd.index, percentage: pct)
-                    fputs("  OK\n", stderr)
+                    try smc.setFanSpeed(index: cmd.index, percentage: cmd.value ?? 0)
                 case "setFanMode":
-                    let mode = Int(cmd.value ?? 0)
-                    guard cmd.index >= 0 && cmd.index < 8 && (mode == 0 || mode == 1) else {
-                        fputs("CMD: setFanMode REJECTED — out of range fan=\(cmd.index) mode=\(mode)\n", stderr)
-                        continue
-                    }
-                    fputs("CMD: setFanMode fan=\(cmd.index) mode=\(mode)\n", stderr)
-                    try smc.setFanMode(index: cmd.index, mode: FanMode(rawValue: mode) ?? .auto)
-                    fputs("  OK\n", stderr)
+                    try smc.setFanMode(index: cmd.index, mode: FanMode(rawValue: Int(cmd.value ?? 0)) ?? .auto)
                 case "setForcedMode":
                     let forced = (cmd.value ?? 0) > 0
-                    let count = cmd.index
-                    guard count >= 1 && count <= 8 else {
-                        fputs("CMD: setForcedMode REJECTED — out of range fanCount=\(count)\n", stderr)
-                        continue
-                    }
-                    fputs("CMD: setForcedMode forced=\(forced) fanCount=\(count)\n", stderr)
-                    try smc.setForcedMode(fanCount: count, forced: forced)
-                    fputs("  OK\n", stderr)
+                    try smc.setForcedMode(fanCount: cmd.index, forced: forced)
+                    logger.info("SMCHelper — forced mode \(forced, privacy: .public) for \(cmd.index, privacy: .public) fans")
                 case "restart":
-                    // App asked us to recycle (e.g. to load a newer binary after an
-                    // app update, or via the manual restart button). Just exit — the
-                    // launchd daemon's KeepAlive relaunches us from the on-disk binary.
-                    fputs("CMD: restart — exiting for launchd to relaunch\n", stderr)
+                    // Exit and let the launchd daemon's KeepAlive relaunch the on-disk binary.
                     logger.info("SMCHelper — restart command received, exiting for launchd relaunch")
+                    ipc.removeCommand(named: name)
                     cleanup()
                     exit(0)
                 default: break
                 }
             } catch {
-                fputs("  FAIL: \(error)\n", stderr)
+                logger.error("SMCHelper — \(cmd.action, privacy: .public) fan=\(cmd.index, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
 
     private static func cleanup() {
-        try? FileManager.default.removeItem(atPath: pidPath)
-        try? FileManager.default.removeItem(atPath: dataPath)
-        purgeCommandFiles()
-    }
-
-    private static func purgeCommandFiles() {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: cmdDir) else { return }
-        for file in files where file.hasSuffix(".json") {
-            try? fm.removeItem(atPath: URL(fileURLWithPath: cmdDir).appendingPathComponent(file).path)
-        }
-    }
-
-    private static func isTrustedCommandFile(path: String) -> Bool {
-        let url = URL(fileURLWithPath: path)
-        guard url.path == url.resolvingSymlinksInPath().path,
-              let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-              (attributes[.type] as? FileAttributeType) == .typeRegular else {
-            return false
-        }
-        let expectedUID = UInt32(ProcessInfo.processInfo.environment[SMCIPC.uidEnvironmentKey] ?? "")
-        let ownerUID = (attributes[.ownerAccountID] as? NSNumber)?.uint32Value
-        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0o777
-        return ownerUID == expectedUID && (permissions & 0o022) == 0
+        guard let ipc = SMCIPC.openForHelper() else { return }
+        ipc.removeFile(named: SMCIPC.pidFileName)
+        ipc.removeFile(named: SMCIPC.dataFileName)
+        ipc.purgeCommands()
     }
 }
 
