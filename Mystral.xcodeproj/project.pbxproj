@@ -38,6 +38,7 @@
 		83AF1B971B28BA878E620BA0 /* ProfileAutoSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */; };
 		83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */; };
 		899EF7962938FA899A4AA954 /* SMCKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DEB194BD8B7268EA696A8B /* SMCKit.swift */; };
+		89A8315685766F36F1E5A5C4 /* PrivilegedShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21528C9AA6134E47C14493CB /* PrivilegedShell.swift */; };
 		8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32669FE44D66FA46AE1A940B /* MenuBarManager.swift */; };
 		8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462BE967A2BED80A410B8FD6 /* Sensor.swift */; };
 		911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */; };
@@ -46,6 +47,7 @@
 		AACB9F0BEBE77A4BC19B21A6 /* performance.json in Resources */ = {isa = PBXBuildFile; fileRef = 0141EF015312ABA6408CBBB5 /* performance.json */; };
 		ACBFB5570607A5786F1F2A3C /* PowerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B0A28B83087A7AF696730F0 /* PowerMonitor.swift */; };
 		AFAA438FE7FF7868A67230D4 /* SensorRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55974A74B43876077772D5D /* SensorRegistry.swift */; };
+		B64898A169C92E31E56E3CB2 /* PrivilegedInstallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2756ACA2BDCBD906498224B7 /* PrivilegedInstallTests.swift */; };
 		B81F91BB671069D90EE0FE59 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B308C0724E27C538E68CE1FD /* MainView.swift */; };
 		B9D70EFE61A693B14E15AA96 /* SensorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F396958B870BBA4EAA4FDF95 /* SensorTests.swift */; };
 		BA5D2794F2D30FDA9C732C35 /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1704CD9C898267DFA1A539A /* ProfileManager.swift */; };
@@ -83,6 +85,8 @@
 		1951A392BF1111D58D8543A3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveEditorView.swift; sourceTree = "<group>"; };
 		20B84A99260FBBACE9652B11 /* MystralTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MystralTests.swift; sourceTree = "<group>"; };
+		21528C9AA6134E47C14493CB /* PrivilegedShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedShell.swift; sourceTree = "<group>"; };
+		2756ACA2BDCBD906498224B7 /* PrivilegedInstallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedInstallTests.swift; sourceTree = "<group>"; };
 		2A73DF33BB8A7747E548544D /* SMCIPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCIPC.swift; sourceTree = "<group>"; };
 		31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAutoSwitcher.swift; sourceTree = "<group>"; };
 		32669FE44D66FA46AE1A940B /* MenuBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarManager.swift; sourceTree = "<group>"; };
@@ -188,6 +192,7 @@
 				6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */,
 				54DA23ACC945EF50541CBE01 /* IOReportPower.swift */,
 				8B0A28B83087A7AF696730F0 /* PowerMonitor.swift */,
+				21528C9AA6134E47C14493CB /* PrivilegedShell.swift */,
 				31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */,
 				B1704CD9C898267DFA1A539A /* ProfileManager.swift */,
 				D55974A74B43876077772D5D /* SensorRegistry.swift */,
@@ -254,6 +259,7 @@
 				6F2CB65F4FBC7DF6F26A823F /* MenuBarTests.swift */,
 				20B84A99260FBBACE9652B11 /* MystralTests.swift */,
 				DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */,
+				2756ACA2BDCBD906498224B7 /* PrivilegedInstallTests.swift */,
 				E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */,
 				A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */,
 				95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */,
@@ -374,6 +380,7 @@
 				8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */,
 				759D269E2FAC5C162D35DDB4 /* MystralApp.swift in Sources */,
 				ACBFB5570607A5786F1F2A3C /* PowerMonitor.swift in Sources */,
+				89A8315685766F36F1E5A5C4 /* PrivilegedShell.swift in Sources */,
 				46532E2210160C677CFBC603 /* Profile.swift in Sources */,
 				83AF1B971B28BA878E620BA0 /* ProfileAutoSwitcher.swift in Sources */,
 				BA5D2794F2D30FDA9C732C35 /* ProfileManager.swift in Sources */,
@@ -404,6 +411,7 @@
 				836D34008D53C05207B74E6A /* MenuBarTests.swift in Sources */,
 				9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */,
 				30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */,
+				B64898A169C92E31E56E3CB2 /* PrivilegedInstallTests.swift in Sources */,
 				F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */,
 				83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */,
 				FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */,

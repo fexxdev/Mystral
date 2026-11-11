@@ -244,6 +244,7 @@ enum HelperDaemon {
         helperVersion: String = SMCHelperMode.helperRevision
     ) -> Bool {
         guard isAllowedExecutablePath(executablePath),
+              isRootOwnedBundle(executablePath: executablePath),
               isSecureHelperTool(),
               FileManager.default.fileExists(atPath: plistPath),
               isLaunchdJobLoaded() else { return false }
@@ -285,7 +286,7 @@ enum HelperDaemon {
             helperVersion: helperVersion
         )
         let encoded = Data(plist.utf8).base64EncodedString()
-        let installCommands = [
+        let installCommands = bundleLockCommands(executablePath: executablePath) + [
             "/bin/mkdir -p /Library/PrivilegedHelperTools",
             "/usr/sbin/chown root:wheel /Library/PrivilegedHelperTools",
             "/bin/chmod 755 /Library/PrivilegedHelperTools",
@@ -296,17 +297,10 @@ enum HelperDaemon {
             "/usr/sbin/chown root:wheel \(shellQuote(plistPath))",
             "/bin/chmod 644 \(shellQuote(plistPath))"
         ] + launchdLifecycleCommands()
-        let installScript = installCommands.joined(separator: " && ")
-        let appleScriptQuote: (String) -> String = { value in
-            "\"\(value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\""
-        }
-        let osa = "do shell script \(appleScriptQuote(installScript)) with administrator privileges"
-        guard let script = NSAppleScript(source: osa) else { return false }
-        var error: NSDictionary?
-        script.executeAndReturnError(&error)
-        if let error {
-            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
-            logger.error("Daemon install failed (code=\(code, privacy: .public)): \(error, privacy: .public)")
+        do {
+            try PrivilegedShell.run(installCommands)
+        } catch {
+            logger.error("Daemon install failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
         return isInstalled(
@@ -315,6 +309,20 @@ enum HelperDaemon {
             appVersion: appVersion,
             helperVersion: helperVersion
         )
+    }
+
+    /// Makes the app bundle root-owned before the helper is copied from it, so user-level
+    /// code cannot later swap the binary that a future helper reinstall would run as root.
+    static func bundleLockCommands(executablePath: String) -> [String] {
+        let bundlePath = URL(fileURLWithPath: executablePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .path
+        return [
+            "/usr/sbin/chown -R root:wheel \(shellQuote(bundlePath))",
+            "/bin/chmod -R go-w \(shellQuote(bundlePath))"
+        ]
     }
 
     static func launchdLifecycleCommands(plistPath: String = HelperDaemon.plistPath) -> [String] {
@@ -328,7 +336,7 @@ enum HelperDaemon {
     }
 
     private static func shellQuote(_ value: String) -> String {
-        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+        PrivilegedShell.quote(value)
     }
 
     private static func isLaunchdJobLoaded() -> Bool {
@@ -344,6 +352,18 @@ enum HelperDaemon {
         } catch {
             return false
         }
+    }
+
+    private static func isRootOwnedBundle(executablePath: String) -> Bool {
+        let bundlePath = URL(fileURLWithPath: executablePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .path
+        let owners = [bundlePath, executablePath].map {
+            (try? FileManager.default.attributesOfItem(atPath: $0)[.ownerAccountID] as? NSNumber)?.uint32Value
+        }
+        return owners.allSatisfy { $0 == 0 }
     }
 
     private static func isSecureHelperTool() -> Bool {

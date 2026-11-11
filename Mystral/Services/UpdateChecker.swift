@@ -271,7 +271,9 @@ final class UpdateChecker {
         let parentDir = (appPath as NSString).deletingLastPathComponent
         let fm = FileManager.default
 
-        if fm.isWritableFile(atPath: parentDir) {
+        // A root-owned bundle (set by the helper install) is only ever replaced as root.
+        let bundleOwner = (try? fm.attributesOfItem(atPath: appPath)[.ownerAccountID] as? NSNumber)?.uint32Value
+        if bundleOwner == getuid(), fm.isWritableFile(atPath: parentDir) {
             try? fm.removeItem(atPath: backupPath)
             try fm.moveItem(atPath: appPath, toPath: backupPath)
             do {
@@ -288,28 +290,28 @@ final class UpdateChecker {
     }
 
     private nonisolated static func replaceAppElevated(appPath: String, sourcePath: String, backupPath: String) throws {
-        let esc: (String) -> String = { $0.replacingOccurrences(of: "'", with: "'\\''") }
-        let cmd = [
-            "rm -rf '\(esc(backupPath))'",
-            "mv '\(esc(appPath))' '\(esc(backupPath))'",
-            "cp -R '\(esc(sourcePath))' '\(esc(appPath))'",
-            "xattr -rd com.apple.quarantine '\(esc(appPath))'",
-            "rm -rf '\(esc(backupPath))'",
-        ].joined(separator: " && ")
-        let script = "do shell script \"\(cmd)\" with administrator privileges"
+        do {
+            try PrivilegedShell.run(elevatedReplaceCommands(appPath: appPath, sourcePath: sourcePath, backupPath: backupPath))
+        } catch PrivilegedShell.Failure.cancelled {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
+        } catch {
+            throw UpdateError.replaceFailed(error.localizedDescription)
+        }
+    }
 
-        guard let appleScript = NSAppleScript(source: script) else {
-            throw UpdateError.replaceFailed("Failed to create AppleScript")
-        }
-        var error: NSDictionary?
-        appleScript.executeAndReturnError(&error)
-        if let error {
-            let code = error[NSAppleScript.errorNumber] as? Int ?? -1
-            if code == -128 { throw NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError) }
-            throw UpdateError.replaceFailed(
-                (error[NSAppleScript.errorMessage] as? String) ?? "Unknown error"
-            )
-        }
+    /// Installs the new bundle root-owned so user-level code cannot swap the binary that
+    /// the privileged helper is later copied from.
+    nonisolated static func elevatedReplaceCommands(appPath: String, sourcePath: String, backupPath: String) -> [String] {
+        let q = PrivilegedShell.quote
+        return [
+            "/bin/rm -rf \(q(backupPath))",
+            "/bin/mv \(q(appPath)) \(q(backupPath))",
+            "/bin/cp -R \(q(sourcePath)) \(q(appPath))",
+            "/usr/sbin/chown -R root:wheel \(q(appPath))",
+            "/bin/chmod -R go-w \(q(appPath))",
+            "/usr/bin/xattr -rd com.apple.quarantine \(q(appPath))",
+            "/bin/rm -rf \(q(backupPath))",
+        ]
     }
 
     // MARK: - Relaunch
