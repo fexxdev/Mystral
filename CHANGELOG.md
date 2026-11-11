@@ -6,6 +6,16 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.1.7] — 2026-11-11
+
+### Security
+- Automatic updates now require an Ed25519 signature made with the Mystral release key, published as `Mystral-x.x.x.dmg.sig` next to the DMG. Access to the GitHub repository alone can no longer push an update that installs itself. Releases without a valid signature only open the release page.
+- The downloaded app must carry exactly the version the signature covers.
+- The helper install and the updater make `/Applications/Mystral.app` root-owned, so other programs running as your user cannot replace the binary the root helper is copied from. Updating Mystral therefore asks for your administrator password.
+- The app is built with the hardened runtime.
+- Administrator commands are escaped for both the shell and AppleScript in one shared place.
+- CI runs with a read-only token and a pinned checkout action.
+
 ## [1.1.6] — 2026-11-11
 
 ### Security

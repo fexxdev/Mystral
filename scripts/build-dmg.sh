@@ -66,7 +66,8 @@ codesign --force --deep --options runtime \
     --entitlements "$PROJECT_ROOT/Mystral/Mystral.entitlements" \
     --sign "$SIGNING_IDENTITY" "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-if ! codesign -dv "$APP_PATH" 2>&1 | grep -q "flags=.*runtime"; then
+SIGNATURE_DETAILS="$(codesign -dv "$APP_PATH" 2>&1)"
+if [[ "$SIGNATURE_DETAILS" != *"flags="*"runtime"* ]]; then
     echo "Hardened runtime is missing from the app signature"
     exit 1
 fi

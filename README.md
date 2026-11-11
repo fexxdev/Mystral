@@ -61,6 +61,8 @@ MYSTRAL_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./script
 open Mystral.xcodeproj
 ```
 
+`build-dmg.sh` also writes `Mystral-x.x.x.dmg.sig`, an Ed25519 signature made with the release key in the maintainer's Keychain (`scripts/update-key.sh`). The in-app updater installs a release automatically only when that signature verifies against the key built into the app. Forks must generate their own key and replace `UpdateSignature.publicKeyBase64`.
+
 ## Usage
 
 1. Mystral appears in the menu bar with a fan icon
