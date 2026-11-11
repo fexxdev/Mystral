@@ -78,9 +78,8 @@ final class UpdateChecker {
             UserDefaults.standard.set(lastCheckedAt, forKey: Self.lastCheckedKey)
 
             if Self.compareVersions(latestVersion, currentVersion) == .orderedDescending {
-                let dmgURL = release.assets.first(where: { $0.name.hasSuffix(".dmg") })
-                    .flatMap { URL(string: $0.browser_download_url) }
-                    .flatMap { Self.isTrustedReleaseURL($0) ? $0 : nil }
+                // Automatic install only for releases that ship a detached update signature.
+                let dmgURL = Self.signedDMGURL(in: release.assets.map { ($0.name, $0.browser_download_url) })
                 let pageURL = URL(string: release.html_url) ?? Self.releasesURL
                 status = .updateAvailable(version: latestVersion, releaseURL: pageURL, dmgURL: dmgURL, notes: release.body ?? "")
                 logger.info("Update available: \(latestVersion, privacy: .public)")
@@ -112,8 +111,17 @@ final class UpdateChecker {
 
         do {
             defer { downloadSession = nil }
+            let signature = try await downloadSignature(for: dmgURL)
             let dmgPath = try await downloadDMG(url: dmgURL, version: version)
             defer { try? FileManager.default.removeItem(at: dmgPath) }
+
+            let signatureValid = await Task.detached(priority: .userInitiated) {
+                UpdateSignature.isValid(signature: signature, dmgAt: dmgPath, version: version)
+            }.value
+            guard signatureValid else {
+                logger.error("Update v\(version, privacy: .public) rejected: release signature does not verify")
+                throw UpdateError.updateSignatureInvalid
+            }
 
             status = .installing(version: version)
             let appPath = Bundle.main.bundlePath
@@ -129,7 +137,8 @@ final class UpdateChecker {
                     try Self.replaceApp(
                         from: mountPoint,
                         appPath: appPath,
-                        currentVersion: installedVersion
+                        currentVersion: installedVersion,
+                        expectedVersion: version
                     )
                 }.value
             } catch {
@@ -203,6 +212,20 @@ final class UpdateChecker {
         }
     }
 
+    private func downloadSignature(for dmgURL: URL) async throws -> String {
+        let url = dmgURL.appendingPathExtension("sig")
+        guard Self.isTrustedSignatureURL(url) else { throw UpdateError.untrustedURL }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              data.count <= UpdateSignature.maxSignatureBytes,
+              let text = String(data: data, encoding: .utf8) else {
+            throw UpdateError.updateSignatureInvalid
+        }
+        return text
+    }
+
     // MARK: - Mount / Unmount
 
     private nonisolated static func mountDMG(at path: URL) throws -> String {
@@ -249,7 +272,8 @@ final class UpdateChecker {
     private nonisolated static func replaceApp(
         from mountPoint: String,
         appPath: String,
-        currentVersion: String
+        currentVersion: String,
+        expectedVersion: String
     ) throws {
         let appName = (appPath as NSString).lastPathComponent
         var sourcePath = "\(mountPoint)/\(appName)"
@@ -263,7 +287,7 @@ final class UpdateChecker {
             sourcePath = "\(mountPoint)/\(found)"
         }
 
-        guard isValidBundleMetadata(at: sourcePath, currentVersion: currentVersion) else {
+        guard isValidBundleMetadata(at: sourcePath, currentVersion: currentVersion, expectedVersion: expectedVersion) else {
             throw UpdateError.invalidBundleMetadata
         }
         try verifyCodeSignature(at: sourcePath)
@@ -371,12 +395,28 @@ final class UpdateChecker {
         output.contains("Signature=adhoc") || hasDeveloperIDSignature(output)
     }
 
-    nonisolated static func isValidBundleMetadata(at appPath: String, currentVersion: String) -> Bool {
+    nonisolated static func isTrustedSignatureURL(_ url: URL) -> Bool {
+        guard url.pathExtension.lowercased() == "sig" else { return false }
+        return isTrustedReleaseURL(url.deletingPathExtension())
+    }
+
+    /// The DMG URL of a release whose assets include a matching `<dmg>.sig`, or nil.
+    nonisolated static func signedDMGURL(in assets: [(name: String, url: String)]) -> URL? {
+        let names = Set(assets.map(\.name))
+        return assets
+            .filter { $0.name.hasSuffix(".dmg") && names.contains($0.name + ".sig") }
+            .compactMap { URL(string: $0.url) }
+            .first { isTrustedReleaseURL($0) && isTrustedSignatureURL($0.appendingPathExtension("sig")) }
+    }
+
+    /// `expectedVersion` is the version the release signature covers; the bundle must match it.
+    nonisolated static func isValidBundleMetadata(at appPath: String, currentVersion: String, expectedVersion: String? = nil) -> Bool {
         let infoPath = URL(fileURLWithPath: appPath).appendingPathComponent("Contents/Info.plist").path
         guard let info = NSDictionary(contentsOfFile: infoPath),
               info["CFBundleIdentifier"] as? String == "com.fexxdev.Mystral",
               info["CFBundlePackageType"] as? String == "APPL",
               let version = info["CFBundleShortVersionString"] as? String else { return false }
+        if let expectedVersion, version != expectedVersion { return false }
         return compareVersions(version, currentVersion) == .orderedDescending
     }
 
@@ -427,6 +467,7 @@ final class UpdateChecker {
         case untrustedURL
         case invalidBundleMetadata
         case signatureInvalid
+        case updateSignatureInvalid
         case operationTimedOut(String)
 
         var errorDescription: String? {
@@ -439,6 +480,7 @@ final class UpdateChecker {
             case .untrustedURL: "Update download URL is not a trusted Mystral GitHub release"
             case .invalidBundleMetadata: "Downloaded app metadata is not a valid newer Mystral release"
             case .signatureInvalid: "Downloaded app has no valid code signature"
+            case .updateSignatureInvalid: "The update is not signed with the Mystral release key. Download it from the release page instead."
             case .operationTimedOut(let operation): "Timed out while \(operation)"
             }
         }

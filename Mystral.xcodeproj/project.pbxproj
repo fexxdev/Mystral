@@ -20,8 +20,10 @@
 		2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044D527A57845C5CC26E4D89 /* SMCService.swift */; };
 		30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */; };
 		3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */; };
+		3BB787CFA3AB97F1DFDF5CB4 /* UpdateSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A0A7E5C6E56BB0C0A77FA5 /* UpdateSignature.swift */; };
 		41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64319980C33FE2804285A28 /* UpdateChecker.swift */; };
 		46532E2210160C677CFBC603 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC93D0D514DBB473923BF1 /* Profile.swift */; };
+		4D3378D6C1660AF0E379224E /* UpdateSignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B39A3D6752D10F44A62CEB /* UpdateSignatureTests.swift */; };
 		5A30B8A06990AF35DEF41DEA /* fullblast.json in Resources */ = {isa = PBXBuildFile; fileRef = 0706841903D9F8775DF00DD5 /* fullblast.json */; };
 		656C56239CD0755E5D131427 /* CurveEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */; };
 		6667E72A957BD3FD5ED320B6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */; };
@@ -93,11 +95,13 @@
 		39DEB194BD8B7268EA696A8B /* SMCKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCKit.swift; sourceTree = "<group>"; };
 		3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
 		3CBF7C4452D1A30B8EBC939C /* SettingsDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDefaultsTests.swift; sourceTree = "<group>"; };
+		44A0A7E5C6E56BB0C0A77FA5 /* UpdateSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSignature.swift; sourceTree = "<group>"; };
 		462BE967A2BED80A410B8FD6 /* Sensor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sensor.swift; sourceTree = "<group>"; };
 		53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManagerTests.swift; sourceTree = "<group>"; };
 		54DA23ACC945EF50541CBE01 /* IOReportPower.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPower.swift; sourceTree = "<group>"; };
 		556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		64B39A3D6752D10F44A62CEB /* UpdateSignatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSignatureTests.swift; sourceTree = "<group>"; };
 		68D77E008E65777E4C46736B /* ViewConstructionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewConstructionTests.swift; sourceTree = "<group>"; };
 		69DB5298EB34D69B0470542B /* Mystral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mystral.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareInfo.swift; sourceTree = "<group>"; };
@@ -203,6 +207,7 @@
 				044D527A57845C5CC26E4D89 /* SMCService.swift */,
 				A1EFCA98618725CFF71FBF44 /* StressTester.swift */,
 				A64319980C33FE2804285A28 /* UpdateChecker.swift */,
+				44A0A7E5C6E56BB0C0A77FA5 /* UpdateSignature.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -269,6 +274,7 @@
 				D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */,
 				BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */,
 				3BB185629721AEFDE98BE0DF /* UpdateCheckerTests.swift */,
+				64B39A3D6752D10F44A62CEB /* UpdateSignatureTests.swift */,
 				68D77E008E65777E4C46736B /* ViewConstructionTests.swift */,
 			);
 			path = MystralTests;
@@ -396,6 +402,7 @@
 				F043C27F29A95684188E630A /* SettingsView.swift in Sources */,
 				DFF2CDB314AE582DA1BF5566 /* StressTester.swift in Sources */,
 				41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */,
+				3BB787CFA3AB97F1DFDF5CB4 /* UpdateSignature.swift in Sources */,
 				14F963889C40BB573B7C85B0 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -421,6 +428,7 @@
 				DE890C91E8FE4C7F45632577 /* SettingsDefaultsTests.swift in Sources */,
 				814977F6568741E44A2300EE /* StressTesterTests.swift in Sources */,
 				DBB3A459CD1B613B1967C3C6 /* UpdateCheckerTests.swift in Sources */,
+				4D3378D6C1660AF0E379224E /* UpdateSignatureTests.swift in Sources */,
 				234680899946A89D7DA35577 /* ViewConstructionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

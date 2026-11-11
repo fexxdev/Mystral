@@ -112,11 +112,29 @@ echo "==> Signing DMG (${SIGNING_MODE})"
 codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
 codesign --verify --strict --verbose=2 "$DMG_PATH"
 
+echo "==> Signing update (Ed25519 release key from the Keychain)"
+SIG_PATH="$DMG_PATH.sig"
+SIGNER=(swift "$PROJECT_ROOT/scripts/update-signing.swift")
+EMBEDDED_KEY=$(sed -n 's/.*static let publicKeyBase64 = "\([^"]*\)".*/\1/p' "$PROJECT_ROOT/Mystral/Services/UpdateSignature.swift")
+if ! update_key="$(/usr/bin/security find-generic-password -s com.fexxdev.Mystral.update-signing -a ed25519-private-key -w)"; then
+    echo "No update signing key in the Keychain. Run scripts/update-key.sh generate (or restore the backup)."
+    exit 1
+fi
+KEYCHAIN_PUBLIC_KEY="$(printf '%s' "$update_key" | "${SIGNER[@]}" public-key)"
+if [[ "$KEYCHAIN_PUBLIC_KEY" != "$EMBEDDED_KEY" ]]; then
+    echo "The Keychain key does not match UpdateSignature.publicKeyBase64; installed apps would reject this update."
+    exit 1
+fi
+printf '%s' "$update_key" | "${SIGNER[@]}" sign "$DMG_PATH" "$VERSION" > "$SIG_PATH"
+unset update_key
+"${SIGNER[@]}" verify "$DMG_PATH" "$VERSION" "$SIG_PATH" "$EMBEDDED_KEY"
+
 rm -rf "$BUILD_DIR"
 
 echo
 echo "==> Done"
 echo "DMG:  $DMG_PATH"
+echo "Sig:  $SIG_PATH (upload it next to the DMG, or the in-app updater will not install this release)"
 echo "Size: $(du -h "$DMG_PATH" | cut -f1)"
 echo
 echo "$GATEKEEPER_NOTE"
