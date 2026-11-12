@@ -395,6 +395,13 @@ struct SettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    private func captionText(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private func statusRow(title: LocalizedStringKey, ok: Bool, okText: LocalizedStringKey, badText: LocalizedStringKey, badColor: Color) -> some View {
         LabeledContent(title) {
             HStack(spacing: 4) {
