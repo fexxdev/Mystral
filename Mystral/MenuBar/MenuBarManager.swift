@@ -20,6 +20,8 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconAndPower = "Icon + Power"
     case powerOnly = "Power Only"
 
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
+
     var showsIcon: Bool {
         switch self {
         case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile, .iconAndPower: return true
@@ -34,6 +36,8 @@ enum MenuBarTempSource: String, CaseIterable, Codable {
     case gpuAverage = "GPU Average"
     case gpuMax = "GPU Max"
     case hottest = "Hottest Sensor"
+
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 @Observable
@@ -187,13 +191,13 @@ final class MenuBarManager {
         }
         menu.addItem(.separator())
 
-        let openItem = NSMenuItem(title: "Open Mystral", action: #selector(openApp), keyEquivalent: "o")
+        let openItem = NSMenuItem(title: NSLocalizedString("Open Mystral", comment: ""), action: #selector(openApp), keyEquivalent: "o")
         openItem.target = self
         menu.addItem(openItem)
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: NSLocalizedString("Quit", comment: ""), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 

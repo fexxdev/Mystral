@@ -111,7 +111,7 @@ struct SettingsView: View {
     private var menuBarSection: some View {
         Section("Menu Bar") {
             Picker("Display mode", selection: $displayMode) {
-                ForEach(MenuBarDisplayMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                ForEach(MenuBarDisplayMode.allCases, id: \.self) { Text($0.localizedName).tag($0) }
             }
             .onChange(of: displayMode) { _, newValue in
                 logger.info("Settings: displayMode picker changed to \(newValue.rawValue, privacy: .public)")
@@ -122,7 +122,7 @@ struct SettingsView: View {
             }
             if displayMode == .iconAndTemperature || displayMode == .temperatureOnly {
                 Picker("Temperature source", selection: $tempSource) {
-                    ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.localizedName).tag($0) }
                 }
                 .onChange(of: tempSource) { _, newValue in
                     logger.info("Settings: tempSource picker changed to \(newValue.rawValue, privacy: .public)")
@@ -376,7 +376,7 @@ struct SettingsView: View {
         }
     }
 
-    private func sliderRow(title: String, value: Binding<Double>, in range: ClosedRange<Double>, step: Double, valueText: String) -> some View {
+    private func sliderRow(title: LocalizedStringKey, value: Binding<Double>, in range: ClosedRange<Double>, step: Double, valueText: String) -> some View {
         HStack(spacing: 12) {
             Text(title)
                 .frame(minWidth: 160, alignment: .leading)
@@ -388,14 +388,14 @@ struct SettingsView: View {
         }
     }
 
-    private func captionText(_ text: String) -> some View {
+    private func captionText(_ text: LocalizedStringKey) -> some View {
         Text(text)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func statusRow(title: String, ok: Bool, okText: String, badText: String, badColor: Color) -> some View {
+    private func statusRow(title: LocalizedStringKey, ok: Bool, okText: LocalizedStringKey, badText: LocalizedStringKey, badColor: Color) -> some View {
         LabeledContent(title) {
             HStack(spacing: 4) {
                 Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")

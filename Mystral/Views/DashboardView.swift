@@ -116,7 +116,7 @@ struct DashboardView: View {
         }
     }
 
-    private func coreGrid(title: String, sensors: [Sensor], isExpanded: Binding<Bool>) -> some View {
+    private func coreGrid(title: LocalizedStringKey, sensors: [Sensor], isExpanded: Binding<Bool>) -> some View {
         let avg = sensors.map(\.temperature).reduce(0, +) / Double(sensors.count)
         let max = sensors.map(\.temperature).max() ?? 0
         return GroupBox {

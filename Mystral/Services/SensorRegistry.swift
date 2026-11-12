@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum SensorCategory: String, CaseIterable, Sendable {
     case cpuPerformance = "CPU P-Cores"
@@ -11,6 +12,8 @@ enum SensorCategory: String, CaseIterable, Sendable {
     case airflow = "Airflow"
     case vrm = "VRM"
     case other = "Other"
+
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 struct SensorInfo: Sendable {
