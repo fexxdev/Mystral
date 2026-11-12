@@ -4,8 +4,8 @@ import Charts
 struct DashboardView: View {
     let fanController: FanController
     let profileManager: ProfileManager
-    @State private var cpuCoresExpanded = false
-    @State private var gpuCoresExpanded = false
+    @AppStorage("cpuCoresExpanded") private var cpuCoresExpanded = true
+    @AppStorage("gpuCoresExpanded") private var gpuCoresExpanded = true
 
     private var cpuCoreSensors: [Sensor] {
         SensorRegistry.cpuCoreSensors(from: fanController.sensors)
@@ -85,7 +85,7 @@ struct DashboardView: View {
         VStack(spacing: 16) {
             HStack(spacing: 20) {
                 TemperatureCard(title: "CPU", max: cpuMax, avg: cpuAvg,
-                                sensorLabel: "TCMz / \(cpuCoreSensors.count) cores")
+                                sensorLabel: "\(cpuCoreSensors.count) cores")
                 TemperatureCard(title: "GPU", max: gpuMax, avg: gpuAvg,
                                 sensorLabel: "\(gpuCoreSensors.count) cores")
             }
@@ -117,28 +117,29 @@ struct DashboardView: View {
     }
 
     private func coreGrid(title: LocalizedStringKey, sensors: [Sensor], isExpanded: Binding<Bool>) -> some View {
-        let avg = sensors.map(\.temperature).reduce(0, +) / Double(sensors.count)
+        let avg = sensors.map(\.temperature).reduce(0, +) / Double(max(1, sensors.count))
         let max = sensors.map(\.temperature).max() ?? 0
         return GroupBox {
             DisclosureGroup(isExpanded: isExpanded) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: min(sensors.count, 6)), spacing: 8) {
                     ForEach(sensors, id: \.id) { sensor in
                         VStack(spacing: 2) {
                             Text("\(String(format: "%.0f", sensor.temperature))°")
                                 .font(.system(.body, design: .rounded).weight(.medium))
                                 .foregroundStyle(temperatureColor(sensor.temperature))
-                            Text(sensor.id).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                            Text(sensor.id).font(.system(size: 9, design: .monospaced).weight(.semibold)).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                         .background(temperatureColor(sensor.temperature).opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .help("\(sensor.name): \(String(format: "%.1f", sensor.temperature))°C")
                     }
                 }
             } label: {
                 HStack {
                     Text(title).font(.headline)
-                    Text("\(sensors.count)").font(.caption).foregroundStyle(.tertiary)
+                    Text("(\(sensors.count))").font(.caption).foregroundStyle(.tertiary)
                     Spacer()
                     Text("Avg: \(String(format: "%.1f", avg))°C")
                         .font(.subheadline).foregroundStyle(.secondary)

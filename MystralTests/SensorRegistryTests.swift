@@ -62,4 +62,45 @@ final class SensorRegistryTests: XCTestCase {
         let fans = [Fan(id: 0, name: "Fan", currentRPM: 0, targetRPM: 0, minRPM: 1000, maxRPM: 5000, mode: .auto)]
         XCTAssertTrue(SensorRegistry.detectChip(sensors: sensors, fans: fans).hasFanControl)
     }
+
+    func testPhysicalCpuCoreMappingStability() {
+        // Construct a realistic SMC sensor pool with >10 sensors
+        var pool: [Sensor] = [
+            Sensor(id: "TCMz", name: "CPU Max", temperature: 45),
+            Sensor(id: "TCMb", name: "CPU Hotspot", temperature: 44),
+            Sensor(id: "Tp01", name: "P1", temperature: 46),
+            Sensor(id: "Tp02", name: "P2", temperature: 45),
+            Sensor(id: "Tp03", name: "P3", temperature: 45),
+            Sensor(id: "Tp04", name: "P4", temperature: 44),
+            Sensor(id: "Tp05", name: "P5", temperature: 46),
+            Sensor(id: "Tp06", name: "P6", temperature: 45),
+            Sensor(id: "Te04", name: "E1", temperature: 40),
+            Sensor(id: "Te05", name: "E2", temperature: 41),
+            Sensor(id: "Te06", name: "E3", temperature: 41),
+            Sensor(id: "Te0R", name: "E4", temperature: 40),
+            Sensor(id: "Tp1j", name: "Phantom Rail", temperature: 2.3),
+            Sensor(id: "Tp1n", name: "Phantom Rail", temperature: 1.5)
+        ]
+        let cores = SensorRegistry.cpuCoreSensors(from: pool)
+        XCTAssertEqual(cores.count, HardwareInfo.physicalCpuCount)
+        // Ensure no phantom rail (1.5°C / 2.3°C) leaked into the physical core list
+        for core in cores {
+            XCTAssertGreaterThanOrEqual(core.temperature, 20.0)
+            XCTAssertLessThanOrEqual(core.temperature, 125.0)
+        }
+    }
+
+    func testPhysicalGpuCoreMappingStability() {
+        var pool: [Sensor] = []
+        for i in 0..<25 {
+            pool.append(Sensor(id: String(format: "Tg%02d", i), name: "GPU", temperature: 40.0 + Double(i % 5)))
+        }
+        let gpu = SensorRegistry.gpuCoreSensors(from: pool)
+        let expectedCount = HardwareInfo.gpuCoreCount > 0 ? HardwareInfo.gpuCoreCount : 25
+        XCTAssertEqual(gpu.count, expectedCount)
+        for g in gpu {
+            XCTAssertTrue(g.id.hasPrefix("G"))
+            XCTAssertGreaterThanOrEqual(g.temperature, 20.0)
+        }
+    }
 }
