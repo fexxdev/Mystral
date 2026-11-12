@@ -46,7 +46,7 @@ struct SensorsView: View {
                         }.width(min: 150, ideal: 200)
 
                         TableColumn("Category") { sensor in
-                            Text(SensorRegistry.categoryForKey(sensor.id).rawValue)
+                            Text(SensorRegistry.categoryForKey(sensor.id).localizedName)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }.width(min: 80, ideal: 100)
@@ -73,13 +73,13 @@ struct SensorsView: View {
             HStack(spacing: 6) {
                 categoryChip(label: "All", category: nil)
                 ForEach(availableCategories, id: \.self) { cat in
-                    categoryChip(label: cat.rawValue, category: cat)
+                    categoryChip(label: cat.localizedName, category: cat)
                 }
             }.padding(.horizontal).padding(.vertical, 8)
         }
     }
 
-    private func categoryChip(label: String, category: SensorCategory?) -> some View {
+    private func categoryChip(label: LocalizedStringKey, category: SensorCategory?) -> some View {
         let isSelected = selectedCategory == category
         return Button {
             selectedCategory = category

@@ -29,7 +29,7 @@ A native macOS menu bar app for controlling fan curves on Apple Silicon Macs.
 - **Alerts** — optional notifications for high CPU temperature and fans that stop responding
 - **30s stress test** — burns all CPU cores and verifies your fan curve actually reacts
 - **Auto-start** — launch at login via macOS native login items
-- **Localization** — English and Italian
+- **Localization** — English, Italian, and Simplified Chinese
 
 ## Requirements
 

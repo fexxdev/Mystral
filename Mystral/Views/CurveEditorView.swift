@@ -49,7 +49,7 @@ struct CurveEditorView: View {
                 )) {
                     Text("CPU Average (all cores)").tag("")
                     ForEach(groupedSensorKeys, id: \.0) { category, keys in
-                        Section(category.rawValue) {
+                        Section(category.localizedName) {
                             ForEach(keys, id: \.self) { key in
                                 Text("\(SensorRegistry.nameForKey(key)) (\(key))").tag(key)
                             }

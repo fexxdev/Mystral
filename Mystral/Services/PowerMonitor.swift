@@ -16,7 +16,7 @@ final class PowerMonitor {
     private(set) var totalHistory: [Double] = []
     private(set) var cpuHistory: [Double] = []
     private(set) var gpuHistory: [Double] = []
-    static let maxHistory = 150
+    nonisolated static let maxHistory = 150
 
     private let smc: SMCKit?
     private let ioreport: IOReportPower?

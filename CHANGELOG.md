@@ -6,6 +6,9 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Added
+- Comprehensive Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories.
+
 ## [1.1.7] — 2026-11-11
 
 ### Security
