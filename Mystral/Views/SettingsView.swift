@@ -313,9 +313,10 @@ struct SettingsView: View {
 
     private var unknownStatusText: String {
         if let last = updateChecker?.lastCheckedAt {
-            return "Last checked \(Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date()))"
+            let relative = Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date())
+            return String(localized: "Last checked \(relative)")
         }
-        return "Not checked yet"
+        return String(localized: "Not checked yet")
     }
 
     private var diagnosticsSection: some View {
@@ -323,7 +324,7 @@ struct SettingsView: View {
             stressTestRow
             Button("Export SMC Data for Developer") { exportSMCData() }
             if let msg = exportMessage {
-                captionText(msg)
+                captionText(verbatim: msg)
             }
         }
     }
@@ -395,8 +396,8 @@ struct SettingsView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func captionText(_ text: String) -> some View {
-        Text(text)
+    private func captionText(verbatim text: String) -> some View {
+        Text(verbatim: text)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -421,9 +422,9 @@ struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try content.write(to: url, atomically: true, encoding: .utf8)
-                exportMessage = "Exported to \(url.lastPathComponent)"
+                exportMessage = String(localized: "Exported to \(url.lastPathComponent)")
             } catch {
-                exportMessage = "Export failed: \(error.localizedDescription)"
+                exportMessage = String(localized: "Export failed: \(error.localizedDescription)")
             }
         }
     }

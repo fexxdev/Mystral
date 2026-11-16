@@ -63,8 +63,8 @@ final class AlertManager {
             tryFire(key: "highTemp", lastFire: lastHighTempAlert) {
                 self.lastHighTempAlert = Date()
                 self.send(
-                    title: NSLocalizedString("High CPU temperature", comment: ""),
-                    body: String(format: NSLocalizedString("CPU at %.0f°C — exceeds %.0f°C threshold", comment: ""), cpuMax, self.highTempThreshold)
+                    title: String(localized: "High CPU temperature"),
+                    body: String(localized: "CPU at \(Int(cpuMax.rounded()))°C — exceeds \(Int(self.highTempThreshold.rounded()))°C threshold")
                 )
             }
         }
@@ -80,8 +80,8 @@ final class AlertManager {
                         if now.timeIntervalSince(last) > cooldown {
                             lastFanStuckAlert[fan.id] = now
                             send(
-                                title: NSLocalizedString("Fan not responding", comment: ""),
-                                body: String(format: NSLocalizedString("%@ reading %lld RPM while target is %lld%%.", comment: ""), fan.name, Int64(fan.currentRPM), Int64(expected))
+                                title: String(localized: "Fan not responding"),
+                                body: String(localized: "\(fan.name) reading \(fan.currentRPM) RPM while target is \(Int(expected))%.")
                             )
                         }
                     }

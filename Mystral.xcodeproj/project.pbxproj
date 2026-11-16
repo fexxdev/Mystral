@@ -41,6 +41,7 @@
 		83C04FD2D6DE19D4276ECFEE /* ProfileManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09D26FD6962AB532CC56157 /* ProfileManagerTests.swift */; };
 		899EF7962938FA899A4AA954 /* SMCKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DEB194BD8B7268EA696A8B /* SMCKit.swift */; };
 		89A8315685766F36F1E5A5C4 /* PrivilegedShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21528C9AA6134E47C14493CB /* PrivilegedShell.swift */; };
+		8CB3846A7D077DB26675D5A3 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCC5ED462667D818802B10FD /* LocalizationTests.swift */; };
 		8D8BA0098C393925726DF65A /* MenuBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32669FE44D66FA46AE1A940B /* MenuBarManager.swift */; };
 		8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 462BE967A2BED80A410B8FD6 /* Sensor.swift */; };
 		911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */; };
@@ -125,6 +126,7 @@
 		BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTesterTests.swift; sourceTree = "<group>"; };
 		C6E40345530F6EBC95C639FE /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		CBACE8663AB1AB3822319558 /* FansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FansView.swift; sourceTree = "<group>"; };
+		CCC5ED462667D818802B10FD /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		D0FEEE75B02FC262F7E93DA5 /* SensorsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorsView.swift; sourceTree = "<group>"; };
 		D55974A74B43876077772D5D /* SensorRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorRegistry.swift; sourceTree = "<group>"; };
 		D68DB9433083EBABDD2C7E52 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 				7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */,
 				0CCC71C9AEBA3D6DC9BB66D8 /* FanModelTests.swift */,
 				EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */,
+				CCC5ED462667D818802B10FD /* LocalizationTests.swift */,
 				6F2CB65F4FBC7DF6F26A823F /* MenuBarTests.swift */,
 				20B84A99260FBBACE9652B11 /* MystralTests.swift */,
 				DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */,
@@ -337,6 +340,7 @@
 				Base,
 				en,
 				it,
+				"zh-Hans",
 			);
 			mainGroup = 4EC88627BE230A277F435695;
 			minimizedProjectReferenceProxies = 1;
@@ -415,6 +419,7 @@
 				3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */,
 				D67BD88E19F47CDF1635A88C /* FanModelTests.swift in Sources */,
 				911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */,
+				8CB3846A7D077DB26675D5A3 /* LocalizationTests.swift in Sources */,
 				836D34008D53C05207B74E6A /* MenuBarTests.swift in Sources */,
 				9FB346A2EB9A67AFFE44E470 /* MystralTests.swift in Sources */,
 				30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */,
@@ -454,8 +459,10 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Mystral/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.Mystral;
 				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Debug;
 		};
@@ -624,9 +631,11 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Mystral/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fexxdev.Mystral;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
 			name = Release;

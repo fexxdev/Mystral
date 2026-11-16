@@ -80,7 +80,7 @@ struct MainView: View {
                     set: { profileManager.activeProfileId = $0 }
                 )) {
                     ForEach(profileManager.allProfiles) { profile in
-                        Label(profile.name, systemImage: profile.icon).tag(Optional(profile.id))
+                        Label(profile.displayName, systemImage: profile.icon).tag(Optional(profile.id))
                     }
                 }
                 .labelsHidden()

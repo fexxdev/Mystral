@@ -7,7 +7,11 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 ## [Unreleased]
 
 ### Added
-- Comprehensive Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories.
+- Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories (thanks @huangyixin447).
+
+### Fixed
+- Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
+- Italian: restored the parts of several Settings and Profiles explanations that were cut short.
 
 ## [1.1.7] — 2026-11-11
 

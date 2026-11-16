@@ -212,7 +212,7 @@ struct DashboardView: View {
                         AxisGridLine()
                         AxisValueLabel {
                             if let s = value.as(Double.self) {
-                                Text(s == 0 ? "now" : "\(Int(-s / 60))m")
+                                if s == 0 { Text("now") } else { Text("\(Int(-s / 60))m") }
                             }
                         }
                     }
@@ -248,6 +248,10 @@ struct DashboardView: View {
         let value: Double
     }
 
+    /// Chart series names double as legend labels, so the "Total" one is localized.
+    /// The same value keys `chartForegroundStyleScale`.
+    private static let totalSeriesName = String(localized: "Total")
+
     private var powerHistorySamples: [PowerPoint] {
         let interval = fanController.pollingInterval
         var pts: [PowerPoint] = []
@@ -259,7 +263,7 @@ struct DashboardView: View {
                                       secondsAgo: -Double(n - 1 - i) * interval, value: v))
             }
         }
-        add(power.totalHistory, "Total")
+        add(power.totalHistory, Self.totalSeriesName)
         add(power.cpuHistory, "CPU")
         add(power.gpuHistory, "GPU")
         return pts
@@ -283,7 +287,7 @@ struct DashboardView: View {
                     .interpolationMethod(.catmullRom)
                 }
                 .chartForegroundStyleScale([
-                    "Total": Color.teal,
+                    Self.totalSeriesName: Color.teal,
                     "CPU": Color.orange,
                     "GPU": Color.purple
                 ])
@@ -293,7 +297,7 @@ struct DashboardView: View {
                         AxisGridLine()
                         AxisValueLabel {
                             if let s = value.as(Double.self) {
-                                Text(s == 0 ? "now" : "\(Int(-s / 60))m")
+                                if s == 0 { Text("now") } else { Text("\(Int(-s / 60))m") }
                             }
                         }
                     }
@@ -330,7 +334,7 @@ struct DashboardView: View {
                 if let profile = profileManager.activeProfile {
                     Image(systemName: profile.icon).font(.title2)
                     VStack(alignment: .leading) {
-                        Text(profile.name).font(.title3)
+                        Text(profile.displayName).font(.title3)
                         if !profile.sensorKey.isEmpty {
                             Text("Driving: \(SensorRegistry.nameForKey(profile.sensorKey)) (\(profile.sensorKey))")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -346,7 +350,7 @@ struct DashboardView: View {
                     get: { profileManager.activeProfileId },
                     set: { profileManager.activeProfileId = $0 }
                 )) {
-                    ForEach(profileManager.allProfiles) { p in Text(p.name).tag(Optional(p.id)) }
+                    ForEach(profileManager.allProfiles) { p in Text(p.displayName).tag(Optional(p.id)) }
                 }.frame(width: 200)
             }.padding()
         }
@@ -366,7 +370,7 @@ struct TemperatureCard: View {
     let title: String
     let max: Double
     let avg: Double
-    let sensorLabel: String
+    let sensorLabel: LocalizedStringKey
 
     private var color: Color {
         switch max {
@@ -445,11 +449,14 @@ struct PowerCard: View {
         }.frame(maxWidth: .infinity)
     }
 
-    private func legend(_ color: Color, _ label: String, _ value: Double?) -> some View {
+    private func legend(_ color: Color, _ label: LocalizedStringKey, _ value: Double?) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(value.map { "\(label) \(Int($0.rounded())) W" } ?? "\(label) --")
-                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Text(label)
+                Text(verbatim: value.map { "\(Int($0.rounded())) W" } ?? "--")
+            }
+            .foregroundStyle(.secondary)
         }
     }
 
