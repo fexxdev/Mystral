@@ -94,7 +94,9 @@ final class SMCProxyService: SMCServiceProtocol, @unchecked Sendable {
         }
 
         cachedSensors = smcData.sensors.map {
-            Sensor(id: $0.key, name: $0.name, temperature: $0.temperature)
+            // Name from this app's catalog, not the helper's: the helper is only
+            // reinstalled on a new build number, so its names can be a release behind.
+            Sensor(id: $0.key, name: SensorRegistry.nameForKey($0.key), temperature: $0.temperature)
         }
         cachedFans = smcData.fans.map {
             Fan(id: $0.id, name: $0.name, currentRPM: $0.currentRPM, targetRPM: $0.targetRPM,

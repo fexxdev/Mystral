@@ -54,6 +54,23 @@
     "%lld" : {
       "shouldTranslate" : false
     },
+    "%lld (%lld P + %lld E)" : {
+      "comment" : "CPU core count: total, performance cores, efficiency cores",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld (%2$lld P + %3$lld E)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld（%2$lld 个性能核心 + %3$lld 个能效核心）"
+          }
+        }
+      }
+    },
     "%lld / %lld s" : {
       "shouldTranslate" : false
     },
@@ -2879,6 +2896,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "平滑温度变化（EMA）"
+          }
+        }
+      }
+    },
+    "SoC" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoC"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoC 芯片"
           }
         }
       }

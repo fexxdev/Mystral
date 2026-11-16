@@ -33,7 +33,7 @@ macOS keeps Apple Silicon fans quiet until the chip is already hot. Mystral lets
 
 ### 📊 Monitoring
 - **Dashboard** with CPU and GPU max/average, a CPU summary (die, package, hotspot), per-core grids and a 5-minute history chart.
-- **Sensors** view listing every SMC temperature sensor. You can search, sort, filter by category (P-cores, E-cores, GPU, memory, SSD, battery, airflow, VRM) and see a sparkline trend for each.
+- **Sensors** view listing every SMC temperature sensor. You can search, sort, filter by category (CPU performance and efficiency clusters, GPU, SoC, memory, SSD, battery, airflow, power delivery) and see a sparkline trend for each.
 - **Fans** view with current, target and min–max RPM, and whether macOS or Mystral is driving each fan.
 - **Chip detection** for your exact chip, core counts and how well its sensors are supported.
 

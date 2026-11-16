@@ -13,6 +13,15 @@ enum HardwareInfo {
         return brand.hasPrefix("Apple ") ? String(brand.dropFirst(6)) : brand
     }
 
+    /// 1 for M1 … 5 for M5, from the chip name ("M3 Pro" → 3); nil if unknown.
+    static let chipFamily: Int? = family(fromChipName: chipName())
+
+    static func family(fromChipName name: String) -> Int? {
+        guard let m = name.firstIndex(of: "M") else { return nil }
+        let digits = name[name.index(after: m)...].prefix { $0.isNumber }
+        return Int(digits)
+    }
+
     private static func sysctlString(_ name: String) -> String {
         var size = 0
         sysctlbyname(name, nil, &size, nil, 0)

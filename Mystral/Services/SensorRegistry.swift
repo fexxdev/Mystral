@@ -6,6 +6,7 @@ enum SensorCategory: String, CaseIterable, Sendable {
     case cpuEfficiency = "CPU E-Cores"
     case cpuSummary = "CPU Summary"
     case gpu = "GPU"
+    case soc = "SoC"
     case memory = "Memory"
     case ssd = "SSD"
     case battery = "Battery"
@@ -23,146 +24,89 @@ struct SensorInfo: Sendable {
 }
 
 enum SensorRegistry {
-    private static let catalog: [String: (String, SensorCategory)] = [
-        // CPU Performance Cores (M1 through M5, keys vary by chip)
-        "Tp01": ("CPU P-Core 1", .cpuPerformance),
-        "Tp02": ("CPU P-Core 2", .cpuPerformance),
-        "Tp03": ("CPU P-Core 3", .cpuPerformance),
-        "Tp04": ("CPU P-Core 4", .cpuPerformance),
-        "Tp05": ("CPU P-Core 5", .cpuPerformance),
-        "Tp06": ("CPU P-Core 6", .cpuPerformance),
-        "Tp07": ("CPU P-Core 7", .cpuPerformance),
-        "Tp08": ("CPU P-Core 8", .cpuPerformance),
-        "Tp0K": ("CPU P-Core 9", .cpuPerformance),
-        "Tp0L": ("CPU P-Core 10", .cpuPerformance),
-        "Tp0M": ("CPU P-Core 11", .cpuPerformance),
-        "Tp0R": ("CPU P-Core 12", .cpuPerformance),
-        "Tp0S": ("CPU P-Core 13", .cpuPerformance),
-        "Tp0T": ("CPU P-Core 14", .cpuPerformance),
-        "Tp0U": ("CPU P-Core 15", .cpuPerformance),
-        "Tp0V": ("CPU P-Core 16", .cpuPerformance),
-        "Tp0W": ("CPU P-Core 17", .cpuPerformance),
-        "Tp0a": ("CPU P-Core 18", .cpuPerformance),
-        "Tp0b": ("CPU P-Core 19", .cpuPerformance),
-        "Tp0c": ("CPU P-Core 20", .cpuPerformance),
-        "Tp0g": ("CPU P-Core 21", .cpuPerformance),
-        "Tp0h": ("CPU P-Core 22", .cpuPerformance),
-        "Tp0i": ("CPU P-Core 23", .cpuPerformance),
-        "Tp0m": ("CPU P-Core 24", .cpuPerformance),
-        "Tp0n": ("CPU P-Core 25", .cpuPerformance),
-        "Tp0o": ("CPU P-Core 26", .cpuPerformance),
-        "Tp0u": ("CPU P-Core 27", .cpuPerformance),
-        "Tp0v": ("CPU P-Core 28", .cpuPerformance),
-        "Tp0w": ("CPU P-Core 29", .cpuPerformance),
-        "Tp0y": ("CPU P-Core 30", .cpuPerformance),
-        "Tp0z": ("CPU P-Core 31", .cpuPerformance),
-        "Tp10": ("CPU P-Core 32", .cpuPerformance),
+    /// The chip family of this Mac (1 for M1 … 5 for M5), nil if unknown.
+    static let chipFamily: Int? = HardwareInfo.chipFamily
 
-        // CPU Efficiency Cores
-        "Tp09": ("CPU E-Core 1", .cpuEfficiency),
-        "Tp0A": ("CPU E-Core 2", .cpuEfficiency),
-        "Tp0B": ("CPU E-Core 3", .cpuEfficiency),
-        "Tp0C": ("CPU E-Core 4", .cpuEfficiency),
-        "Tp0D": ("CPU E-Core 5", .cpuEfficiency),
-        "Tp0E": ("CPU E-Core 6", .cpuEfficiency),
-        "Tp16": ("CPU E-Core 7", .cpuEfficiency),
-        "Tp17": ("CPU E-Core 8", .cpuEfficiency),
-        "Tp18": ("CPU E-Core 9", .cpuEfficiency),
-        "Tp1E": ("CPU E-Core 10", .cpuEfficiency),
-        "Tp1F": ("CPU E-Core 11", .cpuEfficiency),
-        "Tp1G": ("CPU E-Core 12", .cpuEfficiency),
-        "Tp1I": ("CPU E-Core 13", .cpuEfficiency),
-        "Tp1J": ("CPU E-Core 14", .cpuEfficiency),
-        "Tp1K": ("CPU E-Core 15", .cpuEfficiency),
-        "Tp1Q": ("CPU E-Core 16", .cpuEfficiency),
-        "Tp1R": ("CPU E-Core 17", .cpuEfficiency),
-        "Tp1S": ("CPU E-Core 18", .cpuEfficiency),
-        "Tp3O": ("CPU E-Core 19", .cpuEfficiency),
-        "Tp3P": ("CPU E-Core 20", .cpuEfficiency),
-        "Tp3S": ("CPU E-Core 21", .cpuEfficiency),
-        "Tp3T": ("CPU E-Core 22", .cpuEfficiency),
-        "Tp3W": ("CPU E-Core 23", .cpuEfficiency),
-        "Tp3X": ("CPU E-Core 24", .cpuEfficiency),
-
-        // CPU Summary
-        "TCMb": ("CPU Hotspot", .cpuSummary),
-        "TCMz": ("CPU Max", .cpuSummary),
-        "TCDX": ("CPU Die", .cpuSummary),
-        "TCHP": ("CPU Package", .cpuSummary),
-
-        // GPU Cores (vary by chip)
-        "Tg00": ("GPU Core 1", .gpu),
-        "Tg01": ("GPU Core 2", .gpu),
-        "Tg04": ("GPU Core 3", .gpu),
-        "Tg05": ("GPU Core 4", .gpu),
-        "Tg08": ("GPU Core 5", .gpu),
-        "Tg09": ("GPU Core 6", .gpu),
-        "Tg0C": ("GPU Core 7", .gpu),
-        "Tg0D": ("GPU Core 8", .gpu),
-        "Tg0K": ("GPU Core 9", .gpu),
-        "Tg0L": ("GPU Core 10", .gpu),
-        "Tg0U": ("GPU Core 11", .gpu),
-        "Tg0V": ("GPU Core 12", .gpu),
-        "Tg0a": ("GPU Core 13", .gpu),
-        "Tg0b": ("GPU Core 14", .gpu),
-        "Tg0c": ("GPU Core 15", .gpu),
-        "Tg0d": ("GPU Core 16", .gpu),
-        "Tg0u": ("GPU Core 17", .gpu),
-        "Tg0v": ("GPU Core 18", .gpu),
-        "Tg12": ("GPU Core 19", .gpu),
-        "Tg13": ("GPU Core 20", .gpu),
-        "Tg1A": ("GPU Core 21", .gpu),
-        "Tg1B": ("GPU Core 22", .gpu),
-        "Tg1k": ("GPU Core 23", .gpu),
-        "Tg1l": ("GPU Core 24", .gpu),
-
-        // Memory / DRAM
-        "Tm01": ("Memory 1", .memory),
-        "Tm02": ("Memory 2", .memory),
-        "TMVR": ("Memory VRM", .memory),
-
-        // SSD / Storage
-        "Ts0S": ("SSD", .ssd),
-        "TS0P": ("SSD", .ssd),
+    /// Keys whose meaning holds on every Apple Silicon Mac that has them.
+    private static let exactKeys: [String: (String, SensorCategory)] = [
+        // CPU summary values computed by the SMC
+        "TCMz": ("CPU Die Max", .cpuSummary),
+        "TCMb": ("CPU Virtual Die", .cpuSummary),
+        "TCDX": ("SoC Die Max", .cpuSummary),
+        "TVD0": ("CPU Virtual Die", .other),      // same value as TCMb; not a regulator
+        "TCHP": ("CPU Heat Pipe", .other),
 
         // Battery
         "TB0T": ("Battery 1", .battery),
         "TB1T": ("Battery 2", .battery),
         "TB2T": ("Battery 3", .battery),
 
-        // Airflow
+        // Airflow and enclosure
         "TaLP": ("Airflow Left", .airflow),
         "TaRP": ("Airflow Right", .airflow),
         "TaRF": ("Airflow Right", .airflow),
-        "TaTP": ("Airflow Total", .airflow),
-        "TaLT": ("Left Intake", .airflow),
-        "TaRT": ("Right Intake", .airflow),
-        "TaLW": ("Left Exhaust", .airflow),
-        "TaRW": ("Right Exhaust", .airflow),
+        "TaLT": ("Thunderbolt Left", .airflow),   // port proximity, not an intake
+        "TaRT": ("Thunderbolt Right", .airflow),
         "TAOL": ("Ambient", .airflow),
 
-        // VRM
-        "TVD0": ("VRM Die", .vrm),
-        "TVA0": ("VRM Ambient", .vrm),
-
-        // Other
+        // Memory, storage, radios
+        "TMVR": ("Memory Regulator", .memory),
         "TW0P": ("Wireless Module", .other),
+        "TSCP": ("SoC Probe", .soc),
     ]
 
+    /// M1 publishes its efficiency-cluster readings among the `Tp` keys.
+    /// From exelban/stats (MIT), Modules/Sensors/values.swift.
+    private static let m1EfficiencyKeys: Set<String> = ["Tp09", "Tp0T"]
+
+    /// Name and category of an SMC temperature key.
+    ///
+    /// Apple documents none of these keys, and a key can mean different things on
+    /// different chips. Keys are grouped by prefix, checked with CPU-only, E-core-only
+    /// and GPU-only load tests on an M3 Pro and against what open-source monitors do
+    /// (exelban/stats, vladkens/macmon, metaspartan/mactop, dkorunic/iSMC). No key is
+    /// named after a specific core: each cluster publishes groups of probes,
+    /// aggregates and maxima, and none of those projects can tie a key to one core.
+    static func classify(_ key: String, chipFamily: Int?) -> (name: String, category: SensorCategory) {
+        if let known = exactKeys[key] { return known }
+        switch key.prefix(2) {
+        case "Tp":
+            if chipFamily == 1, m1EfficiencyKeys.contains(key) { return ("CPU E-Cluster", .cpuEfficiency) }
+            return ("CPU P-Cluster", .cpuPerformance)
+        case "Te":
+            // M1 uses Te0x for the CPU die; from M2 on they are efficiency-cluster groups.
+            if chipFamily == 1 { return ("CPU Die", .cpuSummary) }
+            return ("CPU E-Cluster", .cpuEfficiency)
+        case "Tg": return ("GPU", .gpu)
+        case "TG": return ("Battery Gauge", .battery)          // uppercase G: gas gauge, not GPU
+        case "Tf": return ("SoC Fabric", .soc)                 // per-SKU blocks near CPU or GPU, plus held min/max
+        case "Tm": return ("Memory", .memory)
+        case "Ts": return key.hasSuffix("P") ? ("SSD Controller", .ssd) : ("SoC", .soc)
+        case "TS": return key.hasSuffix("P") ? ("SSD Proximity", .ssd) : (key, .other)
+        case "TH": return ("SSD NAND", .ssd)
+        case "Th": return ("Heatsink", .other)
+        case "TB": return ("Battery", .battery)
+        case "Ta", "TA": return ("Airflow", .airflow)
+        case "TV": return ("Voltage Regulator", .vrm)
+        case "TD": return ("SoC Diode", .soc)
+        case "TE", "TF": return ("SoC", .soc)
+        default:
+            if key.hasPrefix("TPD") || key.hasPrefix("TRD") { return ("Power Delivery", .vrm) }
+            return (key, .other)
+        }
+    }
+
+    /// True when a rule or the exact-key table knows this key.
+    static func isRecognized(_ key: String) -> Bool {
+        classify(key, chipFamily: chipFamily).name != key
+    }
+
     static func nameForKey(_ key: String) -> String {
-        catalog[key]?.0 ?? key
+        classify(key, chipFamily: chipFamily).name
     }
 
     static func categoryForKey(_ key: String) -> SensorCategory {
-        if let entry = catalog[key] { return entry.1 }
-        if key.hasPrefix("Tp") { return .cpuPerformance }
-        if key.hasPrefix("Tg") { return .gpu }
-        if key.hasPrefix("Tm") { return .memory }
-        if key.hasPrefix("Ts") || key.hasPrefix("TS") { return .ssd }
-        if key.hasPrefix("TB") { return .battery }
-        if key.hasPrefix("Ta") { return .airflow }
-        if key.hasPrefix("TV") { return .vrm }
-        return .other
+        classify(key, chipFamily: chipFamily).category
     }
 
     static func info(for key: String) -> SensorInfo {
@@ -181,8 +125,18 @@ enum SensorRegistry {
         }
     }
 
+    /// A CPU key reading exactly 40.0 °C is a parked slot: on M4 Pro/Max the SMC
+    /// alternates between two banks of P-cluster keys and holds the idle one at 40.0.
+    static let parkedCpuReading = 40.0
+
+    /// CPU-cluster sensors (performance and efficiency) that carry a live reading.
+    /// Like macmon and mactop, the CPU average covers both clusters.
     static func cpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
-        sensors.filter { $0.id.hasPrefix("Tp") }
+        sensors.filter { sensor in
+            let category = categoryForKey(sensor.id)
+            return (category == .cpuPerformance || category == .cpuEfficiency)
+                && sensor.temperature != parkedCpuReading
+        }
     }
 
     static func gpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
@@ -255,7 +209,7 @@ enum SensorRegistry {
         lines.append("=== Mystral SMC Export ===")
         lines.append("Date: \(ISO8601DateFormatter().string(from: Date()))")
         lines.append("Model: \(HardwareInfo.modelIdentifier())")
-        lines.append("Chip: \(HardwareInfo.chipName())")
+        lines.append("Chip: \(HardwareInfo.chipName()) (family \(chipFamily.map(String.init) ?? "unknown"))")
 
         let chip = detectChip(sensors: sensors, fans: fans)
         lines.append("Detected chip: \(chip.chipName)")
@@ -267,7 +221,7 @@ enum SensorRegistry {
         lines.append("=== All Sensors (\(sensors.count)) ===")
         for sensor in sensors {
             let cat = categoryForKey(sensor.id)
-            let known = catalog[sensor.id] != nil ? "KNOWN" : "UNMAPPED"
+            let known = isRecognized(sensor.id) ? "KNOWN" : "UNMAPPED"
             lines.append("\(sensor.id) | \(sensor.name) | \(cat.rawValue) | \(String(format: "%.2f", sensor.temperature))°C | \(known)")
         }
 
@@ -283,7 +237,7 @@ enum SensorRegistry {
         for (cat, catSensors) in grouped {
             lines.append("\(cat.rawValue): \(catSensors.count) sensors")
             for s in catSensors {
-                let known = catalog[s.id] != nil
+                let known = isRecognized(s.id)
                 lines.append("  \(s.id) → \(s.name) \(known ? "" : "[NEEDS MAPPING]")")
             }
         }

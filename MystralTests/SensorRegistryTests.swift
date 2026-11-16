@@ -159,4 +159,71 @@ final class SensorRegistryTests: XCTestCase {
             XCTAssertEqual(cores.performance + cores.efficiency, cores.total)
         }
     }
+
+    // MARK: - Key classification
+
+    private func category(_ key: String, family: Int? = 3) -> SensorCategory {
+        SensorRegistry.classify(key, chipFamily: family).category
+    }
+
+    /// Load tests on an M3 Pro (Mac15,6): Tp follows P-core load, Te is the only group
+    /// that warms under an E-core-only load, Tg follows the GPU, Tf and Ts0x follow
+    /// both and are SoC sensors.
+    func testM3ProKeyGroups() {
+        XCTAssertEqual(category("Tp0C"), .cpuPerformance)
+        XCTAssertEqual(category("Te0H"), .cpuEfficiency)
+        XCTAssertEqual(category("Tg0D"), .gpu)
+        XCTAssertEqual(category("Tf14"), .soc)
+        XCTAssertEqual(category("Tf24"), .soc)
+        XCTAssertEqual(category("Ts0C"), .soc, "Ts0x warms +20 °C under GPU load: not an SSD")
+        XCTAssertEqual(category("TED0"), .soc)
+        XCTAssertEqual(category("TD00"), .soc)
+    }
+
+    func testStorageBatteryAndEnclosureKeys() {
+        XCTAssertEqual(category("Ts0P"), .ssd)
+        XCTAssertEqual(category("TS0P"), .ssd)
+        XCTAssertEqual(category("TH0x"), .ssd)
+        XCTAssertEqual(category("Th00"), .other, "lowercase h is a heatsink, not NAND")
+        XCTAssertEqual(category("TG0B"), .battery, "uppercase G is the gas gauge, not the GPU")
+        XCTAssertEqual(category("TB0T"), .battery)
+        XCTAssertEqual(SensorRegistry.classify("TaLT", chipFamily: 3).name, "Thunderbolt Left")
+        XCTAssertEqual(SensorRegistry.classify("TCHP", chipFamily: 3).name, "CPU Heat Pipe")
+        XCTAssertEqual(category("TCHP"), .other, "a heat pipe is not a CPU summary value")
+        XCTAssertEqual(category("TPD3"), .vrm)
+        XCTAssertEqual(category("TPMP"), .other)
+    }
+
+    func testM1KeysDiffer() {
+        XCTAssertEqual(category("Tp09", family: 1), .cpuEfficiency)
+        XCTAssertEqual(category("Tp09", family: 2), .cpuPerformance)
+        XCTAssertEqual(category("Te00", family: 1), .cpuSummary)
+        XCTAssertEqual(category("Te04", family: 2), .cpuEfficiency)
+    }
+
+    func testNoKeyIsNamedAfterASpecificCore() {
+        for key in ["Tp04", "Tp0C", "Tp1E", "Te05", "Tg0D"] {
+            let name = SensorRegistry.classify(key, chipFamily: 3).name
+            XCTAssertFalse(name.contains("Core "), "\(key) → \(name)")
+        }
+    }
+
+    func testCpuCoreSensorsCoverBothClustersAndSkipParkedSlots() {
+        let sensors = [
+            Sensor(id: "Tp0C", name: "", temperature: 55),
+            Sensor(id: "Te05", name: "", temperature: 45),
+            Sensor(id: "Tp1i", name: "", temperature: 40.0),   // parked bank on M4 Pro/Max
+            Sensor(id: "Tf14", name: "", temperature: 60),
+            Sensor(id: "Ts0C", name: "", temperature: 50)
+        ]
+        XCTAssertEqual(Set(SensorRegistry.cpuCoreSensors(from: sensors).map(\.id)), ["Tp0C", "Te05"])
+    }
+
+    func testChipFamilyFromName() {
+        XCTAssertEqual(HardwareInfo.family(fromChipName: "M3 Pro"), 3)
+        XCTAssertEqual(HardwareInfo.family(fromChipName: "M1"), 1)
+        XCTAssertEqual(HardwareInfo.family(fromChipName: "M4 Max"), 4)
+        XCTAssertNil(HardwareInfo.family(fromChipName: "Intel Core i9"))
+        XCTAssertNil(HardwareInfo.family(fromChipName: ""))
+    }
 }

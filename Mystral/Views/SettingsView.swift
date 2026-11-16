@@ -392,7 +392,8 @@ struct SettingsView: View {
     static func cpuCoresText(_ cores: HardwareInfo.CoreCounts) -> String {
         guard cores.total > 0 else { return "—" }
         guard cores.performance > 0, cores.efficiency > 0 else { return "\(cores.total)" }
-        return "\(cores.total) (\(cores.performance) P + \(cores.efficiency) E)"
+        return String(localized: "\(cores.total) (\(cores.performance) P + \(cores.efficiency) E)",
+                      comment: "CPU core count: total, performance cores, efficiency cores")
     }
 
     private func captionText(_ text: LocalizedStringKey) -> some View {
