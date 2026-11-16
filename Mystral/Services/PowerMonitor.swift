@@ -29,14 +29,21 @@ final class PowerMonitor {
         ioreport = IOReportPower()
     }
 
-    func sample(maxHistory: Int = PowerMonitor.maxHistory) {
+    /// Upper bound for the SMC `PSTR` system total. Even a Mac Pro's power supply
+    /// stays under this; anything above it is a bad read, not real power.
+    nonisolated static let maximumPlausibleTotalWatts: Double = 1500
+
+    /// `minimumInterval` is the shortest window IOReport may average over. Pass
+    /// about half the polling interval so two timer ticks that fire close together
+    /// cannot turn a normal energy delta into a huge wattage.
+    func sample(maxHistory: Int = PowerMonitor.maxHistory, minimumInterval: TimeInterval = 1) {
         let historyLimit = max(1, maxHistory)
-        if let smc, let watts = try? smc.readFloat(key: "PSTR"), watts > 0 {
+        if let smc, let watts = try? smc.readFloat(key: "PSTR"), Self.isPlausibleTotal(watts) {
             totalWatts = watts
         } else {
             totalWatts = nil
         }
-        if let reading = ioreport?.sample() {
+        if let reading = ioreport?.sample(minimumInterval: minimumInterval, systemWatts: totalWatts) {
             cpuWatts = reading.cpu
             gpuWatts = reading.gpu
         } else {
@@ -46,6 +53,16 @@ final class PowerMonitor {
         if let t = totalWatts { totalHistory = Self.appendCapped(t, to: totalHistory, maxHistory: historyLimit) }
         if let c = cpuWatts { cpuHistory = Self.appendCapped(c, to: cpuHistory, maxHistory: historyLimit) }
         if let g = gpuWatts { gpuHistory = Self.appendCapped(g, to: gpuHistory, maxHistory: historyLimit) }
+    }
+
+    /// Drop the IOReport baseline, e.g. after wake, so the first reading after
+    /// sleep is not averaged across the time the Mac was asleep.
+    func resetBaseline() {
+        ioreport?.reset()
+    }
+
+    nonisolated static func isPlausibleTotal(_ watts: Double) -> Bool {
+        watts.isFinite && watts > 0 && watts <= maximumPlausibleTotalWatts
     }
 
     /// Append a value to a rolling history, trimming the oldest samples beyond `maxHistory`.

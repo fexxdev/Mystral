@@ -52,6 +52,7 @@ final class FanController {
     }
     var minimumFanPercentage: Double = 0
     var aggressiveOverrideEnabled: Bool = true
+    private var sensorHistories = SensorHistoryStore()
     private var smoothedTemps: [String: Double] = [:]
     private var lastWrittenPct: [Int: Double] = [:]
     private var ticksSinceForcedReassert = 0
@@ -80,6 +81,7 @@ final class FanController {
         forcedModeSet = false
         consecutiveHelperFailures = 0
         wakeGraceUntil = ProcessInfo.processInfo.systemUptime + 15
+        powerMonitor.resetBaseline()
         if let proxy = smcService as? SMCProxyService {
             proxy.notifyWake()
         } else if let direct = smcService as? SMCService {
@@ -135,16 +137,10 @@ final class FanController {
 
     private func tick() {
         let historyLimit = Self.historyLimit(forPollingInterval: pollingInterval)
-        powerMonitor.sample(maxHistory: historyLimit)
+        powerMonitor.sample(maxHistory: historyLimit, minimumInterval: pollingInterval / 2)
         do {
             var newSensors = try smcService.getAllSensors()
-            let historyMap = Dictionary(uniqueKeysWithValues: sensors.map { ($0.id, $0.history) })
-            for i in newSensors.indices {
-                if let existingHistory = historyMap[newSensors[i].id] {
-                    newSensors[i].history = existingHistory
-                }
-                newSensors[i].recordTemperature(newSensors[i].temperature, maxHistory: historyLimit)
-            }
+            sensorHistories.carry(into: &newSensors, maxHistory: historyLimit)
             sensors = newSensors
             fans = try smcService.getAllFans()
             try smcService.heartbeat()

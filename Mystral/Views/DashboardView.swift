@@ -163,26 +163,16 @@ struct DashboardView: View {
         let cpuCores = cpuCoreSensors
         let gpuCores = gpuCoreSensors
 
-        let cpuLen = cpuCores.map { $0.history.count }.max() ?? 0
-        if cpuLen > 0 {
-            for i in 0..<cpuLen {
-                let vals = cpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
-                guard !vals.isEmpty else { continue }
-                let secondsAgo = -Double(cpuLen - 1 - i) * interval
-                pts.append(HistoryPoint(id: "CPU Max-\(i)", series: "CPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
-                pts.append(HistoryPoint(id: "CPU Avg-\(i)", series: "CPU Avg", secondsAgo: secondsAgo, value: vals.reduce(0, +) / Double(vals.count)))
+        func add(_ series: [Double], _ name: String) {
+            let n = series.count
+            for (i, v) in series.enumerated() {
+                pts.append(HistoryPoint(id: "\(name)-\(i)", series: name,
+                                        secondsAgo: -Double(n - 1 - i) * interval, value: v))
             }
         }
-
-        let gpuLen = gpuCores.map { $0.history.count }.max() ?? 0
-        if gpuLen > 0 {
-            for i in 0..<gpuLen {
-                let vals = gpuCores.compactMap { $0.history.count > i ? $0.history[i] : nil }
-                guard !vals.isEmpty else { continue }
-                let secondsAgo = -Double(gpuLen - 1 - i) * interval
-                pts.append(HistoryPoint(id: "GPU Max-\(i)", series: "GPU Max", secondsAgo: secondsAgo, value: vals.max() ?? 0))
-            }
-        }
+        add(SensorRegistry.alignedHistory(of: cpuCores) { $0.max() ?? 0 }, "CPU Max")
+        add(SensorRegistry.alignedHistory(of: cpuCores) { $0.reduce(0, +) / Double($0.count) }, "CPU Avg")
+        add(SensorRegistry.alignedHistory(of: gpuCores) { $0.max() ?? 0 }, "GPU Max")
         return pts
     }
 

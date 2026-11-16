@@ -200,6 +200,17 @@ enum SensorRegistry {
     }
 
     static let defaultCpuSensorKey = "TCMz"
+
+    /// Readings outside this range are not real temperatures. Some SMC keys are
+    /// unpopulated rails that read 1–3 °C, and a bad read can return a tiny value
+    /// for every key at once; both pulled the CPU average and maximum toward 0 °C
+    /// on the dashboard (seen alongside issue #4). A running Mac's sensors do not
+    /// read below 10 °C, and nothing in it survives 130 °C.
+    static let plausibleTemperatureRange: ClosedRange<Double> = 10...130
+
+    static func isPlausibleTemperature(_ value: Double) -> Bool {
+        value.isFinite && plausibleTemperatureRange.contains(value)
+    }
     static let defaultGpuSensorKey = ""
 
     struct ChipDetection: Sendable {
@@ -272,5 +283,67 @@ enum SensorRegistry {
         lines.append("Keys marked [NEEDS MAPPING] need human-readable names.")
 
         return lines.joined(separator: "\n")
+    }
+}
+
+
+/// Keeps per-sensor temperature history across ticks.
+///
+/// A sensor can be missing for a tick or two: its read failed, or the value was
+/// outside `SensorRegistry.plausibleTemperatureRange` and was dropped. Its history
+/// used to be thrown away then, so the sensor started again from a single sample.
+/// Here a short absence keeps the history; only a long one discards it, since its
+/// old samples would no longer line up in time with the other sensors.
+struct SensorHistoryStore {
+    /// Ticks a sensor may be missing before its history is discarded.
+    static let maximumMissedTicks = 5
+
+    private var histories: [String: [Double]] = [:]
+    private var missedTicks: [String: Int] = [:]
+
+    /// Attach the stored history to each sensor and record its current temperature.
+    mutating func carry(into sensors: inout [Sensor], maxHistory: Int) {
+        let limit = max(1, maxHistory)
+        var seen = Set<String>()
+        for i in sensors.indices {
+            let id = sensors[i].id
+            seen.insert(id)
+            sensors[i].history = histories[id] ?? []
+            sensors[i].recordTemperature(sensors[i].temperature, maxHistory: limit)
+            histories[id] = sensors[i].history
+            missedTicks[id] = nil
+        }
+        for id in histories.keys where !seen.contains(id) {
+            let missed = (missedTicks[id] ?? 0) + 1
+            if missed > Self.maximumMissedTicks {
+                histories[id] = nil
+                missedTicks[id] = nil
+            } else {
+                missedTicks[id] = missed
+            }
+        }
+    }
+}
+
+extension SensorRegistry {
+    /// Combine several sensors' histories into one series, aligned on the newest
+    /// sample. Histories have different lengths (a sensor that appeared later, or
+    /// was dropped for a while), so position `i` from the start does not mean the
+    /// same moment for every sensor; position `i` from the end does.
+    static func alignedHistory(of sensors: [Sensor], combine: ([Double]) -> Double) -> [Double] {
+        let length = sensors.map(\.history.count).max() ?? 0
+        guard length > 0 else { return [] }
+        var series: [Double] = []
+        series.reserveCapacity(length)
+        for i in 0..<length {
+            let fromEnd = length - 1 - i
+            let values = sensors.compactMap { sensor -> Double? in
+                let h = sensor.history
+                return h.count > fromEnd ? h[h.count - 1 - fromEnd] : nil
+            }
+            guard !values.isEmpty else { continue }
+            series.append(combine(values))
+        }
+        return series
     }
 }

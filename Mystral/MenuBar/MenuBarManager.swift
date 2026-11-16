@@ -363,18 +363,7 @@ final class MenuBarManager {
 
     private func renderMiniGraphImage() -> NSImage {
         let cpuSensors = SensorRegistry.cpuCoreSensors(from: fanController.sensors)
-        let history: [Double]
-        if !cpuSensors.isEmpty {
-            let len = cpuSensors.map { $0.history.count }.max() ?? 0
-            var avgs: [Double] = []
-            for i in 0..<len {
-                let vals = cpuSensors.compactMap { $0.history.count > i ? $0.history[i] : nil }
-                if !vals.isEmpty { avgs.append(vals.reduce(0, +) / Double(vals.count)) }
-            }
-            history = avgs
-        } else {
-            history = []
-        }
+        let history = SensorRegistry.alignedHistory(of: cpuSensors) { $0.reduce(0, +) / Double($0.count) }
         let currentTemp = history.last ?? 0
         let currentRPM = fanController.fans.first?.currentRPM ?? 0
         let stroke = Self.lineColor(for: currentTemp)

@@ -35,6 +35,15 @@ final class PowerMonitorTests: XCTestCase {
         XCTAssertEqual(PowerCard.otherWatts(total: 30, cpu: nil, gpu: 4), 26, accuracy: 0.0001)
     }
 
+    func testTotalPowerPlausibility() {
+        XCTAssertTrue(PowerMonitor.isPlausibleTotal(35))
+        XCTAssertFalse(PowerMonitor.isPlausibleTotal(0))
+        XCTAssertFalse(PowerMonitor.isPlausibleTotal(-3))
+        XCTAssertFalse(PowerMonitor.isPlausibleTotal(1_900_000))
+        XCTAssertFalse(PowerMonitor.isPlausibleTotal(.infinity))
+        XCTAssertFalse(PowerMonitor.isPlausibleTotal(.nan))
+    }
+
     func testHistoryLimitKeepsFiveMinutesAtEachPollingInterval() {
         XCTAssertEqual(FanController.historyLimit(forPollingInterval: 2), 151)
         XCTAssertEqual(FanController.historyLimit(forPollingInterval: 5), 61)

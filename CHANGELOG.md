@@ -6,6 +6,13 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Fixed
+- CPU power no longer spikes to impossible values such as 1,900 W on macOS 27 (#4). On macOS 27 the CPU energy counter Mystral reads stops moving for long stretches and then delivers all the missed energy in one sample. That energy is now averaged over the whole time the counter stood still. A reading that is negative, above 500 W, or far above the Mac's total power is dropped.
+- On macOS 27, CPU and GPU power are read from the AppleCLPC energy counters, which keep counting where the old source freezes. This covers the 17 Apple Silicon drivers known for macOS 27 (table ported from [macmon](https://github.com/vladkens/macmon), MIT). Other macOS versions and unknown chips keep the old source.
+- While a CPU energy counter stands still, CPU power is shown as unavailable after 6 seconds instead of a false 0 W.
+- A power reading is taken over at least half the polling interval, and the measurement restarts after the Mac wakes from sleep. A total system power reading above 1,500 W is ignored.
+- The temperature charts no longer dip toward 0 °C. Readings outside 10–130 °C, such as unpopulated SMC rails at 1–3 °C, are ignored. A sensor that drops out for a few ticks keeps its history, and sensors with histories of different lengths are now lined up on their newest sample. They used to be lined up on their oldest, which put recent readings at the wrong time on the dashboard chart and in the menu bar mini graph.
+
 ## [1.1.7] — 2026-11-11
 
 ### Security
