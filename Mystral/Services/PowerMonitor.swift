@@ -10,12 +10,13 @@ final class PowerMonitor {
     private(set) var cpuWatts: Double?
     private(set) var gpuWatts: Double?
 
-    /// Rolling watt history for the dashboard chart — one sample per FanController
+    /// Rolling watt history for the dashboard chart — one entry per FanController
     /// tick, so it shares the exact polling cadence as sensor history. At the default
-    /// 2 s interval, `maxHistory` samples ≈ the last 5 minutes.
-    private(set) var totalHistory: [Double] = []
-    private(set) var cpuHistory: [Double] = []
-    private(set) var gpuHistory: [Double] = []
+    /// 2 s interval, `maxHistory` entries ≈ the last 5 minutes. A tick without a
+    /// reading stores nil, so every entry stays at its own point in time.
+    private(set) var totalHistory: [Double?] = []
+    private(set) var cpuHistory: [Double?] = []
+    private(set) var gpuHistory: [Double?] = []
     static let maxHistory = 150
 
     private let smc: SMCKit?
@@ -50,9 +51,9 @@ final class PowerMonitor {
             cpuWatts = nil
             gpuWatts = nil
         }
-        if let t = totalWatts { totalHistory = Self.appendCapped(t, to: totalHistory, maxHistory: historyLimit) }
-        if let c = cpuWatts { cpuHistory = Self.appendCapped(c, to: cpuHistory, maxHistory: historyLimit) }
-        if let g = gpuWatts { gpuHistory = Self.appendCapped(g, to: gpuHistory, maxHistory: historyLimit) }
+        totalHistory = Self.appendCapped(totalWatts, to: totalHistory, maxHistory: historyLimit)
+        cpuHistory = Self.appendCapped(cpuWatts, to: cpuHistory, maxHistory: historyLimit)
+        gpuHistory = Self.appendCapped(gpuWatts, to: gpuHistory, maxHistory: historyLimit)
     }
 
     /// Drop the IOReport baseline, e.g. after wake, so the first reading after
@@ -75,7 +76,7 @@ final class PowerMonitor {
     }
 
     /// Append a value to a rolling history, trimming the oldest samples beyond `maxHistory`.
-    nonisolated static func appendCapped(_ value: Double, to history: [Double], maxHistory: Int) -> [Double] {
+    nonisolated static func appendCapped<T>(_ value: T, to history: [T], maxHistory: Int) -> [T] {
         var h = history
         h.append(value)
         if h.count > maxHistory { h.removeFirst(h.count - maxHistory) }

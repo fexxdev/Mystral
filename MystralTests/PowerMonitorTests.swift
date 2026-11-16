@@ -49,4 +49,20 @@ final class PowerMonitorTests: XCTestCase {
         XCTAssertEqual(FanController.historyLimit(forPollingInterval: 5), 61)
         XCTAssertEqual(FanController.historyLimit(forPollingInterval: 10), 31)
     }
+
+    // MARK: - Gaps keep their place in time
+
+    func testMissingReadingIsStoredAsGap() {
+        let h = PowerMonitor.appendCapped(nil, to: [1.0, 2.0] as [Double?], maxHistory: 3)
+        XCTAssertEqual(h, [1.0, 2.0, nil])
+    }
+
+    /// A tick without a reading must not shift older points: the point before the
+    /// gap is still two ticks old.
+    @MainActor
+    func testChartPointsKeepTimingAcrossGaps() {
+        let points = DashboardView.chartPoints([5, nil, 7], series: "CPU", interval: 2)
+        XCTAssertEqual(points.map(\.secondsAgo), [-4, 0])
+        XCTAssertEqual(points.map(\.value), [5, 7])
+    }
 }

@@ -31,9 +31,6 @@ final class IOReportPower {
     enum Evaluation: Equatable {
         /// Plausible reading: publish it and advance the baseline.
         case accept(cpu: Double?, gpu: Double?)
-        /// Window too short to give a stable rate: keep the old baseline and
-        /// measure again next tick over the longer window.
-        case keepBaseline
         /// Counter went backwards or produced an impossible rate: drop the
         /// reading and start a fresh baseline from the current sample.
         case rebase
@@ -54,7 +51,7 @@ final class IOReportPower {
     /// True when the subscription includes the macOS 27 CLPC energy counters.
     let hasCLPCChannels: Bool
     private var previous: CFDictionary?
-    private var previousUptime: TimeInterval = 0
+    private var previousTime: TimeInterval = 0
     /// Time the CPU counter has gone without moving, and the last reading shown.
     private var cpuStalledFor: TimeInterval = 0
     private var lastCpuWatts: Double?
@@ -85,7 +82,9 @@ final class IOReportPower {
         // group getter to be told apart from the Energy Model channels.
         if chanGroup != nil, let extended = Self.addingCLPCChannels(to: chans) {
             var subbed: Unmanaged<CFMutableDictionary>?
-            if let sub = cs(nil, extended, &subbed, 0, nil)?.takeRetainedValue() {
+            let sub = cs(nil, extended, &subbed, 0, nil)?.takeRetainedValue()
+            subbed?.release() // returned +1 and unused: samples use the requested set
+            if let sub {
                 channels = extended
                 subscription = sub
                 hasCLPCChannels = true
@@ -95,7 +94,9 @@ final class IOReportPower {
         // Energy Model only: macOS 26 and older, an unknown CLPC driver, or a
         // subscription that IOReport refused with the CLPC channels in it.
         var subbed: Unmanaged<CFMutableDictionary>?
-        guard let sub = cs(nil, mut, &subbed, 0, nil)?.takeRetainedValue() else { return nil }
+        let sub = cs(nil, mut, &subbed, 0, nil)?.takeRetainedValue()
+        subbed?.release()
+        guard let sub else { return nil }
         channels = mut
         subscription = sub
         hasCLPCChannels = false
@@ -122,7 +123,7 @@ final class IOReportPower {
     /// call only records a new baseline.
     func reset() {
         previous = nil
-        previousUptime = 0
+        previousTime = 0
         cpuStalledFor = 0
         lastCpuWatts = nil
     }
@@ -132,58 +133,62 @@ final class IOReportPower {
     /// while its counter is frozen. `systemWatts` is the SMC system total, used
     /// to recognise a CPU or GPU reading far above what the whole Mac draws.
     func sample(minimumInterval: TimeInterval = 1, systemWatts: Double? = nil) -> (cpu: Double?, gpu: Double?) {
-        let start = ProcessInfo.processInfo.systemUptime
+        let start = Self.continuousTime()
         guard let current = createSamples(subscription, channels, nil)?.takeRetainedValue() else {
             return (nil, nil)
         }
         // Time the sample at the middle of the call rather than after it returns,
         // so a slow IOReport call does not stretch or shrink the window.
-        let now = (start + ProcessInfo.processInfo.systemUptime) / 2
+        let now = (start + Self.continuousTime()) / 2
         guard let prev = previous else {
-            previous = current; previousUptime = now
+            previous = current; previousTime = now
             return (nil, nil)
         }
-        let elapsed = now - previousUptime
-        if elapsed > 0, elapsed < Self.effectiveMinimumInterval(minimumInterval) {
+        let elapsed = now - previousTime
+        if Self.isWindowTooShort(elapsed: elapsed, minimumInterval: minimumInterval) {
             return (nil, nil) // keep the baseline; the next tick measures a longer window
         }
         guard let delta = createDelta(prev, current, nil)?.takeRetainedValue() else {
-            previous = current; previousUptime = now
+            previous = current; previousTime = now
             return (nil, nil)
         }
 
         var model = EnergyReading(), clpc = EnergyReading()
+        var modelDieCPU: Double?
         _ = iterate(delta) { [self] channel in
+            // Name first: only a handful of the ~200 channels matter, so skip the
+            // rest before bridging their unit and group strings.
             let name = (chanName(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
-            let unit = (getUnit(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
-            let group = (chanGroup?(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
+            let cpuKind = Self.cpuChannelKind(name)
+            guard cpuKind != nil || name == CLPCEnergyChannels.gpuName else { return 0 }
             let raw = simpleInt(channel, 0)
-            let joules = IOReportPower.energyToJoules(raw: raw, unit: unit)
+            let group = (chanGroup?(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
             if group == CLPCEnergyChannels.groupName {
                 // Described as nanojoules in the descriptor, so do not depend on
                 // the label IOReport derives for a hand-built channel.
                 let clpcJoules = Double(raw) / 1e9
-                if name == CLPCEnergyChannels.cpuName { clpc.addCPU(clpcJoules) }
-                else if name == CLPCEnergyChannels.gpuName { clpc.addGPU(clpcJoules) }
-            } else if name.hasSuffix("CPU Energy") {
-                // Roll-up channels only. Ultra chips name theirs "DIE_n_CPU Energy".
-                // Never match by substring: per-core and SRAM sub-channels would be
-                // counted on top of the roll-up (lablup/all-smi#410).
-                model.addCPU(joules)
-            } else if name == "GPU Energy" {
-                model.addGPU(joules)
+                if cpuKind == .rollUp { clpc.addCPU(clpcJoules) } else if cpuKind == nil { clpc.addGPU(clpcJoules) }
+                return 0
+            }
+            let unit = (getUnit(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
+            let joules = IOReportPower.energyToJoules(raw: raw, unit: unit)
+            switch cpuKind {
+            case .rollUp: model.addCPU(joules)
+            case .perDie: modelDieCPU = (modelDieCPU ?? 0) + joules
+            case nil: model.addGPU(joules)
             }
             return 0
         }
+        model.cpu = Self.energyModelCPU(rollUp: model.cpu, perDie: modelDieCPU)
         let reading = Self.preferred(clpc: clpc, energyModel: model)
         let sawCPU = reading.cpu != nil
 
         switch Self.evaluate(cpuJoules: reading.cpu,
                              gpuJoules: reading.gpu,
-                             elapsed: elapsed, minimumInterval: minimumInterval,
+                             elapsed: elapsed,
                              cpuStalledFor: cpuStalledFor, systemWatts: systemWatts) {
         case .accept(let cpu, let gpu):
-            previous = current; previousUptime = now
+            previous = current; previousTime = now
             if sawCPU, cpu == nil {
                 // Counter did not move: hold the last reading briefly, then report none.
                 cpuStalledFor += elapsed
@@ -193,10 +198,8 @@ final class IOReportPower {
                 lastCpuWatts = cpu
             }
             return (lastCpuWatts, gpu)
-        case .keepBaseline:
-            return (nil, nil)
         case .rebase:
-            previous = current; previousUptime = now
+            previous = current; previousTime = now
             cpuStalledFor = 0
             lastCpuWatts = nil
             return (nil, nil)
@@ -230,6 +233,39 @@ final class IOReportPower {
         max(absoluteMinimumInterval, requested.isFinite ? requested : 0)
     }
 
+    /// Too short a window to give a stable rate: keep the old baseline and measure
+    /// again next tick over the longer window. Two timer ticks firing close together
+    /// would otherwise turn a normal energy delta into a huge wattage.
+    static func isWindowTooShort(elapsed: TimeInterval, minimumInterval: TimeInterval) -> Bool {
+        elapsed > 0 && elapsed < effectiveMinimumInterval(minimumInterval)
+    }
+
+    /// Seconds on a clock that keeps running while the Mac sleeps. IOReport energy
+    /// keeps accumulating through sleep and Power Nap dark wakes, so a clock that
+    /// stops (`ProcessInfo.systemUptime`) would divide that energy by the few
+    /// seconds awake and show a false spike after wake.
+    static func continuousTime() -> TimeInterval {
+        TimeInterval(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000
+    }
+
+    enum CPUChannelKind: Equatable { case rollUp, perDie }
+
+    /// Which Energy Model (or CLPC) channels carry whole-CPU energy. "CPU Energy" is
+    /// the roll-up; Ultra chips may also, or only, publish "DIE_n_CPU Energy" per die.
+    /// Per-core and SRAM sub-channels must never match: they would be counted on top
+    /// of the roll-up (lablup/all-smi#410).
+    static func cpuChannelKind(_ name: String) -> CPUChannelKind? {
+        if name == CLPCEnergyChannels.cpuName { return .rollUp }
+        if name.hasPrefix("DIE_"), name.hasSuffix("_CPU Energy") { return .perDie }
+        return nil
+    }
+
+    /// The whole-chip roll-up when the chip has one; the per-die sum only when it
+    /// doesn't. Adding both would count an Ultra's CPU twice.
+    static func energyModelCPU(rollUp: Double?, perDie: Double?) -> Double? {
+        rollUp ?? perDie
+    }
+
     /// Turn one energy delta into watts, or decide that it cannot be trusted.
     ///
     /// A CPU delta of exactly zero is not 0 W: the CPU is running this code, so
@@ -239,10 +275,9 @@ final class IOReportPower {
     /// `elapsed + cpuStalledFor`. A GPU delta of zero is a real reading: an idle
     /// GPU can be powered down.
     static func evaluate(cpuJoules: Double?, gpuJoules: Double?,
-                         elapsed: TimeInterval, minimumInterval: TimeInterval,
+                         elapsed: TimeInterval,
                          cpuStalledFor: TimeInterval = 0, systemWatts: Double? = nil) -> Evaluation {
         guard elapsed.isFinite, elapsed > 0 else { return .rebase }
-        guard elapsed >= effectiveMinimumInterval(minimumInterval) else { return .keepBaseline }
         let joules = [cpuJoules, gpuJoules].compactMap { $0 }
         // A negative or non-finite delta means the counter was reset or wrapped.
         if joules.contains(where: { !$0.isFinite || $0 < 0 }) { return .rebase }

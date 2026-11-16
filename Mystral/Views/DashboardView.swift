@@ -150,30 +150,35 @@ struct DashboardView: View {
         }
     }
 
-    private struct HistoryPoint: Identifiable {
+    /// One point of a history chart. Both the temperature and the power chart use it.
+    struct ChartPoint: Identifiable {
         let id: String
         let series: String
         let secondsAgo: Double
         let value: Double
     }
 
-    private var historySamples: [HistoryPoint] {
+    /// Points for one series sampled once per tick, newest last. A nil entry is a tick
+    /// without a reading: it gets no point, but still counts for the timing, so every
+    /// other point stays at the moment it was measured.
+    static func chartPoints(_ history: [Double?], series: String, interval: Double) -> [ChartPoint] {
+        let n = history.count
+        return history.enumerated().compactMap { i, value in
+            value.map { ChartPoint(id: "\(series)-\(i)", series: series,
+                                   secondsAgo: -Double(n - 1 - i) * interval, value: $0) }
+        }
+    }
+
+    private var historySamples: [ChartPoint] {
         let interval = fanController.pollingInterval
-        var pts: [HistoryPoint] = []
         let cpuCores = cpuCoreSensors
         let gpuCores = gpuCoreSensors
-
-        func add(_ series: [Double], _ name: String) {
-            let n = series.count
-            for (i, v) in series.enumerated() {
-                pts.append(HistoryPoint(id: "\(name)-\(i)", series: name,
-                                        secondsAgo: -Double(n - 1 - i) * interval, value: v))
-            }
+        func points(_ series: [Double], _ name: String) -> [ChartPoint] {
+            Self.chartPoints(series.map { Optional($0) }, series: name, interval: interval)
         }
-        add(SensorRegistry.alignedHistory(of: cpuCores) { $0.max() ?? 0 }, "CPU Max")
-        add(SensorRegistry.alignedHistory(of: cpuCores) { $0.reduce(0, +) / Double($0.count) }, "CPU Avg")
-        add(SensorRegistry.alignedHistory(of: gpuCores) { $0.max() ?? 0 }, "GPU Max")
-        return pts
+        return points(SensorRegistry.alignedHistory(of: cpuCores) { $0.max() ?? 0 }, "CPU Max")
+            + points(SensorRegistry.alignedHistory(of: cpuCores) { $0.reduce(0, +) / Double($0.count) }, "CPU Avg")
+            + points(SensorRegistry.alignedHistory(of: gpuCores) { $0.max() ?? 0 }, "GPU Max")
     }
 
     private var historyChartSection: some View {
@@ -231,32 +236,16 @@ struct DashboardView: View {
         }
     }
 
-    private struct PowerPoint: Identifiable {
-        let id: String
-        let series: String
-        let secondsAgo: Double
-        let value: Double
-    }
 
     /// Chart series names double as legend labels, so the "Total" one is localized.
     /// The same value keys `chartForegroundStyleScale`.
     private static let totalSeriesName = String(localized: "Total")
 
-    private var powerHistorySamples: [PowerPoint] {
+    private var powerHistorySamples: [ChartPoint] {
         let interval = fanController.pollingInterval
-        var pts: [PowerPoint] = []
-        func add(_ history: [Double], _ series: String) {
-            let n = history.count
-            guard n > 0 else { return }
-            for (i, v) in history.enumerated() {
-                pts.append(PowerPoint(id: "\(series)-\(i)", series: series,
-                                      secondsAgo: -Double(n - 1 - i) * interval, value: v))
-            }
-        }
-        add(power.totalHistory, Self.totalSeriesName)
-        add(power.cpuHistory, "CPU")
-        add(power.gpuHistory, "GPU")
-        return pts
+        return Self.chartPoints(power.totalHistory, series: Self.totalSeriesName, interval: interval)
+            + Self.chartPoints(power.cpuHistory, series: "CPU", interval: interval)
+            + Self.chartPoints(power.gpuHistory, series: "GPU", interval: interval)
     }
 
     private var powerHistoryChart: some View {

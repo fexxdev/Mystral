@@ -26,61 +26,84 @@ final class IOReportPowerTests: XCTestCase {
     // MARK: - Sample sanity (issue #4)
 
     func testNormalReadingIsAccepted() {
-        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: 6, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: 6, elapsed: 2)
         XCTAssertEqual(result, .accept(cpu: 20, gpu: 3))
     }
 
     func testMissingChannelStaysNil() {
-        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: nil, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: nil, elapsed: 2)
         XCTAssertEqual(result, .accept(cpu: 20, gpu: nil))
     }
 
     /// Two timer ticks firing close together: 1 J over 20 ms would read as 50 W
     /// and worse spikes follow from coarser counter updates. Keep the baseline instead.
     func testShortWindowKeepsBaseline() {
-        let result = IOReportPower.evaluate(cpuJoules: 1, gpuJoules: 0.1, elapsed: 0.02, minimumInterval: 1)
-        XCTAssertEqual(result, .keepBaseline)
+        XCTAssertTrue(IOReportPower.isWindowTooShort(elapsed: 0.02, minimumInterval: 1))
+        XCTAssertFalse(IOReportPower.isWindowTooShort(elapsed: 2, minimumInterval: 1))
+        // Zero or negative windows are not "too short": evaluate() rebases on them.
+        XCTAssertFalse(IOReportPower.isWindowTooShort(elapsed: 0, minimumInterval: 1))
     }
 
     func testAbsoluteMinimumIntervalAppliesEvenWhenCallerAsksForLess() {
         XCTAssertEqual(IOReportPower.effectiveMinimumInterval(0), IOReportPower.absoluteMinimumInterval)
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 1, gpuJoules: nil, elapsed: 0.1, minimumInterval: 0),
-                       .keepBaseline)
+        XCTAssertTrue(IOReportPower.isWindowTooShort(elapsed: 0.1, minimumInterval: 0))
+    }
+
+    // MARK: - CPU channel selection
+
+    func testOnlyRollUpChannelsCountAsCPU() {
+        XCTAssertEqual(IOReportPower.cpuChannelKind("CPU Energy"), .rollUp)
+        XCTAssertEqual(IOReportPower.cpuChannelKind("DIE_0_CPU Energy"), .perDie)
+        XCTAssertEqual(IOReportPower.cpuChannelKind("DIE_1_CPU Energy"), .perDie)
+        // Sub-channels seen on an M3 Pro (macOS 27.2.1) must never count.
+        for name in ["PCPU", "ECPU", "PCPU0", "ECPU0_SRAM", "PCPUDTL00", "GPU Energy", "GPU SRAM"] {
+            XCTAssertNil(IOReportPower.cpuChannelKind(name), name)
+        }
+    }
+
+    /// An Ultra may publish both the chip roll-up and one roll-up per die.
+    func testRollUpWinsOverPerDieSum() {
+        XCTAssertEqual(IOReportPower.energyModelCPU(rollUp: 30, perDie: 30), 30)
+        XCTAssertEqual(IOReportPower.energyModelCPU(rollUp: nil, perDie: 30), 30)
+        XCTAssertNil(IOReportPower.energyModelCPU(rollUp: nil, perDie: nil))
+    }
+
+    func testContinuousClockAdvances() {
+        let a = IOReportPower.continuousTime()
+        Thread.sleep(forTimeInterval: 0.05)
+        XCTAssertGreaterThan(IOReportPower.continuousTime() - a, 0.04)
     }
 
     func testImplausibleWattageIsRejected() {
         // The spike in issue #4: about 1,900 W of CPU power for one sample.
-        let result = IOReportPower.evaluate(cpuJoules: 3_800, gpuJoules: 2, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: 3_800, gpuJoules: 2, elapsed: 2)
         XCTAssertEqual(result, .rebase)
     }
 
     // MARK: - macOS 27 frozen CPU counter (vladkens/macmon#76)
 
     func testZeroCpuDeltaIsNoReadingNotZeroWatts() {
-        let result = IOReportPower.evaluate(cpuJoules: 0, gpuJoules: 1, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: 0, gpuJoules: 1, elapsed: 2)
         XCTAssertEqual(result, .accept(cpu: nil, gpu: 0.5))
     }
 
     func testZeroGpuDeltaIsARealReading() {
-        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: 0, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: 40, gpuJoules: 0, elapsed: 2)
         XCTAssertEqual(result, .accept(cpu: 20, gpu: 0))
     }
 
     /// After 4 s without movement the counter delivers 6 s of energy at once.
     /// Averaged over the whole 6 s it is 20 W, not 60 W.
     func testCatchUpIsAveragedOverTheStalledTime() {
-        let result = IOReportPower.evaluate(cpuJoules: 120, gpuJoules: nil, elapsed: 2,
-                                            minimumInterval: 1, cpuStalledFor: 4)
+        let result = IOReportPower.evaluate(cpuJoules: 120, gpuJoules: nil, elapsed: 2, cpuStalledFor: 4)
         XCTAssertEqual(result, .accept(cpu: 20, gpu: nil))
     }
 
     func testReadingFarAboveSystemTotalIsRejected() {
         // 300 W of CPU while the whole Mac draws 7 W is a catch-up spike.
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 600, gpuJoules: nil, elapsed: 2,
-                                              minimumInterval: 1, systemWatts: 7), .rebase)
+        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 600, gpuJoules: nil, elapsed: 2, systemWatts: 7), .rebase)
         // A real load step ahead of the lagging SMC total is kept.
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 27.2, gpuJoules: nil, elapsed: 2,
-                                              minimumInterval: 1, systemWatts: 1.2),
+        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 27.2, gpuJoules: nil, elapsed: 2, systemWatts: 1.2),
                        .accept(cpu: 13.6, gpu: nil))
     }
 
@@ -155,13 +178,13 @@ final class IOReportPowerTests: XCTestCase {
     }
 
     func testNegativeDeltaIsRejected() {
-        let result = IOReportPower.evaluate(cpuJoules: -5, gpuJoules: 2, elapsed: 2, minimumInterval: 1)
+        let result = IOReportPower.evaluate(cpuJoules: -5, gpuJoules: 2, elapsed: 2)
         XCTAssertEqual(result, .rebase)
     }
 
     func testNonFiniteInputsAreRejected() {
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: .nan, gpuJoules: nil, elapsed: 2, minimumInterval: 1), .rebase)
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 10, gpuJoules: nil, elapsed: 0, minimumInterval: 1), .rebase)
-        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 10, gpuJoules: nil, elapsed: -1, minimumInterval: 1), .rebase)
+        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: .nan, gpuJoules: nil, elapsed: 2), .rebase)
+        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 10, gpuJoules: nil, elapsed: 0), .rebase)
+        XCTAssertEqual(IOReportPower.evaluate(cpuJoules: 10, gpuJoules: nil, elapsed: -1), .rebase)
     }
 }

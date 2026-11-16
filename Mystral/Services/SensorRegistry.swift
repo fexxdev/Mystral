@@ -296,8 +296,9 @@ enum SensorRegistry {
 /// A sensor can be missing for a tick or two: its read failed, or the value was
 /// outside `SensorRegistry.plausibleTemperatureRange` and was dropped. Its history
 /// used to be thrown away then, so the sensor started again from a single sample.
-/// Here a short absence keeps the history; only a long one discards it, since its
-/// old samples would no longer line up in time with the other sensors.
+/// Here a short absence repeats the last value for each missed tick, so the history
+/// keeps one entry per tick and stays lined up in time with the other sensors.
+/// A long absence discards it.
 struct SensorHistoryStore {
     /// Ticks a sensor may be missing before its history is discarded.
     static let maximumMissedTicks = 5
@@ -324,6 +325,11 @@ struct SensorHistoryStore {
                 missedTicks[id] = nil
             } else {
                 missedTicks[id] = missed
+                if var history = histories[id], let last = history.last {
+                    history.append(last)
+                    if history.count > limit { history.removeFirst(history.count - limit) }
+                    histories[id] = history
+                }
             }
         }
     }

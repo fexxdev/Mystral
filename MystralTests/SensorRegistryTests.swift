@@ -106,7 +106,9 @@ final class SensorRegistryTests: XCTestCase {
         store.carry(into: &tick2, maxHistory: 10)
         var tick3 = [Sensor(id: "Tp01", name: "P1", temperature: 45)]
         store.carry(into: &tick3, maxHistory: 10)
-        XCTAssertEqual(tick3[0].history, [40, 45])
+        // The missed tick repeats the last value, so the history keeps one entry
+        // per tick and stays aligned with sensors that never dropped out.
+        XCTAssertEqual(tick3[0].history, [40, 40, 45])
     }
 
     func testHistoryDiscardedAfterLongAbsence() {

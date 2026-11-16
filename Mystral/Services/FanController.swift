@@ -63,25 +63,31 @@ final class FanController {
         self.smcService = smcService
         self.profileManager = profileManager
         NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(handleWake),
+            self, selector: #selector(handleSystemWake),
             name: NSWorkspace.didWakeNotification, object: nil
         )
         NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(handleWake),
+            self, selector: #selector(handleScreensWake),
             name: NSWorkspace.screensDidWakeNotification, object: nil
         )
     }
 
-    @objc nonisolated private func handleWake() {
-        Task { @MainActor in self.handleWakeOnMainActor() }
+    @objc nonisolated private func handleSystemWake() {
+        Task { @MainActor in self.handleWakeOnMainActor(systemSlept: true) }
     }
 
-    private func handleWakeOnMainActor() {
-        logger.info("System woke — re-applying forced fan mode on next tick, granting helper 15s grace")
+    @objc nonisolated private func handleScreensWake() {
+        Task { @MainActor in self.handleWakeOnMainActor(systemSlept: false) }
+    }
+
+    private func handleWakeOnMainActor(systemSlept: Bool) {
+        logger.info("Wake (system: \(systemSlept, privacy: .public)) — re-applying forced fan mode on next tick, granting helper 15s grace")
         forcedModeSet = false
         consecutiveHelperFailures = 0
         wakeGraceUntil = ProcessInfo.processInfo.systemUptime + 15
-        powerMonitor.resetBaseline()
+        // Only a real system sleep breaks the power measurement; a display waking
+        // up while the Mac stayed awake leaves the IOReport baseline valid.
+        if systemSlept { powerMonitor.resetBaseline() }
         if let proxy = smcService as? SMCProxyService {
             proxy.notifyWake()
         } else if let direct = smcService as? SMCService {
