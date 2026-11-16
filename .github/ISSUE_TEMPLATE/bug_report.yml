@@ -18,14 +18,15 @@ body:
     id: macos-version
     attributes:
       label: macOS version
-      placeholder: "15.2"
+      placeholder: "26.1"
     validations:
       required: true
   - type: input
     id: mystral-version
     attributes:
       label: Mystral version
-      placeholder: "1.0.0"
+      placeholder: "1.1.7"
+      description: Settings → About
     validations:
       required: true
   - type: textarea
@@ -45,5 +46,5 @@ body:
     id: logs
     attributes:
       label: Console logs (optional)
-      description: Any relevant output from Console.app filtered to subsystem com.fexxdev.Mystral
+      description: Output of `log show --last 1h --predicate 'subsystem == "com.fexxdev.Mystral"'`, or Console.app filtered to subsystem com.fexxdev.Mystral
       render: text

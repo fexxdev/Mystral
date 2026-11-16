@@ -63,8 +63,8 @@ final class AlertManager {
             tryFire(key: "highTemp", lastFire: lastHighTempAlert) {
                 self.lastHighTempAlert = Date()
                 self.send(
-                    title: "High CPU temperature",
-                    body: String(format: "CPU at %.0f°C — exceeds %.0f°C threshold", cpuMax, self.highTempThreshold)
+                    title: String(localized: "High CPU temperature"),
+                    body: String(localized: "CPU at \(Int(cpuMax.rounded()))°C — exceeds \(Int(self.highTempThreshold.rounded()))°C threshold")
                 )
             }
         }
@@ -80,8 +80,8 @@ final class AlertManager {
                         if now.timeIntervalSince(last) > cooldown {
                             lastFanStuckAlert[fan.id] = now
                             send(
-                                title: "Fan not responding",
-                                body: "\(fan.name) reading \(fan.currentRPM) RPM while target is \(Int(expected))%."
+                                title: String(localized: "Fan not responding"),
+                                body: String(localized: "\(fan.name) reading \(fan.currentRPM) RPM while target is \(Int(expected))%.")
                             )
                         }
                     }

@@ -47,7 +47,7 @@ final class ProfileManagerTests: XCTestCase {
         let dup = try manager.duplicateAsCustom(preset)
         XCTAssertFalse(dup.isPreset)
         XCTAssertEqual(dup.curvePoints.count, preset.curvePoints.count)
-        XCTAssertTrue(dup.name.contains(preset.name))
+        XCTAssertTrue(dup.name.contains(preset.displayName))
         XCTAssertEqual(manager.customProfiles.count, 1)
     }
     func testMaxCustomProfiles() throws {

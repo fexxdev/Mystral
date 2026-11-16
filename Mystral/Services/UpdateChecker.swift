@@ -341,17 +341,8 @@ final class UpdateChecker {
     // MARK: - Relaunch
 
     private func relaunchAndTerminate() {
-        let appPath = Bundle.main.bundlePath
-        let pid = ProcessInfo.processInfo.processIdentifier
-        let escaped = appPath.replacingOccurrences(of: "'", with: "'\\''")
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; open '\(escaped)'"]
-        try? process.run()
-
-        logger.info("Relaunch script spawned, terminating for update")
-        NSApp.terminate(nil)
+        logger.info("Relaunching after update")
+        AppRelauncher.relaunch()
     }
 
     // MARK: - Helpers

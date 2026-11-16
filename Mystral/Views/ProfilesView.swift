@@ -42,7 +42,7 @@ struct ProfilesView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Are you sure you want to delete \"\(profileToDelete?.name ?? "")\"?") }
+        } message: { Text("Are you sure you want to delete \"\(profileToDelete?.displayName ?? "")\"?") }
         .alert("Profile Error", isPresented: Binding(
             get: { operationError != nil },
             set: { if !$0 { operationError = nil } }
@@ -65,7 +65,7 @@ struct ProfilesView: View {
 
             if profileManager.customProfiles.count < ProfileManager.maxCustomProfiles {
                 Button {
-                    let newP = Profile(name: "New Profile", curvePoints: [
+                    let newP = Profile(name: String(localized: "New Profile"), curvePoints: [
                         CurvePoint(temperature: 30, fanPercentage: 15),
                         CurvePoint(temperature: 60, fanPercentage: 50),
                         CurvePoint(temperature: 90, fanPercentage: 100)
@@ -90,7 +90,7 @@ struct ProfilesView: View {
         .padding(.vertical, 8)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .font(.caption.bold())
             .foregroundStyle(.secondary)
@@ -108,7 +108,7 @@ struct ProfilesView: View {
             Image(systemName: profile.icon)
                 .frame(width: 20)
                 .foregroundStyle(isSelected ? Color.white : .primary)
-            Text(profile.name)
+            Text(profile.displayName)
                 .lineLimit(1)
                 .foregroundStyle(isSelected ? Color.white : .primary)
             Spacer()
@@ -202,7 +202,7 @@ struct ProfilesView: View {
             VStack(alignment: .leading, spacing: 4) {
                 if profile.isPreset {
                     HStack(spacing: 8) {
-                        Text(profile.name).font(.title2.bold())
+                        Text(profile.displayName).font(.title2.bold())
                         Text("Preset").font(.caption)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.secondary.opacity(0.15))
@@ -260,7 +260,7 @@ struct ProfilesView: View {
         guard !profile.isPreset else { return }
         var sanitized = profile
         let trimmed = sanitized.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { sanitized.name = "Untitled Profile" } else { sanitized.name = trimmed }
+        if trimmed.isEmpty { sanitized.name = String(localized: "Untitled Profile") } else { sanitized.name = trimmed }
         saveTask?.cancel()
         saveTask = Task { @MainActor in
             do {
@@ -364,10 +364,10 @@ struct TriggersEditorView: View {
 
     private func label(for trigger: ProfileTrigger) -> String {
         switch trigger {
-        case .powerSource(.ac): return "On AC Power"
-        case .powerSource(.battery): return "On Battery"
-        case .thermalState(let level): return "Thermal: \(level.rawValue.capitalized)"
-        case .frontmostApp(let bid): return "App is frontmost: \(bid)"
+        case .powerSource(.ac): return String(localized: "On AC Power")
+        case .powerSource(.battery): return String(localized: "On Battery")
+        case .thermalState(let level): return String(localized: "Thermal: \(level.localizedName)")
+        case .frontmostApp(let bid): return String(localized: "App is frontmost: \(bid)")
         }
     }
 }

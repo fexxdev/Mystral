@@ -25,6 +25,10 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         GENERATE_INFOPLIST_FILE: false
         ENABLE_HARDENED_RUNTIME: YES
+        # Localization: languages come from Localizable.xcstrings (XcodeGen adds each
+        # one to knownRegions). Emitting Swift strings keeps the catalog in sync.
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
       configs:
         Release:
           SWIFT_OPTIMIZATION_LEVEL: -O

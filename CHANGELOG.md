@@ -6,7 +6,15 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Added
+- Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories (thanks @huangyixin447).
+- **Language** picker in Settings → General: System, English, Italiano or 简体中文. It sets Mystral's own language (the same setting as System Settings → Language & Region → Applications) and offers to restart, reopening on Settings.
+
 ### Fixed
+- Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
+- Italian: restored the parts of several Settings and Profiles explanations that were cut short.
+- Removed the firmware-lock warning for M3/M4 Pro and Max MacBook Pros. Its model list used identifiers no Mac has (`MacBookPro20,x`, `MacBookPro21,x`), so it never appeared, and manual fan control does work on an M3 Pro (`Mac15,6`) running macOS 27.
+- **Settings → Chip Detection → Fan control** now shows **Working** only while the fans are actually in forced mode under Mystral. It used to show **Working** for any fan with a speed range.
 - CPU power no longer spikes to impossible values such as 1,900 W on macOS 27 (#4). On macOS 27 the CPU energy counter Mystral reads stops moving for long stretches and then delivers all the missed energy in one sample. That energy is now averaged over the whole time the counter stood still. A reading that is negative, above 500 W, or far above the Mac's total power is dropped.
 - On macOS 27, CPU and GPU power are read from the AppleCLPC energy counters, which keep counting where the old source freezes. This covers the 17 Apple Silicon drivers known for macOS 27 (table ported from [macmon](https://github.com/vladkens/macmon), MIT). Other macOS versions and unknown chips keep the old source.
 - While a CPU energy counter stands still, CPU power is shown as unavailable after 6 seconds instead of a false 0 W.
@@ -78,6 +86,61 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 - The main sidebar uses a fixed 200-point column. The Profiles sidebar uses a fixed 260-point column.
 - The main window enforces a 1200-by-640-point minimum size for the Profiles editor.
 
+## [1.1.1] — 2026-06-09
+
+### Fixed
+- Fans no longer keep spinning at the last forced speed while the Mac sleeps. On system sleep the helper hands fan control back to macOS automatic mode; your curve takes over again on wake ([#2](https://github.com/fexxdev/Mystral/issues/2)).
+
+## [1.1.0] — 2026-06-01
+
+### Added
+- **Power monitoring**, with no extra permissions. Total system watts come from the SMC (`PSTR`), CPU and GPU watts from the IOReport energy model.
+- Menu bar display modes **Icon + Power** and **Power Only**.
+- Total, CPU and GPU watts in the live dropdown.
+- A Dashboard **Power** section: total watts with a stacked CPU / GPU / Other bar, and a **Power — Last 5 Minutes** chart.
+
+## [1.0.15] — 2026-05-29
+
+### Fixed
+- The SMC helper is now installed as a launchd **LaunchDaemon** with `KeepAlive`. macOS no longer reaps it every 20–40 minutes, it survives reboots, and the administrator password is asked only at first install. Manual restarts and helper reloads after an update no longer prompt.
+
+## [1.0.14] — 2026-05-25
+
+### Fixed
+- Helper restarts could get stuck because the health check and the restart logic used different staleness thresholds (60 s and 120 s).
+
+### Added
+- After three failed restarts, the app retries every 12 hours instead of giving up.
+- A **Restart Helper** button in the Dashboard banner.
+
+## [1.0.13] — 2026-05-20
+
+### Fixed
+- The SMC helper crashed on macOS Tahoe before reaching Swift code, because the LLVM profiling runtime tried to write to `/`.
+- The Sensors empty state used an SF Symbol that doesn't exist.
+
+### Improved
+- Dashboard, Sensors and Fans share the same empty-state style.
+
+## [1.0.12] — 2026-05-19
+
+### Added
+- **In-app updater**: Settings → Updates downloads the new DMG with a progress bar, installs it and relaunches. It validates the version, rolls back if the install fails, and removes the quarantine attribute.
+
+## [1.0.11] — 2026-05-19
+
+### Fixed
+- Unneeded administrator prompts during sleep and wake: the helper is no longer killed while its data file is briefly stale, as long as its process is alive. It also ignores `SIGHUP`.
+
+## [1.0.10] — 2026-05-17
+
+### Fixed
+- Chip detection reads the chip name from `machdep.cpu.brand_string` instead of guessing from sensor counts, so every Apple Silicon chip is named correctly.
+- CPU core sensors are counted by prefix, so new sensor keys are included.
+
+### Improved
+- The SMC export includes the `hw.model` identifier and the chip name.
+
 ## [1.0.9] — 2026-05-16
 
 ### Fixed
@@ -91,6 +154,21 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 ### Improved
 - Better observability in the helper: consecutive SMC read errors are counted and logged, with a recovery message when normal operation resumes.
 
+## [1.0.7] — 2026-05-06
+
+### Fixed
+- The helper validates every command (fan index, percentage, mode) and rejects out-of-range values.
+- Curve points are clamped to 0–120 °C and 0–100 %, empty profile names become "Untitled Profile", and curve interpolation handles overlapping points.
+- The app stops queuing fan commands while the helper is down.
+- A memory leak in the power-source callback of the auto-switcher.
+- Stuck-fan alerts trigger below 100 RPM instead of only at 0.
+- **Reset All Settings** now resets every setting.
+
+### Improved
+- SMC key info is cached, and redundant helper file reads are skipped.
+- The manual fan slider is debounced, and the menu bar follows the configured polling interval.
+- Release builds use whole-module optimisation.
+
 ## [1.0.6] — 2026-05-06
 
 ### Fixed
@@ -100,6 +178,19 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ### Added
 - **Helper status banner**: the Dashboard now shows a red warning when the SMC helper is unresponsive, so the user knows fan control is inactive instead of seeing frozen readings.
+
+## [1.0.5] — 2026-05-06
+
+### Added
+- The menu bar dropdown shows CPU/GPU temperatures and every fan's RPM, and keeps updating while it is open. Left and right click both open it; **Open Mystral** opens the window.
+- Mystral shows a Dock icon only while its window is open.
+- Structured logging under the `com.fexxdev.Mystral` subsystem.
+
+### Fixed
+- Alert, auto-switch and update settings were not saved.
+- Menu bar display mode changes did not apply.
+- Timers stopped while the menu bar dropdown was open.
+- Outdated helpers are detected by version and replaced.
 
 ## [1.0.2] — 2026-04-30
 

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum SensorCategory: String, CaseIterable, Sendable {
     case cpuPerformance = "CPU P-Cores"
@@ -11,6 +12,8 @@ enum SensorCategory: String, CaseIterable, Sendable {
     case airflow = "Airflow"
     case vrm = "VRM"
     case other = "Other"
+
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 struct SensorInfo: Sendable {
@@ -200,6 +203,7 @@ enum SensorRegistry {
     }
 
     static let defaultCpuSensorKey = "TCMz"
+    static let defaultGpuSensorKey = ""
 
     /// Readings outside this range are not real temperatures. Some SMC keys are
     /// unpopulated rails that read 1–3 °C, and a bad read can return a tiny value
@@ -211,7 +215,6 @@ enum SensorRegistry {
     static func isPlausibleTemperature(_ value: Double) -> Bool {
         value.isFinite && plausibleTemperatureRange.contains(value)
     }
-    static let defaultGpuSensorKey = ""
 
     struct ChipDetection: Sendable {
         let chipName: String
@@ -226,7 +229,9 @@ enum SensorRegistry {
         let cpuCores = cpuCoreSensors(from: sensors).count
         let gpuCores = gpuCoreSensors(from: sensors).count
         let hasSummary = keys.contains("TCMz") || keys.contains("TCMb")
-        let hasFanControl = fans.contains { $0.maxRPM > $0.minRPM }
+        // Mystral forces every fan it drives, so a fan still in automatic mode means the
+        // SMC did not accept manual control (or the helper hasn't applied it yet).
+        let hasFanControl = fans.contains { $0.maxRPM > $0.minRPM && $0.mode == .forced }
 
         let sysName = HardwareInfo.chipName()
         let chipName = sysName.isEmpty ? (cpuCores > 0 ? "Apple Silicon" : "Unknown") : sysName
@@ -285,7 +290,6 @@ enum SensorRegistry {
         return lines.joined(separator: "\n")
     }
 }
-
 
 /// Keeps per-sensor temperature history across ticks.
 ///

@@ -47,4 +47,16 @@ final class ViewConstructionTests: XCTestCase {
         _ = SparklineView(data: [45, 50, 55]).body
         _ = SparklineView(data: [45]).body
     }
+
+    func testEnumLocalizedNames() {
+        for mode in MenuBarDisplayMode.allCases {
+            _ = mode.localizedName
+        }
+        for source in MenuBarTempSource.allCases {
+            _ = source.localizedName
+        }
+        for category in SensorCategory.allCases {
+            _ = category.localizedName
+        }
+    }
 }

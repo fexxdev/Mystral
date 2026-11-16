@@ -20,6 +20,8 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
     case iconAndPower = "Icon + Power"
     case powerOnly = "Power Only"
 
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
+
     var showsIcon: Bool {
         switch self {
         case .iconOnly, .iconAndTemperature, .iconAndRPM, .iconAndProfile, .iconAndPower: return true
@@ -34,6 +36,8 @@ enum MenuBarTempSource: String, CaseIterable, Codable {
     case gpuAverage = "GPU Average"
     case gpuMax = "GPU Max"
     case hottest = "Hottest Sensor"
+
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 @Observable
@@ -178,7 +182,7 @@ final class MenuBarManager {
 
         liveProfileItems = []
         for profile in profileManager.allProfiles {
-            let item = NSMenuItem(title: profile.name, action: #selector(selectProfile(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: profile.displayName, action: #selector(selectProfile(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = profile.id
             if profile.id == profileManager.activeProfileId { item.state = .on }
@@ -187,13 +191,13 @@ final class MenuBarManager {
         }
         menu.addItem(.separator())
 
-        let openItem = NSMenuItem(title: "Open Mystral", action: #selector(openApp), keyEquivalent: "o")
+        let openItem = NSMenuItem(title: String(localized: "Open Mystral"), action: #selector(openApp), keyEquivalent: "o")
         openItem.target = self
         menu.addItem(openItem)
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: String(localized: "Quit"), action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
@@ -311,7 +315,7 @@ final class MenuBarManager {
             button.title = prefix + rpmString()
         case .iconAndProfile:
             if let profile = profileManager.activeProfile {
-                button.title = prefix + profile.name
+                button.title = prefix + profile.displayName
             } else {
                 button.title = ""
             }

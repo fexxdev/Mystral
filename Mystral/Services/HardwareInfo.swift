@@ -21,16 +21,4 @@ enum HardwareInfo {
         let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
         return String(decoding: bytes, as: UTF8.self)
     }
-
-    /// Models where Apple firmware-locks SMC fan control on macOS Sequoia+.
-    /// Source: github.com/crystalidea/macs-fan-control/issues/785 (M3/M4 Pro & Max MacBook Pros).
-    private static let firmwareLockedModels: Set<String> = [
-        "MacBookPro20,2", "MacBookPro20,3", "MacBookPro20,4",
-        "MacBookPro20,5", "MacBookPro20,6", "MacBookPro20,7",
-        "MacBookPro21,2", "MacBookPro21,3", "MacBookPro21,4", "MacBookPro21,5"
-    ]
-
-    static var isFirmwareLocked: Bool {
-        firmwareLockedModels.contains(modelIdentifier())
-    }
 }

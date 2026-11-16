@@ -12,6 +12,8 @@ struct SettingsView: View {
     let updateChecker: UpdateChecker?
 
     @State private var launchAtLogin = false
+    @State private var language = AppLanguage.current()
+    @State private var showLanguageRestartPrompt = false
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
     @State private var tempSource: MenuBarTempSource = .cpuAverage
     @State private var pollingInterval: Double = 2.0
@@ -40,7 +42,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             chipSection
-            if HardwareInfo.isFirmwareLocked { firmwareLockSection }
             generalSection
             menuBarSection
             monitoringSection
@@ -55,6 +56,14 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .onAppear { loadSettings() }
+        .alert("Restart Mystral now?", isPresented: $showLanguageRestartPrompt) {
+            Button("Restart Now") {
+                AppRelauncher.relaunch(arguments: [AppRelauncher.openSettingsArgument])
+            }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("The new language takes effect when Mystral restarts. Fans return to automatic control for a moment.")
+        }
     }
 
     private var chipSection: some View {
@@ -79,39 +88,29 @@ struct SettingsView: View {
         }
     }
 
-    private var firmwareLockSection: some View {
-        Section {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.orange)
-                    .font(.title2)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Limited fan control on this Mac")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Apple firmware-locks manual fan control on M3/M4 Pro/Max MacBook Pros running macOS Sequoia and later. No third-party app — including Mystral, Macs Fan Control, or iStat — can override this.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Link("Read more", destination: URL(string: "https://github.com/crystalidea/macs-fan-control/issues/785")!)
-                        .font(.caption)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
     private var generalSection: some View {
         Section("General") {
             Toggle("Launch at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, newValue in setLaunchAtLogin(newValue) }
+            Picker("Language", selection: $language) {
+                Text("System").tag(AppLanguage.system)
+                ForEach(AppLanguage.allCases.filter { $0 != .system }) { language in
+                    Text(verbatim: language.nativeName).tag(language)
+                }
+            }
+            .onChange(of: language) { _, newValue in
+                logger.info("Settings: language changed to \(newValue.rawValue.isEmpty ? "system" : newValue.rawValue, privacy: .public)")
+                newValue.apply()
+                showLanguageRestartPrompt = true
+            }
+            captionText("System follows the macOS language. A change applies after Mystral restarts.")
         }
     }
 
     private var menuBarSection: some View {
         Section("Menu Bar") {
             Picker("Display mode", selection: $displayMode) {
-                ForEach(MenuBarDisplayMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                ForEach(MenuBarDisplayMode.allCases, id: \.self) { Text($0.localizedName).tag($0) }
             }
             .onChange(of: displayMode) { _, newValue in
                 logger.info("Settings: displayMode picker changed to \(newValue.rawValue, privacy: .public)")
@@ -122,7 +121,7 @@ struct SettingsView: View {
             }
             if displayMode == .iconAndTemperature || displayMode == .temperatureOnly {
                 Picker("Temperature source", selection: $tempSource) {
-                    ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(MenuBarTempSource.allCases, id: \.self) { Text($0.localizedName).tag($0) }
                 }
                 .onChange(of: tempSource) { _, newValue in
                     logger.info("Settings: tempSource picker changed to \(newValue.rawValue, privacy: .public)")
@@ -313,9 +312,10 @@ struct SettingsView: View {
 
     private var unknownStatusText: String {
         if let last = updateChecker?.lastCheckedAt {
-            return "Last checked \(Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date()))"
+            let relative = Self.relativeDateFormatter.localizedString(for: last, relativeTo: Date())
+            return String(localized: "Last checked \(relative)")
         }
-        return "Not checked yet"
+        return String(localized: "Not checked yet")
     }
 
     private var diagnosticsSection: some View {
@@ -323,7 +323,7 @@ struct SettingsView: View {
             stressTestRow
             Button("Export SMC Data for Developer") { exportSMCData() }
             if let msg = exportMessage {
-                captionText(msg)
+                captionText(verbatim: msg)
             }
         }
     }
@@ -376,7 +376,7 @@ struct SettingsView: View {
         }
     }
 
-    private func sliderRow(title: String, value: Binding<Double>, in range: ClosedRange<Double>, step: Double, valueText: String) -> some View {
+    private func sliderRow(title: LocalizedStringKey, value: Binding<Double>, in range: ClosedRange<Double>, step: Double, valueText: String) -> some View {
         HStack(spacing: 12) {
             Text(title)
                 .frame(minWidth: 160, alignment: .leading)
@@ -388,14 +388,21 @@ struct SettingsView: View {
         }
     }
 
-    private func captionText(_ text: String) -> some View {
+    private func captionText(_ text: LocalizedStringKey) -> some View {
         Text(text)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func statusRow(title: String, ok: Bool, okText: String, badText: String, badColor: Color) -> some View {
+    private func captionText(verbatim text: String) -> some View {
+        Text(verbatim: text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func statusRow(title: LocalizedStringKey, ok: Bool, okText: LocalizedStringKey, badText: LocalizedStringKey, badColor: Color) -> some View {
         LabeledContent(title) {
             HStack(spacing: 4) {
                 Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -414,9 +421,9 @@ struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 try content.write(to: url, atomically: true, encoding: .utf8)
-                exportMessage = "Exported to \(url.lastPathComponent)"
+                exportMessage = String(localized: "Exported to \(url.lastPathComponent)")
             } catch {
-                exportMessage = "Export failed: \(error.localizedDescription)"
+                exportMessage = String(localized: "Export failed: \(error.localizedDescription)")
             }
         }
     }

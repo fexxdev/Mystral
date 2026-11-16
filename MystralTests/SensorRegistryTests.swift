@@ -59,8 +59,13 @@ final class SensorRegistryTests: XCTestCase {
             Sensor(id: "Tp01", name: "P1", temperature: 60),
             Sensor(id: "TCMz", name: "CPU Max", temperature: 65)
         ]
-        let fans = [Fan(id: 0, name: "Fan", currentRPM: 0, targetRPM: 0, minRPM: 1000, maxRPM: 5000, mode: .auto)]
+        let fans = [Fan(id: 0, name: "Fan", currentRPM: 0, targetRPM: 0, minRPM: 1000, maxRPM: 5000, mode: .forced)]
         XCTAssertTrue(SensorRegistry.detectChip(sensors: sensors, fans: fans).hasFanControl)
+    }
+
+    func testFanLeftInAutoModeIsNotUnderControl() {
+        let fans = [Fan(id: 0, name: "Fan", currentRPM: 2500, targetRPM: 2500, minRPM: 1000, maxRPM: 5000, mode: .auto)]
+        XCTAssertFalse(SensorRegistry.detectChip(sensors: [], fans: fans).hasFanControl)
     }
 
     // MARK: - Plausible readings

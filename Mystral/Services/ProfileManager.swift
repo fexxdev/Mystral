@@ -139,7 +139,7 @@ final class ProfileManager {
     }
 
     func duplicateAsCustom(_ preset: Profile) throws -> Profile {
-        let copy = Profile(name: "\(preset.name) (Custom)", icon: preset.icon, isPreset: false,
+        let copy = Profile(name: String(localized: "\(preset.displayName) (Custom)"), icon: preset.icon, isPreset: false,
                            curvePoints: preset.curvePoints, sensorKey: preset.sensorKey)
         try saveCustomProfile(copy)
         return copy

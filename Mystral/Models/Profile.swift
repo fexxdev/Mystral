@@ -41,6 +41,16 @@ enum ProfileTrigger: Codable, Equatable, Sendable {
     enum PowerSource: String, Codable, Sendable, CaseIterable { case ac, battery }
     enum ThermalLevel: String, Codable, Sendable, CaseIterable {
         case nominal, fair, serious, critical
+
+        /// Name shown in the UI. Matches the catalog keys used by the "Add Trigger" menu.
+        var localizedName: String {
+            switch self {
+            case .nominal: String(localized: "Nominal")
+            case .fair: String(localized: "Fair")
+            case .serious: String(localized: "Serious")
+            case .critical: String(localized: "Critical")
+            }
+        }
     }
 }
 
@@ -72,6 +82,13 @@ struct Profile: Codable, Identifiable, Equatable, Sendable {
         self.sensorKey = sensorKey
         self.fanCurves = fanCurves
         self.triggers = triggers
+    }
+
+    /// Name shown in the UI. Preset names ("Silent", "Balanced", ...) are catalog keys
+    /// and get translated; custom profile names are the user's own text and stay as typed.
+    /// `name` itself is never localized: it is persisted and used to look presets up.
+    var displayName: String {
+        isPreset ? Bundle.main.localizedString(forKey: name, value: name, table: nil) : name
     }
 
     func curve(for fanIndex: Int) -> [CurvePoint] {
