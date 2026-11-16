@@ -10,7 +10,8 @@
 
 - [ ] `xcodebuild test -project Mystral.xcodeproj -scheme Mystral -destination 'platform=macOS'` passes
 - [ ] Manually verified on Apple Silicon hardware
-- [ ] No new SwiftLint warnings (if applicable)
+- [ ] `xcodegen generate` leaves `Mystral.xcodeproj` unchanged
+- [ ] CHANGELOG updated under **Unreleased** (if users will notice)
 
 ## Screenshots / video (UI changes)
 
