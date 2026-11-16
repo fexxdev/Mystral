@@ -95,6 +95,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         updateChecker = UpdateChecker()
         updateChecker!.runAutoCheckIfNeeded()
+
+        // Relaunched from Settings (e.g. after a language change): reopen where the user was.
+        if ProcessInfo.processInfo.arguments.contains(AppRelauncher.openSettingsArgument) {
+            openMainWindow(section: .settings)
+        }
         logger.info("applicationDidFinishLaunching — complete")
     }
 
@@ -167,7 +172,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         fanController?.stop()
     }
 
-    func openMainWindow() {
+    func openMainWindow(section: SidebarItem = .dashboard) {
         logger.info("openMainWindow — existing window=\(self.window != nil, privacy: .public)")
         if let window = window {
             window.makeKeyAndOrderFront(nil)
@@ -181,7 +186,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             profileManager: profileManager!,
             alertManager: alertManager,
             autoSwitcher: autoSwitcher,
-            updateChecker: updateChecker
+            updateChecker: updateChecker,
+            initialSelection: section
         )
 
         let window = NSWindow(

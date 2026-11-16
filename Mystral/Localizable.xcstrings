@@ -1760,6 +1760,22 @@
         }
       }
     },
+    "Language" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lingua"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言"
+          }
+        }
+      }
+    },
     "Last 5 Minutes" : {
       "localizations" : {
         "it" : {
@@ -1788,6 +1804,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上次检查：%@"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Più Tardi"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "稍后"
           }
         }
       }
@@ -2614,6 +2646,38 @@
         }
       }
     },
+    "Restart Mystral now?" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavviare Mystral ora?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在重新启动 Mystral 吗？"
+          }
+        }
+      }
+    },
+    "Restart Now" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia Ora"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重新启动"
+          }
+        }
+      }
+    },
     "Retry" : {
       "localizations" : {
         "it" : {
@@ -2905,6 +2969,38 @@
         }
       }
     },
+    "System" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come il sistema"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随系统"
+          }
+        }
+      }
+    },
+    "System follows the macOS language. A change applies after Mystral restarts." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Come il sistema» usa la lingua di macOS. La modifica si applica al riavvio di Mystral."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“跟随系统”使用 macOS 的语言。更改将在 Mystral 重新启动后生效。"
+          }
+        }
+      }
+    },
     "TCMz / %lld cores" : {
       "localizations" : {
         "it" : {
@@ -3046,6 +3142,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "温度来源"
+          }
+        }
+      }
+    },
+    "The new language takes effect when Mystral restarts. Fans return to automatic control for a moment." : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La nuova lingua si applica al riavvio di Mystral. Durante il riavvio le ventole tornano per un attimo al controllo automatico."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新语言将在 Mystral 重新启动后生效。重启期间，风扇会短暂恢复为自动控制。"
           }
         }
       }

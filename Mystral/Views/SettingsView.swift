@@ -12,6 +12,8 @@ struct SettingsView: View {
     let updateChecker: UpdateChecker?
 
     @State private var launchAtLogin = false
+    @State private var language = AppLanguage.current()
+    @State private var showLanguageRestartPrompt = false
     @State private var displayMode: MenuBarDisplayMode = .iconOnly
     @State private var tempSource: MenuBarTempSource = .cpuAverage
     @State private var pollingInterval: Double = 2.0
@@ -55,6 +57,14 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .onAppear { loadSettings() }
+        .alert("Restart Mystral now?", isPresented: $showLanguageRestartPrompt) {
+            Button("Restart Now") {
+                AppRelauncher.relaunch(arguments: [AppRelauncher.openSettingsArgument])
+            }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("The new language takes effect when Mystral restarts. Fans return to automatic control for a moment.")
+        }
     }
 
     private var chipSection: some View {
@@ -105,6 +115,18 @@ struct SettingsView: View {
         Section("General") {
             Toggle("Launch at login", isOn: $launchAtLogin)
                 .onChange(of: launchAtLogin) { _, newValue in setLaunchAtLogin(newValue) }
+            Picker("Language", selection: $language) {
+                Text("System").tag(AppLanguage.system)
+                ForEach(AppLanguage.allCases.filter { $0 != .system }) { language in
+                    Text(verbatim: language.nativeName).tag(language)
+                }
+            }
+            .onChange(of: language) { _, newValue in
+                logger.info("Settings: language changed to \(newValue.rawValue.isEmpty ? "system" : newValue.rawValue, privacy: .public)")
+                newValue.apply()
+                showLanguageRestartPrompt = true
+            }
+            captionText("System follows the macOS language. A change applies after Mystral restarts.")
         }
     }
 

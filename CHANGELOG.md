@@ -8,6 +8,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ### Added
 - Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories (thanks @huangyixin447).
+- **Language** picker in Settings → General: System, English, Italiano or 简体中文. It sets Mystral's own language (the same setting as System Settings → Language & Region → Applications) and offers to restart, reopening on Settings.
 
 ### Fixed
 - Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.

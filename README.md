@@ -63,7 +63,7 @@ macOS keeps Apple Silicon fans quiet until the chip is already hot. Mystral lets
 - Hardened runtime, a root-owned app bundle, and a private IPC directory between the app and the helper.
 
 ### 🌍 Languages
-English, Italiano and 简体中文. Mystral follows your macOS language. [Help translate it](CONTRIBUTING.md#translations).
+English, Italiano and 简体中文. Mystral follows your macOS language, or pick one in **Settings → General → Language**; Mystral offers to restart and reopens on Settings. [Help translate it](CONTRIBUTING.md#translations).
 
 ## Screenshots
 
@@ -112,7 +112,7 @@ Mystral now sits in the menu bar. Your profiles are saved in `~/Library/Applicat
 | **Sensors** | Browse, search, sort and filter every temperature sensor |
 | **Fans** | Live RPM per fan, manual override |
 | **Profiles** | Pick a preset, create custom curves, set per-fan curves and auto-switch triggers |
-| **Settings** | Launch at login, menu bar display, polling interval (2/5/10 s), fan behaviour, alerts, updates, diagnostics |
+| **Settings** | Launch at login, language, menu bar display, polling interval (2/5/10 s), fan behaviour, alerts, updates, diagnostics |
 
 ### Preset profiles
 

@@ -59,9 +59,10 @@ All UI text lives in `Mystral/Localizable.xcstrings`. Mystral ships English (sou
 
 To add a language:
 1. Open the project in Xcode, select `Localizable.xcstrings`, click **+** and pick the language.
-2. Translate every string. Keep format specifiers (`%@`, `%lld`); when the word order changes, use positional ones (`%1$@`, `%2$lld`).
-3. Run `xcodegen generate`. XcodeGen picks the new language up from the catalog and adds it to the project's known regions.
-4. Run the tests and check the app with `-AppleLanguages '(xx)'` in the scheme's launch arguments.
+2. Add a case to `AppLanguage` (`Mystral/Services/AppLanguage.swift`) with the language's own name, so it shows up in the Settings picker. A test fails if the picker and the shipped languages disagree.
+3. Translate every string. Keep format specifiers (`%@`, `%lld`); when the word order changes, use positional ones (`%1$@`, `%2$lld`).
+4. Run `xcodegen generate`. XcodeGen picks the new language up from the catalog and adds it to the project's known regions.
+5. Run the tests and check the app in Settings → General → Language, or with `-AppleLanguages '(xx)'` in the scheme's launch arguments.
 
 Writing new UI code:
 - Pass string literals straight to SwiftUI (`Text("Fans")`, `Button("Retry")`): they are looked up automatically.

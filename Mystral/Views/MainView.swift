@@ -30,8 +30,24 @@ struct MainView: View {
     let alertManager: AlertManager?
     let autoSwitcher: ProfileAutoSwitcher?
     let updateChecker: UpdateChecker?
-    @State private var selectedItem: SidebarItem = .dashboard
+    @State private var selectedItem: SidebarItem
     @State private var isSidebarVisible = true
+
+    init(
+        fanController: FanController,
+        profileManager: ProfileManager,
+        alertManager: AlertManager?,
+        autoSwitcher: ProfileAutoSwitcher?,
+        updateChecker: UpdateChecker?,
+        initialSelection: SidebarItem = .dashboard
+    ) {
+        self.fanController = fanController
+        self.profileManager = profileManager
+        self.alertManager = alertManager
+        self.autoSwitcher = autoSwitcher
+        self.updateChecker = updateChecker
+        _selectedItem = State(initialValue: initialSelection)
+    }
 
     var body: some View {
         NavigationStack {

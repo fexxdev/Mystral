@@ -21,6 +21,7 @@
 		30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */; };
 		3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */; };
 		3BB787CFA3AB97F1DFDF5CB4 /* UpdateSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A0A7E5C6E56BB0C0A77FA5 /* UpdateSignature.swift */; };
+		3D66717DD0F5B7FE2463E52D /* AppLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5774E3FFA6A27C0B9927E018 /* AppLanguageTests.swift */; };
 		41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64319980C33FE2804285A28 /* UpdateChecker.swift */; };
 		46532E2210160C677CFBC603 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CC93D0D514DBB473923BF1 /* Profile.swift */; };
 		4D3378D6C1660AF0E379224E /* UpdateSignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B39A3D6752D10F44A62CEB /* UpdateSignatureTests.swift */; };
@@ -63,7 +64,9 @@
 		E8B5AC4AE236301F73984345 /* FanController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EA4F8C6E8D825A5768015E /* FanController.swift */; };
 		EBD1DD4A2391005EE603140D /* IOReportPower.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DA23ACC945EF50541CBE01 /* IOReportPower.swift */; };
 		F043C27F29A95684188E630A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1492F8F118B5D2787454874D /* SettingsView.swift */; };
+		F37A65C45E16DC4F9FE3BA49 /* AppRelauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3854DF0A42EADDE116072B8 /* AppRelauncher.swift */; };
 		F685D8F6FB3BB488202500E1 /* ProfileAdvancedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */; };
+		F7DB048904ED9A9CB7695B4A /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587657CE2DEBBC42E0567FD /* AppLanguage.swift */; };
 		FF405D1DFA0A96D97798D6C5 /* ProfileModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -89,6 +92,7 @@
 		1FBEA945FBF763ACAC29A811 /* CurveEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveEditorView.swift; sourceTree = "<group>"; };
 		20B84A99260FBBACE9652B11 /* MystralTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MystralTests.swift; sourceTree = "<group>"; };
 		21528C9AA6134E47C14493CB /* PrivilegedShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedShell.swift; sourceTree = "<group>"; };
+		2587657CE2DEBBC42E0567FD /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		2756ACA2BDCBD906498224B7 /* PrivilegedInstallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedInstallTests.swift; sourceTree = "<group>"; };
 		2A73DF33BB8A7747E548544D /* SMCIPC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCIPC.swift; sourceTree = "<group>"; };
 		31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAutoSwitcher.swift; sourceTree = "<group>"; };
@@ -101,6 +105,7 @@
 		53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertManagerTests.swift; sourceTree = "<group>"; };
 		54DA23ACC945EF50541CBE01 /* IOReportPower.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPower.swift; sourceTree = "<group>"; };
 		556B7FA0DE1F8CA6CD570D9D /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		5774E3FFA6A27C0B9927E018 /* AppLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguageTests.swift; sourceTree = "<group>"; };
 		641F2E94829E26BDED1D3BEF /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		64B39A3D6752D10F44A62CEB /* UpdateSignatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSignatureTests.swift; sourceTree = "<group>"; };
 		68D77E008E65777E4C46736B /* ViewConstructionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewConstructionTests.swift; sourceTree = "<group>"; };
@@ -133,6 +138,7 @@
 		D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMCServiceTests.swift; sourceTree = "<group>"; };
 		D9EA4F8C6E8D825A5768015E /* FanController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanController.swift; sourceTree = "<group>"; };
 		DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitorTests.swift; sourceTree = "<group>"; };
+		E3854DF0A42EADDE116072B8 /* AppRelauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRelauncher.swift; sourceTree = "<group>"; };
 		E421B4BADAD871CBC640E4A0 /* ProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilesView.swift; sourceTree = "<group>"; };
 		E89A1E7CBCF574962A0046CD /* ProfileAdvancedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileAdvancedTests.swift; sourceTree = "<group>"; };
 		EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOReportPowerTests.swift; sourceTree = "<group>"; };
@@ -193,6 +199,8 @@
 			isa = PBXGroup;
 			children = (
 				AE7DD7E0E7A61390B45908D9 /* AlertManager.swift */,
+				2587657CE2DEBBC42E0567FD /* AppLanguage.swift */,
+				E3854DF0A42EADDE116072B8 /* AppRelauncher.swift */,
 				FC04DA554248F4188EAE49FB /* AppSettings.swift */,
 				D9EA4F8C6E8D825A5768015E /* FanController.swift */,
 				6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */,
@@ -260,6 +268,7 @@
 			isa = PBXGroup;
 			children = (
 				53F74C10F19280F09F35CAFA /* AlertManagerTests.swift */,
+				5774E3FFA6A27C0B9927E018 /* AppLanguageTests.swift */,
 				7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */,
 				0CCC71C9AEBA3D6DC9BB66D8 /* FanModelTests.swift */,
 				EFEF813E6B23F5657EE07821 /* IOReportPowerTests.swift */,
@@ -378,6 +387,8 @@
 			files = (
 				D26E077786FEE88922BE207D /* AlertManager.swift in Sources */,
 				6667E72A957BD3FD5ED320B6 /* AppDelegate.swift in Sources */,
+				F7DB048904ED9A9CB7695B4A /* AppLanguage.swift in Sources */,
+				F37A65C45E16DC4F9FE3BA49 /* AppRelauncher.swift in Sources */,
 				716581699959180CBAE22539 /* AppSettings.swift in Sources */,
 				656C56239CD0755E5D131427 /* CurveEditorView.swift in Sources */,
 				6E00FE4CD7801F690CD1A4A4 /* DashboardView.swift in Sources */,
@@ -416,6 +427,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				76E19A16214C1D92B7A71E92 /* AlertManagerTests.swift in Sources */,
+				3D66717DD0F5B7FE2463E52D /* AppLanguageTests.swift in Sources */,
 				3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */,
 				D67BD88E19F47CDF1635A88C /* FanModelTests.swift in Sources */,
 				911DF981B9CB2B7D1E76375B /* IOReportPowerTests.swift in Sources */,
