@@ -219,12 +219,16 @@ enum SensorRegistry {
     struct ChipDetection: Sendable {
         let chipName: String
         let isSupported: Bool
-        let cpuCoreCount: Int
-        let gpuCoreCount: Int
+        /// Physical cores, from the system (0 when unknown).
+        let cores: HardwareInfo.CoreCounts
+        /// SMC temperature keys Mystral reads for the CPU and GPU; not core counts.
+        let cpuSensorCount: Int
+        let gpuSensorCount: Int
         let hasFanControl: Bool
     }
 
-    static func detectChip(sensors: [Sensor], fans: [Fan]) -> ChipDetection {
+    static func detectChip(sensors: [Sensor], fans: [Fan],
+                           cores: HardwareInfo.CoreCounts = HardwareInfo.coreCounts) -> ChipDetection {
         let keys = Set(sensors.map(\.id))
         let cpuCores = cpuCoreSensors(from: sensors).count
         let gpuCores = gpuCoreSensors(from: sensors).count
@@ -239,8 +243,9 @@ enum SensorRegistry {
         return ChipDetection(
             chipName: chipName,
             isSupported: hasSummary && cpuCores > 0,
-            cpuCoreCount: cpuCores,
-            gpuCoreCount: gpuCores,
+            cores: cores,
+            cpuSensorCount: cpuCores,
+            gpuSensorCount: gpuCores,
             hasFanControl: hasFanControl
         )
     }
@@ -254,7 +259,8 @@ enum SensorRegistry {
 
         let chip = detectChip(sensors: sensors, fans: fans)
         lines.append("Detected chip: \(chip.chipName)")
-        lines.append("CPU cores: \(chip.cpuCoreCount), GPU cores: \(chip.gpuCoreCount)")
+        lines.append("CPU cores: \(chip.cores.total) (P \(chip.cores.performance), E \(chip.cores.efficiency)), GPU cores: \(chip.cores.gpu)")
+        lines.append("CPU sensors: \(chip.cpuSensorCount), GPU sensors: \(chip.gpuSensorCount)")
         lines.append("Supported: \(chip.isSupported)")
         lines.append("")
 

@@ -69,8 +69,8 @@ struct SettingsView: View {
     private var chipSection: some View {
         Section("Chip Detection") {
             LabeledContent("Detected chip", value: chipDetection.chipName)
-            LabeledContent("CPU cores", value: "\(chipDetection.cpuCoreCount)")
-            LabeledContent("GPU cores", value: "\(chipDetection.gpuCoreCount)")
+            LabeledContent("CPU cores", value: Self.cpuCoresText(chipDetection.cores))
+            LabeledContent("GPU cores", value: chipDetection.cores.gpu > 0 ? "\(chipDetection.cores.gpu)" : "—")
             statusRow(
                 title: "Sensor coverage",
                 ok: chipDetection.isSupported,
@@ -386,6 +386,13 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 60, alignment: .trailing)
         }
+    }
+
+    /// "11 (5 P + 6 E)" on a hybrid chip, the plain count otherwise, "—" when unknown.
+    static func cpuCoresText(_ cores: HardwareInfo.CoreCounts) -> String {
+        guard cores.total > 0 else { return "—" }
+        guard cores.performance > 0, cores.efficiency > 0 else { return "\(cores.total)" }
+        return "\(cores.total) (\(cores.performance) P + \(cores.efficiency) E)"
     }
 
     private func captionText(_ text: LocalizedStringKey) -> some View {

@@ -60,18 +60,18 @@
     "%lld RPM" : {
       "shouldTranslate" : false
     },
-    "%lld cores" : {
+    "%lld sensors" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld core"
+            "value" : "%lld sensori"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld 个核心"
+            "value" : "%lld 个传感器"
           }
         }
       }
@@ -638,22 +638,6 @@
         }
       }
     },
-    "CPU Cores" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core CPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CPU 核心"
-          }
-        }
-      }
-    },
     "CPU E-Cores" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -701,6 +685,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU 性能核心"
+          }
+        }
+      }
+    },
+    "CPU Sensors" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensori CPU"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU 传感器"
           }
         }
       }
@@ -1475,22 +1475,6 @@
         }
       }
     },
-    "GPU Cores" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core GPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPU 核心"
-          }
-        }
-      }
-    },
     "GPU Max" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1504,6 +1488,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GPU 最高温度"
+          }
+        }
+      }
+    },
+    "GPU Sensors" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensori GPU"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU 传感器"
           }
         }
       }
@@ -2947,18 +2947,18 @@
         }
       }
     },
-    "TCMz / %lld cores" : {
+    "TCMz / %lld sensors" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "TCMz / %lld core"
+            "value" : "TCMz / %lld sensori"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "TCMz / %lld 个核心"
+            "value" : "TCMz / %lld 个传感器"
           }
         }
       }

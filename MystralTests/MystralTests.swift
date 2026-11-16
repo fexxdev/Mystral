@@ -10,7 +10,8 @@ final class MystralTests: XCTestCase {
                 "smoothingEnabled", "smoothingAlpha", "deadbandPercent",
                 "minimumFanPercentage", "aggressiveOverrideEnabled",
                 "alertsEnabled", "alertsHighTempThreshold", "alertsFanStuckEnabled",
-                "autoSwitchEnabled", "updatesAutoCheckEnabled", "updatesLastCheckedAt"
+                "autoSwitchEnabled", "updatesAutoCheckEnabled", "updatesLastCheckedAt",
+                "dashboardCpuSensorsExpanded", "dashboardGpuSensorsExpanded"
             ])
         )
     }

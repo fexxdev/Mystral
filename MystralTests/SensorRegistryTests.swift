@@ -132,4 +132,31 @@ final class SensorRegistryTests: XCTestCase {
             if t == 4 { XCTAssertEqual(s[0].history, [42, 43, 44]) }
         }
     }
+
+    // MARK: - Physical cores vs sensors
+
+    /// An M3 Pro reports 48 `Tp` keys and 18 `Tg` keys, but has 11 CPU and 14 GPU cores.
+    func testDetectChipReportsPhysicalCoresNotSensorKeys() {
+        let sensors = (0..<48).map { Sensor(id: String(format: "Tp%02X", $0), name: "", temperature: 45) }
+            + [Sensor(id: "TCMz", name: "CPU Max", temperature: 50)]
+        let cores = HardwareInfo.CoreCounts(performance: 5, efficiency: 6, total: 11, gpu: 14)
+        let chip = SensorRegistry.detectChip(sensors: sensors, fans: [], cores: cores)
+        XCTAssertEqual(chip.cores, cores)
+        XCTAssertEqual(chip.cpuSensorCount, 48)
+    }
+
+    func testCpuCoresText() {
+        XCTAssertEqual(SettingsView.cpuCoresText(.init(performance: 5, efficiency: 6, total: 11, gpu: 14)), "11 (5 P + 6 E)")
+        XCTAssertEqual(SettingsView.cpuCoresText(.init(performance: 0, efficiency: 0, total: 8, gpu: 0)), "8")
+        XCTAssertEqual(SettingsView.cpuCoresText(.unknown), "—")
+    }
+
+    /// Apple Silicon has no SMT: every core is either a P-core or an E-core.
+    func testThisMacReportsConsistentCoreCounts() {
+        let cores = HardwareInfo.coreCounts
+        XCTAssertGreaterThan(cores.total, 0)
+        if cores.performance > 0, cores.efficiency > 0 {
+            XCTAssertEqual(cores.performance + cores.efficiency, cores.total)
+        }
+    }
 }

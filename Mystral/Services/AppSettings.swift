@@ -6,7 +6,8 @@ enum AppSettings {
         "smoothingEnabled", "smoothingAlpha", "deadbandPercent",
         "minimumFanPercentage", "aggressiveOverrideEnabled",
         "alertsEnabled", "alertsHighTempThreshold", "alertsFanStuckEnabled",
-        "autoSwitchEnabled", "updatesAutoCheckEnabled", "updatesLastCheckedAt"
+        "autoSwitchEnabled", "updatesAutoCheckEnabled", "updatesLastCheckedAt",
+        "dashboardCpuSensorsExpanded", "dashboardGpuSensorsExpanded"
     ]
 
     static func reset(_ defaults: UserDefaults = .standard) {

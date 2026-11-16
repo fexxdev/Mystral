@@ -11,6 +11,8 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 - **Language** picker in Settings → General: System, English, Italiano or 简体中文. It sets Mystral's own language (the same setting as System Settings → Language & Region → Applications) and offers to restart, reopening on Settings.
 
 ### Fixed
+- **Settings → Chip Detection** shows the real number of CPU cores (performance and efficiency) and GPU cores, read from the system. It used to show the number of SMC temperature sensors, for example 48 CPU and 18 GPU "cores" on an 11-core, 14-GPU-core M3 Pro (thanks @huangyixin447 for the approach).
+- The Dashboard grids and temperature cards say **sensors** instead of **cores**, since each square is an SMC sensor, not a core. The grids are open by default and remember whether you closed them.
 - Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
 - Italian: restored the parts of several Settings and Profiles explanations that were cut short.
 - Removed the firmware-lock warning for M3/M4 Pro and Max MacBook Pros. Its model list used identifiers no Mac has (`MacBookPro20,x`, `MacBookPro21,x`), so it never appeared, and manual fan control does work on an M3 Pro (`Mac15,6`) running macOS 27.

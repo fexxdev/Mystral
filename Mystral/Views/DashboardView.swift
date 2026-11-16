@@ -4,8 +4,9 @@ import Charts
 struct DashboardView: View {
     let fanController: FanController
     let profileManager: ProfileManager
-    @State private var cpuCoresExpanded = false
-    @State private var gpuCoresExpanded = false
+    // Open by default so every sensor is visible at a glance; the choice is remembered.
+    @AppStorage("dashboardCpuSensorsExpanded") private var cpuCoresExpanded = true
+    @AppStorage("dashboardGpuSensorsExpanded") private var gpuCoresExpanded = true
 
     private var cpuCoreSensors: [Sensor] {
         SensorRegistry.cpuCoreSensors(from: fanController.sensors)
@@ -85,9 +86,9 @@ struct DashboardView: View {
         VStack(spacing: 16) {
             HStack(spacing: 20) {
                 TemperatureCard(title: "CPU", max: cpuMax, avg: cpuAvg,
-                                sensorLabel: "TCMz / \(cpuCoreSensors.count) cores")
+                                sensorLabel: "TCMz / \(cpuCoreSensors.count) sensors")
                 TemperatureCard(title: "GPU", max: gpuMax, avg: gpuAvg,
-                                sensorLabel: "\(gpuCoreSensors.count) cores")
+                                sensorLabel: "\(gpuCoreSensors.count) sensors")
             }
 
             if !cpuSummary.isEmpty {
@@ -107,11 +108,11 @@ struct DashboardView: View {
             }
 
             if !cpuCoreSensors.isEmpty {
-                coreGrid(title: "CPU Cores", sensors: cpuCoreSensors, isExpanded: $cpuCoresExpanded)
+                coreGrid(title: "CPU Sensors", sensors: cpuCoreSensors, isExpanded: $cpuCoresExpanded)
             }
 
             if !gpuCoreSensors.isEmpty {
-                coreGrid(title: "GPU Cores", sensors: gpuCoreSensors, isExpanded: $gpuCoresExpanded)
+                coreGrid(title: "GPU Sensors", sensors: gpuCoreSensors, isExpanded: $gpuCoresExpanded)
             }
         }
     }
