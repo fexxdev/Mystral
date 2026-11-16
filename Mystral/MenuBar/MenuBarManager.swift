@@ -229,7 +229,7 @@ final class MenuBarManager {
             item.title = "GPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
         }
         if let item = livePowerItem, let w = powerMonitor.totalWatts {
-            item.title = "Power  \(Int(w.rounded())) W"
+            item.title = "Power  " + PowerMonitor.formatWatts(w)
         }
         if let item = livePowerBreakdownItem,
            let text = Self.formatPowerBreakdown(cpu: powerMonitor.cpuWatts, gpu: powerMonitor.gpuWatts) {
@@ -251,15 +251,15 @@ final class MenuBarManager {
         return item
     }
 
-    nonisolated static func formatTotalWatts(_ watts: Double?) -> String {
+    nonisolated static func formatTotalWatts(_ watts: Double?, locale: Locale = .current) -> String {
         guard let w = watts, w > 0 else { return "-- W" }
-        return "\(Int(w.rounded())) W"
+        return PowerMonitor.formatWatts(w, locale: locale)
     }
 
-    nonisolated static func formatPowerBreakdown(cpu: Double?, gpu: Double?) -> String? {
+    nonisolated static func formatPowerBreakdown(cpu: Double?, gpu: Double?, locale: Locale = .current) -> String? {
         var parts: [String] = []
-        if let c = cpu, c >= 0 { parts.append("CPU \(Int(c.rounded())) W") }
-        if let g = gpu, g >= 0 { parts.append("GPU \(Int(g.rounded())) W") }
+        if let c = cpu, c >= 0 { parts.append("CPU " + PowerMonitor.formatWatts(c, locale: locale)) }
+        if let g = gpu, g >= 0 { parts.append("GPU " + PowerMonitor.formatWatts(g, locale: locale)) }
         return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
     }
 

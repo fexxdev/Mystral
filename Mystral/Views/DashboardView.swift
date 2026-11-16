@@ -422,7 +422,7 @@ struct PowerCard: View {
                     Spacer()
                     Text("total system").font(.caption2).foregroundStyle(.tertiary)
                 }
-                Text(total.map { "\(Int($0.rounded())) W" } ?? "-- W")
+                Text(verbatim: total.map { PowerMonitor.formatWatts($0) } ?? "-- W")
                     .font(.system(size: 48, weight: .medium, design: .rounded))
                 if showBreakdown, let total {
                     let other = PowerCard.otherWatts(total: total, cpu: cpu, gpu: gpu)
@@ -444,7 +444,7 @@ struct PowerCard: View {
             Circle().fill(color).frame(width: 8, height: 8)
             HStack(spacing: 4) {
                 Text(label)
-                Text(verbatim: value.map { "\(Int($0.rounded())) W" } ?? "--")
+                Text(verbatim: value.map { PowerMonitor.formatWatts($0) } ?? "--")
             }
             .foregroundStyle(.secondary)
         }

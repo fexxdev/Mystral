@@ -65,6 +65,15 @@ final class PowerMonitor {
         watts.isFinite && watts > 0 && watts <= maximumPlausibleTotalWatts
     }
 
+    /// Watts as shown in the UI: one decimal below 10 W, whole watts above.
+    /// An idle Apple Silicon GPU draws tens of milliwatts and the CPU often 1–2 W,
+    /// so rounding to whole watts showed real readings as "0 W" or "1 W".
+    nonisolated static func formatWatts(_ watts: Double, locale: Locale = .current) -> String {
+        let tenths = (watts * 10).rounded() / 10
+        let digits = tenths < 10 ? 1 : 0
+        return watts.formatted(.number.precision(.fractionLength(digits)).locale(locale)) + " W"
+    }
+
     /// Append a value to a rolling history, trimming the oldest samples beyond `maxHistory`.
     nonisolated static func appendCapped(_ value: Double, to history: [Double], maxHistory: Int) -> [Double] {
         var h = history

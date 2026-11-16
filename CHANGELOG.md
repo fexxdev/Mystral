@@ -19,6 +19,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 - On macOS 27, CPU and GPU power are read from the AppleCLPC energy counters, which keep counting where the old source freezes. This covers the 17 Apple Silicon drivers known for macOS 27 (table ported from [macmon](https://github.com/vladkens/macmon), MIT). Other macOS versions and unknown chips keep the old source.
 - While a CPU energy counter stands still, CPU power is shown as unavailable after 6 seconds instead of a false 0 W.
 - A power reading is taken over at least half the polling interval, and the measurement restarts after the Mac wakes from sleep. A total system power reading above 1,500 W is ignored.
+- Power below 10 W is shown with one decimal (for example CPU 1.4 W, GPU 0.1 W) in the menu bar, the dropdown and the Dashboard. Rounding to whole watts showed real idle readings as 0 W or 1 W.
 - The temperature charts no longer dip toward 0 °C. Readings outside 10–130 °C, such as unpopulated SMC rails at 1–3 °C, are ignored. A sensor that drops out for a few ticks keeps its history, and sensors with histories of different lengths are now lined up on their newest sample. They used to be lined up on their oldest, which put recent readings at the wrong time on the dashboard chart and in the menu bar mini graph.
 
 ## [1.1.7] — 2026-11-11
