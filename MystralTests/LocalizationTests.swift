@@ -25,7 +25,8 @@ final class LocalizationTests: XCTestCase {
     /// Enum rawValues and preset names are looked up at runtime, so the compiler never
     /// sees them; the catalog keeps them as manual entries.
     func testRuntimeKeysResolve() {
-        XCTAssertEqual(localized(SensorCategory.cpuPerformance.rawValue, in: "zh-Hans"), "CPU 性能核心")
+        XCTAssertEqual(localized(SensorCategory.board.rawValue, in: "zh-Hans"), "主板")
+        XCTAssertEqual(localized(SensorCategory.soc.rawValue, in: "zh-Hans"), "SoC 芯片")
         XCTAssertEqual(localized(MenuBarDisplayMode.iconOnly.rawValue, in: "zh-Hans"), "仅显示图标")
         XCTAssertEqual(localized(MenuBarTempSource.hottest.rawValue, in: "zh-Hans"), "最热传感器")
         XCTAssertEqual(localized(SidebarItem.profiles.rawValue, in: "zh-Hans"), "配置")

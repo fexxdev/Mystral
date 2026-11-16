@@ -51,21 +51,24 @@ final class IOReportPowerTests: XCTestCase {
 
     // MARK: - CPU channel selection
 
-    func testOnlyRollUpChannelsCountAsCPU() {
-        XCTAssertEqual(IOReportPower.cpuChannelKind("CPU Energy"), .rollUp)
-        XCTAssertEqual(IOReportPower.cpuChannelKind("DIE_0_CPU Energy"), .perDie)
-        XCTAssertEqual(IOReportPower.cpuChannelKind("DIE_1_CPU Energy"), .perDie)
+    func testOnlyRollUpChannelsCount() {
+        XCTAssertEqual(IOReportPower.energyChannelKind("CPU Energy"), .cpuRollUp)
+        XCTAssertEqual(IOReportPower.energyChannelKind("GPU Energy"), .gpuRollUp)
+        // Ultra chips publish one roll-up per die.
+        XCTAssertEqual(IOReportPower.energyChannelKind("DIE_0_CPU Energy"), .cpuPerDie)
+        XCTAssertEqual(IOReportPower.energyChannelKind("DIE_1_CPU Energy"), .cpuPerDie)
+        XCTAssertEqual(IOReportPower.energyChannelKind("DIE_1_GPU Energy"), .gpuPerDie)
         // Sub-channels seen on an M3 Pro (macOS 27.2.1) must never count.
-        for name in ["PCPU", "ECPU", "PCPU0", "ECPU0_SRAM", "PCPUDTL00", "GPU Energy", "GPU SRAM"] {
-            XCTAssertNil(IOReportPower.cpuChannelKind(name), name)
+        for name in ["PCPU", "ECPU", "PCPU0", "ECPU0_SRAM", "PCPUDTL00", "GPU", "GPU SRAM", "DIE_0_PCPU", "ANE"] {
+            XCTAssertNil(IOReportPower.energyChannelKind(name), name)
         }
     }
 
-    /// An Ultra may publish both the chip roll-up and one roll-up per die.
+    /// A chip that publishes both the chip roll-up and one roll-up per die must not be counted twice.
     func testRollUpWinsOverPerDieSum() {
-        XCTAssertEqual(IOReportPower.energyModelCPU(rollUp: 30, perDie: 30), 30)
-        XCTAssertEqual(IOReportPower.energyModelCPU(rollUp: nil, perDie: 30), 30)
-        XCTAssertNil(IOReportPower.energyModelCPU(rollUp: nil, perDie: nil))
+        XCTAssertEqual(IOReportPower.wholeChipEnergy(rollUp: 30, perDie: 30), 30)
+        XCTAssertEqual(IOReportPower.wholeChipEnergy(rollUp: nil, perDie: 30), 30)
+        XCTAssertNil(IOReportPower.wholeChipEnergy(rollUp: nil, perDie: nil))
     }
 
     func testContinuousClockAdvances() {

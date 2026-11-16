@@ -351,10 +351,9 @@ final class MenuBarManager {
             if !cpuCores.isEmpty {
                 return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
             }
-            return sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey })?.temperature ?? 0
+            return SensorRegistry.cpuMaximumTemperature(from: sensors)
         case .cpuMax:
-            if !cpuCores.isEmpty { return cpuCores.map(\.temperature).max() ?? 0 }
-            return sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey })?.temperature ?? 0
+            return SensorRegistry.cpuMaximumTemperature(from: sensors)
         case .gpuAverage:
             guard !gpuCores.isEmpty else { return 0 }
             return gpuCores.map(\.temperature).reduce(0, +) / Double(gpuCores.count)

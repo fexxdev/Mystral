@@ -39,8 +39,10 @@ The M1 efficiency-cluster SMC keys (`Tp09`, `Tp0T`) in
 [Stats](https://github.com/exelban/stats) (`Modules/Sensors/values.swift`).
 The prefix grouping of the other temperature keys was checked against Stats,
 [macmon](https://github.com/vladkens/macmon), [mactop](https://github.com/metaspartan/mactop)
-and [iSMC](https://github.com/dkorunic/iSMC), and against load tests on an M3 Pro;
-no table or text from iSMC is included.
+and [iSMC](https://github.com/dkorunic/iSMC), against load tests on an M3 Pro, and
+against the load recordings in iSMC's repository for M1 through M6. iSMC is GPL-3.0:
+its recordings were used to test Mystral's rules, and no table, description or
+other text from it is included in Mystral.
 
 ```
 MIT License

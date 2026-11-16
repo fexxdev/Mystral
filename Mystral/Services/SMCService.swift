@@ -46,7 +46,7 @@ final class SMCService: SMCServiceProtocol, @unchecked Sendable {
     func getAllSensors() throws -> [Sensor] {
         let keys = try smc.temperatureKeys()
         return keys.compactMap { key in
-            guard let temp = try? smc.readFloat(key: key), SensorRegistry.isPlausibleTemperature(temp) else { return nil }
+            guard let temp = try? smc.readTemperature(key: key), SensorRegistry.isPlausibleTemperature(temp) else { return nil }
             return Sensor(id: key, name: SensorRegistry.nameForKey(key), temperature: temp)
         }
     }

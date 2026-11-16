@@ -388,12 +388,25 @@ struct SettingsView: View {
         }
     }
 
-    /// "11 (5 P + 6 E)" on a hybrid chip, the plain count otherwise, "—" when unknown.
+    /// "11 (5 Performance + 6 Efficiency)", with the levels the chip really has:
+    /// Super + Efficiency on M5, Super + Performance on M5 Pro/Max, all three on M6.
+    /// The plain count when the system reports no levels, "—" when it reports nothing.
     static func cpuCoresText(_ cores: HardwareInfo.CoreCounts) -> String {
         guard cores.total > 0 else { return "—" }
-        guard cores.performance > 0, cores.efficiency > 0 else { return "\(cores.total)" }
-        return String(localized: "\(cores.total) (\(cores.performance) P + \(cores.efficiency) E)",
-                      comment: "CPU core count: total, performance cores, efficiency cores")
+        guard cores.levels.count > 1 else { return "\(cores.total)" }
+        let parts = cores.levels.map { "\($0.cores) \(localizedLevelName($0.name))" }.joined(separator: " + ")
+        return String(localized: "\(cores.total) (\(parts))",
+                      comment: "CPU core count: total, then the breakdown by core type, e.g. 11 (5 Performance + 6 Efficiency)")
+    }
+
+    /// The kernel names core types in English; translate the ones we know.
+    static func localizedLevelName(_ name: String) -> String {
+        switch name {
+        case "Performance": String(localized: "Performance", comment: "CPU core type")
+        case "Efficiency": String(localized: "Efficiency", comment: "CPU core type")
+        case "Super": String(localized: "Super", comment: "CPU core type")
+        default: name
+        }
     }
 
     private func captionText(_ text: LocalizedStringKey) -> some View {

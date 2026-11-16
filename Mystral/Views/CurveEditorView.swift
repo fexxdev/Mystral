@@ -47,7 +47,7 @@ struct CurveEditorView: View {
                     get: { profile.sensorKey },
                     set: { profile.sensorKey = $0 }
                 )) {
-                    Text("CPU Average (all cores)").tag("")
+                    Text("CPU hottest sensor (default)").tag("")
                     ForEach(groupedSensorKeys, id: \.0) { category, keys in
                         Section(category.localizedName) {
                             ForEach(keys, id: \.self) { key in

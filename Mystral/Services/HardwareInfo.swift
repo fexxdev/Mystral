@@ -13,14 +13,49 @@ enum HardwareInfo {
         return brand.hasPrefix("Apple ") ? String(brand.dropFirst(6)) : brand
     }
 
-    /// 1 for M1 … 5 for M5, from the chip name ("M3 Pro" → 3); nil if unknown.
-    static let chipFamily: Int? = family(fromChipName: chipName())
+    /// Which chip this is, as far as sensor layout is concerned.
+    struct Chip: Equatable, Sendable {
+        enum Tier: Sendable { case base, pro, max, ultra }
 
-    static func family(fromChipName name: String) -> Int? {
-        guard let m = name.firstIndex(of: "M") else { return nil }
-        let digits = name[name.index(after: m)...].prefix { $0.isNumber }
-        return Int(digits)
+        /// 1 for M1 … 6 for M6; nil for anything else (A18 Pro, unknown).
+        var family: Int?
+        var tier: Tier
+        /// Names of the CPU performance levels the kernel reports, fastest first:
+        /// ["Performance", "Efficiency"] up to M4, ["Super", "Efficiency"] on M5,
+        /// ["Super", "Performance"] on M5 Pro/Max, all three on M6.
+        var levelNames: [String]
+
+        var hasSuperCores: Bool { levelNames.contains("Super") }
+        var hasPerformanceCores: Bool { levelNames.contains("Performance") }
+
+        /// A pre-M5 layout, for callers that know nothing about the chip.
+        static let generic = Chip(family: nil, tier: .base, levelNames: ["Performance", "Efficiency"])
+
+        init(family: Int?, tier: Tier, levelNames: [String]) {
+            self.family = family
+            self.tier = tier
+            self.levelNames = levelNames
+        }
+
+        /// From a chip name such as "M3 Pro", "M5 Max" or "A18 Pro".
+        init(name: String, levelNames: [String]) {
+            let lower = name.lowercased()
+            var family: Int?
+            if let m = name.firstIndex(of: "M") {
+                family = Int(name[name.index(after: m)...].prefix { $0.isNumber })
+            }
+            let tier: Tier
+            if family == nil { tier = .base }       // "A18 Pro" is not a Pro-tier M chip
+            else if lower.contains("ultra") { tier = .ultra }
+            else if lower.contains("max") { tier = .max }
+            else if lower.contains("pro") { tier = .pro }
+            else { tier = .base }
+            self.init(family: family, tier: tier, levelNames: levelNames)
+        }
     }
+
+    /// Read once: the hardware does not change while the app runs.
+    static let chip = Chip(name: chipName(), levelNames: coreCounts.levels.map(\.name))
 
     private static func sysctlString(_ name: String) -> String {
         var size = 0
@@ -35,22 +70,36 @@ enum HardwareInfo {
     /// Physical core counts of this Mac. SMC temperature keys are not cores: an
     /// M3 Pro has 48 `Tp` keys for 11 CPU cores and 18 `Tg` keys for 14 GPU cores.
     struct CoreCounts: Equatable, Sendable {
+        struct Level: Equatable, Sendable {
+            /// The kernel's name for the level: "Performance", "Efficiency" or "Super".
+            var name: String
+            var cores: Int
+        }
+
+        /// CPU performance levels, fastest first. Two on most chips, three on M6;
+        /// empty when the system does not report them.
+        var levels: [Level]
         /// 0 when unknown.
-        var performance: Int
-        var efficiency: Int
         var total: Int
         var gpu: Int
 
-        static let unknown = CoreCounts(performance: 0, efficiency: 0, total: 0, gpu: 0)
+        static let unknown = CoreCounts(levels: [], total: 0, gpu: 0)
     }
 
     /// Read once: the hardware does not change while the app runs.
     static let coreCounts: CoreCounts = {
-        let performance = sysctlInt("hw.perflevel0.physicalcpu")
-        let efficiency = sysctlInt("hw.perflevel1.physicalcpu")
+        // The number and names of levels differ per chip (M5 Pro has no efficiency
+        // cores, M6 has three levels), so ask instead of assuming P + E.
+        let levelCount = min(max(sysctlInt("hw.nperflevels"), 0), 8)
+        let levels: [CoreCounts.Level] = (0..<levelCount).compactMap { index in
+            let cores = sysctlInt("hw.perflevel\(index).physicalcpu")
+            guard cores > 0 else { return nil }
+            let name = sysctlString("hw.perflevel\(index).name")
+            return CoreCounts.Level(name: name.isEmpty ? "Level \(index)" : name, cores: cores)
+        }
         let physical = sysctlInt("hw.physicalcpu")
-        return CoreCounts(performance: performance, efficiency: efficiency,
-                          total: physical > 0 ? physical : performance + efficiency,
+        return CoreCounts(levels: levels,
+                          total: physical > 0 ? physical : levels.reduce(0) { $0 + $1.cores },
                           gpu: gpuCoreCount())
     }()
 

@@ -21,7 +21,7 @@ struct DashboardView: View {
     }
 
     private var cpuMax: Double {
-        cpuCoreSensors.map(\.temperature).max() ?? cpuSummary.first(where: { $0.id == "TCMz" })?.temperature ?? 0
+        SensorRegistry.cpuMaximumTemperature(from: fanController.sensors)
     }
 
     private var cpuAvg: Double {
@@ -86,7 +86,7 @@ struct DashboardView: View {
         VStack(spacing: 16) {
             HStack(spacing: 20) {
                 TemperatureCard(title: "CPU", max: cpuMax, avg: cpuAvg,
-                                sensorLabel: "TCMz / \(cpuCoreSensors.count) sensors")
+                                sensorLabel: "\(cpuCoreSensors.count) sensors")
                 TemperatureCard(title: "GPU", max: gpuMax, avg: gpuAvg,
                                 sensorLabel: "\(gpuCoreSensors.count) sensors")
             }
@@ -319,7 +319,7 @@ struct DashboardView: View {
                             Text("Driving: \(SensorRegistry.nameForKey(profile.sensorKey)) (\(profile.sensorKey))")
                                 .font(.caption).foregroundStyle(.secondary)
                         } else {
-                            Text("Driving: CPU Average").font(.caption).foregroundStyle(.secondary)
+                            Text("Driving: CPU hottest sensor").font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 } else {

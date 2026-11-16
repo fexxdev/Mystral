@@ -252,12 +252,7 @@ final class FanController {
         if !profile.sensorKey.isEmpty, let sensor = sensors.first(where: { $0.id == profile.sensorKey }) {
             return sensor.temperature
         }
-        if let cpuMax = sensors.first(where: { $0.id == SensorRegistry.defaultCpuSensorKey }) {
-            return cpuMax.temperature
-        }
-        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
-        guard !cpuCores.isEmpty else { return sensors.first?.temperature ?? 0 }
-        return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
+        return SensorRegistry.defaultDrivingTemperature(from: sensors)
     }
 
     func requestManualRestart() {

@@ -153,33 +153,33 @@ final class IOReportPower {
             return (nil, nil)
         }
 
-        var model = EnergyReading(), clpc = EnergyReading()
-        var modelDieCPU: Double?
+        var model = EnergyReading(), modelPerDie = EnergyReading(), clpc = EnergyReading()
         _ = iterate(delta) { [self] channel in
             // Name first: only a handful of the ~200 channels matter, so skip the
             // rest before bridging their unit and group strings.
             let name = (chanName(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
-            let cpuKind = Self.cpuChannelKind(name)
-            guard cpuKind != nil || name == CLPCEnergyChannels.gpuName else { return 0 }
+            guard let kind = Self.energyChannelKind(name) else { return 0 }
             let raw = simpleInt(channel, 0)
             let group = (chanGroup?(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
             if group == CLPCEnergyChannels.groupName {
                 // Described as nanojoules in the descriptor, so do not depend on
                 // the label IOReport derives for a hand-built channel.
                 let clpcJoules = Double(raw) / 1e9
-                if cpuKind == .rollUp { clpc.addCPU(clpcJoules) } else if cpuKind == nil { clpc.addGPU(clpcJoules) }
+                if kind == .cpuRollUp { clpc.addCPU(clpcJoules) } else if kind == .gpuRollUp { clpc.addGPU(clpcJoules) }
                 return 0
             }
             let unit = (getUnit(channel)?.takeUnretainedValue()).map { $0 as String } ?? ""
             let joules = IOReportPower.energyToJoules(raw: raw, unit: unit)
-            switch cpuKind {
-            case .rollUp: model.addCPU(joules)
-            case .perDie: modelDieCPU = (modelDieCPU ?? 0) + joules
-            case nil: model.addGPU(joules)
+            switch kind {
+            case .cpuRollUp: model.addCPU(joules)
+            case .gpuRollUp: model.addGPU(joules)
+            case .cpuPerDie: modelPerDie.addCPU(joules)
+            case .gpuPerDie: modelPerDie.addGPU(joules)
             }
             return 0
         }
-        model.cpu = Self.energyModelCPU(rollUp: model.cpu, perDie: modelDieCPU)
+        model.cpu = Self.wholeChipEnergy(rollUp: model.cpu, perDie: modelPerDie.cpu)
+        model.gpu = Self.wholeChipEnergy(rollUp: model.gpu, perDie: modelPerDie.gpu)
         let reading = Self.preferred(clpc: clpc, energyModel: model)
         let sawCPU = reading.cpu != nil
 
@@ -248,21 +248,25 @@ final class IOReportPower {
         TimeInterval(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000
     }
 
-    enum CPUChannelKind: Equatable { case rollUp, perDie }
+    enum EnergyChannelKind: Equatable { case cpuRollUp, gpuRollUp, cpuPerDie, gpuPerDie }
 
-    /// Which Energy Model (or CLPC) channels carry whole-CPU energy. "CPU Energy" is
-    /// the roll-up; Ultra chips may also, or only, publish "DIE_n_CPU Energy" per die.
-    /// Per-core and SRAM sub-channels must never match: they would be counted on top
-    /// of the roll-up (lablup/all-smi#410).
-    static func cpuChannelKind(_ name: String) -> CPUChannelKind? {
-        if name == CLPCEnergyChannels.cpuName { return .rollUp }
-        if name.hasPrefix("DIE_"), name.hasSuffix("_CPU Energy") { return .perDie }
+    /// Which Energy Model (or CLPC) channels carry whole-CPU or whole-GPU energy.
+    /// "CPU Energy" and "GPU Energy" are the roll-ups. Ultra chips are two dies and
+    /// publish "DIE_n_CPU Energy" per die instead (macmon and Stats both sum those).
+    /// Per-core and SRAM sub-channels ("PCPU0", "GPU SRAM") must never match: they
+    /// would be counted on top of the roll-up (lablup/all-smi#410).
+    static func energyChannelKind(_ name: String) -> EnergyChannelKind? {
+        if name == CLPCEnergyChannels.cpuName { return .cpuRollUp }
+        if name == CLPCEnergyChannels.gpuName { return .gpuRollUp }
+        guard name.hasPrefix("DIE_") else { return nil }
+        if name.hasSuffix("_CPU Energy") { return .cpuPerDie }
+        if name.hasSuffix("_GPU Energy") { return .gpuPerDie }
         return nil
     }
 
     /// The whole-chip roll-up when the chip has one; the per-die sum only when it
-    /// doesn't. Adding both would count an Ultra's CPU twice.
-    static func energyModelCPU(rollUp: Double?, perDie: Double?) -> Double? {
+    /// doesn't. Adding both would count an Ultra twice.
+    static func wholeChipEnergy(rollUp: Double?, perDie: Double?) -> Double? {
         rollUp ?? perDie
     }
 

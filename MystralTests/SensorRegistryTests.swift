@@ -135,95 +135,244 @@ final class SensorRegistryTests: XCTestCase {
 
     // MARK: - Physical cores vs sensors
 
+    private typealias Level = HardwareInfo.CoreCounts.Level
+
     /// An M3 Pro reports 48 `Tp` keys and 18 `Tg` keys, but has 11 CPU and 14 GPU cores.
     func testDetectChipReportsPhysicalCoresNotSensorKeys() {
         let sensors = (0..<48).map { Sensor(id: String(format: "Tp%02X", $0), name: "", temperature: 45) }
             + [Sensor(id: "TCMz", name: "CPU Max", temperature: 50)]
-        let cores = HardwareInfo.CoreCounts(performance: 5, efficiency: 6, total: 11, gpu: 14)
+        let cores = HardwareInfo.CoreCounts(levels: [Level(name: "Performance", cores: 5), Level(name: "Efficiency", cores: 6)],
+                                            total: 11, gpu: 14)
         let chip = SensorRegistry.detectChip(sensors: sensors, fans: [], cores: cores)
         XCTAssertEqual(chip.cores, cores)
         XCTAssertEqual(chip.cpuSensorCount, 48)
     }
 
-    func testCpuCoresText() {
-        XCTAssertEqual(SettingsView.cpuCoresText(.init(performance: 5, efficiency: 6, total: 11, gpu: 14)), "11 (5 P + 6 E)")
-        XCTAssertEqual(SettingsView.cpuCoresText(.init(performance: 0, efficiency: 0, total: 8, gpu: 0)), "8")
+    /// The breakdown follows the levels the chip has, whatever the UI language calls them.
+    func testCpuCoresTextListsEveryLevel() {
+        func text(_ levels: [(String, Int)]) -> String {
+            SettingsView.cpuCoresText(.init(levels: levels.map { Level(name: $0.0, cores: $0.1) },
+                                            total: levels.reduce(0) { $0 + $1.1 }, gpu: 0))
+        }
+        let m3Pro = text([("Performance", 5), ("Efficiency", 6)])
+        XCTAssertTrue(m3Pro.hasPrefix("11"))
+        XCTAssertEqual(m3Pro.components(separatedBy: " + ").count, 2)
+        XCTAssertTrue(m3Pro.contains("5 \(SettingsView.localizedLevelName("Performance"))"))
+        XCTAssertTrue(m3Pro.contains("6 \(SettingsView.localizedLevelName("Efficiency"))"))
+
+        // M5 Pro: super and performance cores, no efficiency cores.
+        let m5Pro = text([("Super", 6), ("Performance", 12)])
+        XCTAssertTrue(m5Pro.hasPrefix("18"))
+        XCTAssertTrue(m5Pro.contains("6 \(SettingsView.localizedLevelName("Super"))"))
+        XCTAssertFalse(m5Pro.contains(SettingsView.localizedLevelName("Efficiency")))
+
+        // M6: three levels.
+        let m6 = text([("Super", 2), ("Performance", 4), ("Efficiency", 6)])
+        XCTAssertTrue(m6.hasPrefix("12"))
+        XCTAssertEqual(m6.components(separatedBy: " + ").count, 3)
+
+        XCTAssertEqual(SettingsView.cpuCoresText(.init(levels: [], total: 8, gpu: 0)), "8")
         XCTAssertEqual(SettingsView.cpuCoresText(.unknown), "—")
     }
 
-    /// Apple Silicon has no SMT: every core is either a P-core or an E-core.
     func testThisMacReportsConsistentCoreCounts() {
         let cores = HardwareInfo.coreCounts
         XCTAssertGreaterThan(cores.total, 0)
-        if cores.performance > 0, cores.efficiency > 0 {
-            XCTAssertEqual(cores.performance + cores.efficiency, cores.total)
+        if !cores.levels.isEmpty {
+            XCTAssertEqual(cores.levels.reduce(0) { $0 + $1.cores }, cores.total)
+            XCTAssertFalse(cores.levels.contains { $0.name.isEmpty })
         }
+    }
+
+    // MARK: - Chip identity
+
+    private typealias Chip = HardwareInfo.Chip
+    private let m1Ultra = Chip(name: "M1 Ultra", levelNames: ["Performance", "Efficiency"])
+    private let m3Pro = Chip(name: "M3 Pro", levelNames: ["Performance", "Efficiency"])
+    private let m4Pro = Chip(name: "M4 Pro", levelNames: ["Performance", "Efficiency"])
+    private let m5 = Chip(name: "M5", levelNames: ["Super", "Efficiency"])
+    private let m5Pro = Chip(name: "M5 Pro", levelNames: ["Super", "Performance"])
+    private let m6 = Chip(name: "M6", levelNames: ["Super", "Performance", "Efficiency"])
+    private let a18Pro = Chip(name: "A18 Pro", levelNames: ["Performance", "Efficiency"])
+    private var everyChip: [Chip] { [m1Ultra, m3Pro, m4Pro, m5, m5Pro, m6, a18Pro, .generic] }
+
+    func testChipFromName() {
+        XCTAssertEqual(m3Pro.family, 3)
+        XCTAssertEqual(m3Pro.tier, .pro)
+        XCTAssertEqual(m1Ultra.tier, .ultra)
+        XCTAssertEqual(Chip(name: "M4 Max", levelNames: []).tier, .max)
+        XCTAssertEqual(m5.tier, .base)
+        XCTAssertEqual(m6.family, 6)
+        // "A18 Pro" is not an M chip, and its "Pro" is not the M-series Pro tier.
+        XCTAssertNil(a18Pro.family)
+        XCTAssertEqual(a18Pro.tier, .base)
+        XCTAssertNil(Chip(name: "Intel Core i9", levelNames: []).family)
     }
 
     // MARK: - Key classification
 
-    private func category(_ key: String, family: Int? = 3) -> SensorCategory {
-        SensorRegistry.classify(key, chipFamily: family).category
+    private func category(_ key: String, _ chip: Chip) -> SensorCategory {
+        SensorRegistry.classify(key, chip: chip).category
+    }
+    private func name(_ key: String, _ chip: Chip) -> String {
+        SensorRegistry.classify(key, chip: chip).name
     }
 
-    /// Load tests on an M3 Pro (Mac15,6): Tp follows P-core load, Te is the only group
-    /// that warms under an E-core-only load, Tg follows the GPU, Tf and Ts0x follow
-    /// both and are SoC sensors.
-    func testM3ProKeyGroups() {
-        XCTAssertEqual(category("Tp0C"), .cpuPerformance)
-        XCTAssertEqual(category("Te0H"), .cpuEfficiency)
-        XCTAssertEqual(category("Tg0D"), .gpu)
-        XCTAssertEqual(category("Tf14"), .soc)
-        XCTAssertEqual(category("Tf24"), .soc)
-        XCTAssertEqual(category("Ts0C"), .soc, "Ts0x warms +20 °C under GPU load: not an SSD")
-        XCTAssertEqual(category("TED0"), .soc)
-        XCTAssertEqual(category("TD00"), .soc)
-    }
-
-    func testStorageBatteryAndEnclosureKeys() {
-        XCTAssertEqual(category("Ts0P"), .ssd)
-        XCTAssertEqual(category("TS0P"), .ssd)
-        XCTAssertEqual(category("TH0x"), .ssd)
-        XCTAssertEqual(category("Th00"), .other, "lowercase h is a heatsink, not NAND")
-        XCTAssertEqual(category("TG0B"), .battery, "uppercase G is the gas gauge, not the GPU")
-        XCTAssertEqual(category("TB0T"), .battery)
-        XCTAssertEqual(SensorRegistry.classify("TaLT", chipFamily: 3).name, "Thunderbolt Left")
-        XCTAssertEqual(SensorRegistry.classify("TCHP", chipFamily: 3).name, "CPU Heat Pipe")
-        XCTAssertEqual(category("TCHP"), .other, "a heat pipe is not a CPU summary value")
-        XCTAssertEqual(category("TPD3"), .vrm)
-        XCTAssertEqual(category("TPMP"), .other)
-    }
-
-    func testM1KeysDiffer() {
-        XCTAssertEqual(category("Tp09", family: 1), .cpuEfficiency)
-        XCTAssertEqual(category("Tp09", family: 2), .cpuPerformance)
-        XCTAssertEqual(category("Te00", family: 1), .cpuSummary)
-        XCTAssertEqual(category("Te04", family: 2), .cpuEfficiency)
-    }
-
-    func testNoKeyIsNamedAfterASpecificCore() {
-        for key in ["Tp04", "Tp0C", "Tp1E", "Te05", "Tg0D"] {
-            let name = SensorRegistry.classify(key, chipFamily: 3).name
-            XCTAssertFalse(name.contains("Core "), "\(key) → \(name)")
+    /// Tp follows CPU load and Tg GPU load in every load capture from M1 to M6.
+    func testCpuAndGpuKeysOnEveryChip() {
+        for chip in everyChip {
+            XCTAssertEqual(category("Tp0C", chip), .cpu)
+            XCTAssertEqual(category("Tg0D", chip), .gpu)
         }
     }
 
-    func testCpuCoreSensorsCoverBothClustersAndSkipParkedSlots() {
+    func testCpuClusterNamesFollowTheCoresTheChipHas() {
+        XCTAssertEqual(name("Tp0C", m3Pro), "CPU P-Cluster")
+        XCTAssertEqual(name("Te05", m3Pro), "CPU E-Cluster")
+        XCTAssertEqual(name("Tp00", m5), "CPU Super-Cluster")          // Super + Efficiency
+        XCTAssertEqual(name("Tp00", m5Pro), "CPU Super/P-Cluster")     // Super + Performance
+        XCTAssertEqual(name("Tp0j", m6), "CPU Super/P-Cluster")
+        XCTAssertEqual(name("Te07", m6), "CPU E-Cluster")
+        XCTAssertEqual(name("Tp05", a18Pro), "CPU P-Cluster")
+        XCTAssertEqual(category("Te05", a18Pro), .cpu)
+    }
+
+    /// M1 lays its keys out differently from every later chip.
+    func testM1Keys() {
+        XCTAssertEqual(name("Tp09", m1Ultra), "CPU E-Cluster")
+        XCTAssertEqual(name("Tp09", m3Pro), "CPU P-Cluster")
+        XCTAssertEqual(name("Te00", m1Ultra), "CPU Die")
+        XCTAssertEqual(category("Tc01", m1Ultra), .cpu)
+        XCTAssertEqual(category("TpD3", m1Ultra), .vrm, "TpD keys never follow CPU load")
+        XCTAssertEqual(category("TrD2", m1Ultra), .vrm)
+        XCTAssertEqual(category("TC12", m1Ultra), .soc)
+        XCTAssertEqual(category("Td04", m1Ultra), .soc)
+        XCTAssertEqual(category("Tm02", m1Ultra), .memory)
+    }
+
+    /// On M5 Pro/Max the 40 Tm keys warm by 14–22 °C under CPU load.
+    func testM5ProReusesMemoryKeysForTheCpu() {
+        XCTAssertEqual(category("Tm0C", m5Pro), .cpu)
+        XCTAssertEqual(name("Tm0C", m5Pro), "CPU P-Cluster")
+        XCTAssertEqual(category("Tm0B", m5), .memory)
+        XCTAssertEqual(category("Tm0p", m4Pro), .memory)
+        XCTAssertEqual(category("Tm0C", m6), .memory)
+    }
+
+    func testSocKeys() {
+        for chip in everyChip {
+            XCTAssertEqual(category("Ts0C", chip), .soc, "Ts keys follow CPU and GPU load on every chip")
+            XCTAssertEqual(category("Tf14", chip), .soc)
+            XCTAssertEqual(category("Th00", chip), .soc)
+        }
+        XCTAssertEqual(category("TED0", m3Pro), .soc)
+        XCTAssertEqual(category("TUD3", m4Pro), .soc)
+        XCTAssertEqual(category("TN00", m5Pro), .soc)
+        XCTAssertEqual(category("TQ0d", a18Pro), .soc)
+        // M5 and M6: Ta0x warms with the CPU and is not airflow.
+        XCTAssertEqual(category("Ta00", m5), .soc)
+        XCTAssertEqual(category("Ta0O", m6), .soc)
+        XCTAssertEqual(category("Ta0p", m4Pro), .airflow)
+        XCTAssertEqual(category("TaLP", m5Pro), .airflow)
+    }
+
+    func testStorageKeys() {
+        for key in ["Ts0P", "Ts1P", "TsOP", "TS0P", "TS0p", "TH0x", "TH0a", "THSP", "TSDD"] {
+            XCTAssertEqual(category(key, m4Pro), .ssd, key)
+        }
+    }
+
+    func testBatteryKeys() {
+        for key in ["TB0T", "TB2T", "TG0B", "TG0V", "TG1B", "TG0H"] {
+            XCTAssertEqual(category(key, m3Pro), .battery, key)
+        }
+        // GPU-style TG keys belong to Intel Macs, and a proximity key is not a cell.
+        XCTAssertEqual(category("TG0D", m3Pro), .other)
+        XCTAssertEqual(category("TB0p", m1Ultra), .other)
+    }
+
+    func testBoardKeys() {
+        for key in ["TD00", "TD14", "TDBP", "TDeL", "TT0P", "TIOP", "TW0P", "TR1d", "TaLT", "TSCD"] {
+            XCTAssertEqual(category(key, m4Pro), .board, key)
+        }
+        XCTAssertEqual(name("TaLT", m3Pro), "Thunderbolt Left")
+    }
+
+    func testPowerKeys() {
+        for key in ["TPD3", "TPDX", "TPMP", "TPSP", "TPH3", "TRD2", "TSVR", "TUVS", "TV01", "TVN1", "TVMN", "TVV0"] {
+            XCTAssertEqual(category(key, m5Pro), .vrm, key)
+        }
+    }
+
+    func testVirtualKeys() {
+        XCTAssertEqual(name("TVD0", m3Pro), "CPU Virtual Die")
+        XCTAssertEqual(category("TVDG", m5), .soc)
+        XCTAssertEqual(category("TVA0", m3Pro), .airflow)
+        for key in ["TVM0", "TVm1", "TVh2"] { XCTAssertEqual(category(key, m4Pro), .memory, key) }
+        XCTAssertEqual(category("TVS1", m3Pro), .other)
+        XCTAssertEqual(name("TVS1", m3Pro), "Virtual Sensor")
+    }
+
+    func testSummaryAndOddKeys() {
+        XCTAssertEqual(category("TCMz", m3Pro), .cpuSummary)
+        XCTAssertEqual(name("TCHP", m3Pro), "CPU Heat Pipe")
+        XCTAssertEqual(category("TCHP", m3Pro), .other, "a heat pipe is not a CPU summary value")
+        XCTAssertEqual(name("TR0Z", m3Pro), "Calibration Constant")
+        // Nobody knows these: they keep their key as name.
+        for key in ["TSG1", "T5SP", "ZZZZ"] {
+            XCTAssertEqual(name(key, m3Pro), key)
+            XCTAssertEqual(category(key, m3Pro), .other)
+        }
+    }
+
+    func testNoKeyIsNamedAfterASpecificCore() {
+        for chip in everyChip {
+            for key in ["Tp04", "Tp0C", "Tp1E", "Te05", "Tg0D", "Tm0C"] {
+                let name = SensorRegistry.classify(key, chip: chip).name
+                XCTAssertFalse(name.contains("Core "), "\(key) → \(name)")
+            }
+        }
+    }
+
+    func testCpuCoreSensorsCoverEveryClusterAndSkipParkedSlots() {
         let sensors = [
             Sensor(id: "Tp0C", name: "", temperature: 55),
             Sensor(id: "Te05", name: "", temperature: 45),
             Sensor(id: "Tp1i", name: "", temperature: 40.0),   // parked bank on M4 Pro/Max
+            Sensor(id: "TpD3", name: "", temperature: 38),     // M1 power delivery
             Sensor(id: "Tf14", name: "", temperature: 60),
             Sensor(id: "Ts0C", name: "", temperature: 50)
         ]
         XCTAssertEqual(Set(SensorRegistry.cpuCoreSensors(from: sensors).map(\.id)), ["Tp0C", "Te05"])
     }
 
-    func testChipFamilyFromName() {
-        XCTAssertEqual(HardwareInfo.family(fromChipName: "M3 Pro"), 3)
-        XCTAssertEqual(HardwareInfo.family(fromChipName: "M1"), 1)
-        XCTAssertEqual(HardwareInfo.family(fromChipName: "M4 Max"), 4)
-        XCTAssertNil(HardwareInfo.family(fromChipName: "Intel Core i9"))
-        XCTAssertNil(HardwareInfo.family(fromChipName: ""))
+    // MARK: - Default fan-curve temperature
+
+    func testDefaultDrivingTemperatureUsesTheDieMaximumWhenPublished() {
+        let sensors = [
+            Sensor(id: "TCMz", name: "", temperature: 72),
+            Sensor(id: "Tp0C", name: "", temperature: 70),
+            Sensor(id: "Te05", name: "", temperature: 55)
+        ]
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: sensors), 72)
+    }
+
+    /// M5 and M6 publish no TCMz. The curve must still follow the hottest CPU sensor,
+    /// not the average, or it would react much later than on older chips.
+    func testDefaultDrivingTemperatureWithoutTCMzIsTheHottestCpuSensor() {
+        let sensors = [
+            Sensor(id: "TCMb", name: "", temperature: 64),
+            Sensor(id: "Tp00", name: "", temperature: 81),
+            Sensor(id: "Tp0G", name: "", temperature: 67),
+            Sensor(id: "Te04", name: "", temperature: 52),
+            Sensor(id: "Tg0U", name: "", temperature: 90)   // the GPU must not drive a CPU default
+        ]
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: sensors), 81)
+    }
+
+    func testDefaultDrivingTemperatureFallsBackToSummaryThenAnything() {
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: [Sensor(id: "TCMb", name: "", temperature: 61)]), 61)
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: [Sensor(id: "TB0T", name: "", temperature: 30)]), 30)
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: []), 0)
     }
 }

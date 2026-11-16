@@ -6,7 +6,7 @@
 
 **Fan curves, temperatures and power draw for Apple Silicon Macs, from the menu bar.**
 
-[![Latest release](https://img.shields.io/github/v/release/fexxdev/Mystral?label=release&color=blue)](https://github.com/fexxdev/Mystral/releases/latest) [![CI](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml/badge.svg)](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M5-green) ![Languages](https://img.shields.io/badge/languages-EN%20%C2%B7%20IT%20%C2%B7%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-orange) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/fexxdev/Mystral?label=release&color=blue)](https://github.com/fexxdev/Mystral/releases/latest) [![CI](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml/badge.svg)](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M6-green) ![Languages](https://img.shields.io/badge/languages-EN%20%C2%B7%20IT%20%C2%B7%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-orange) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
 [**Download**](https://github.com/fexxdev/Mystral/releases/latest) · [Features](#features) · [Install](#installation) · [Usage](#usage) · [How it works](#how-it-works) · [FAQ](#troubleshooting)
 
@@ -23,7 +23,7 @@ macOS keeps Apple Silicon fans quiet until the chip is already hot. Mystral lets
 ## Features
 
 ### 🌀 Fan control
-- **Real fan control on Apple Silicon**, M1 to M5. Mystral unlocks manual mode through the SMC `Ftst` key, so `thermalmonitord` stops overriding your speeds.
+- **Real fan control on Apple Silicon.** Mystral unlocks manual mode through the SMC `Ftst` key, so `thermalmonitord` stops overriding your speeds.
 - **Curve editor**: drag points on the chart or type values into the table next to it. Use one curve for all fans, or a separate curve per fan.
 - **Driving sensor**: base a curve on the CPU average or on any single sensor.
 - **Manual override**: pin a fan to a fixed speed from the Fans view.
@@ -33,9 +33,10 @@ macOS keeps Apple Silicon fans quiet until the chip is already hot. Mystral lets
 
 ### 📊 Monitoring
 - **Dashboard** with CPU and GPU max/average, a CPU summary (die, package, hotspot), per-core grids and a 5-minute history chart.
-- **Sensors** view listing every SMC temperature sensor. You can search, sort, filter by category (CPU performance and efficiency clusters, GPU, SoC, memory, SSD, battery, airflow, power delivery) and see a sparkline trend for each.
+- **Sensors** view listing every SMC temperature sensor. You can search, sort, filter by category (CPU, GPU, SoC, memory, SSD, battery, airflow, board, power delivery) and see a sparkline trend for each.
 - **Fans** view with current, target and min–max RPM, and whether macOS or Mystral is driving each fan.
-- **Chip detection** for your exact chip, core counts and how well its sensors are supported.
+- **Chip detection** for your exact chip, its real core counts (performance, efficiency and super cores) and how well its sensors are supported.
+- **Sensor layouts for M1 to M6**, checked against load-test recordings of twelve Macs: a sensor is listed as CPU or GPU only if it warms under that load.
 
 ### ⚡ Power
 - **Total system watts** from the SMC (`PSTR`), plus **CPU and GPU watts** from the IOReport energy model. No extra permissions needed.
@@ -83,11 +84,11 @@ English, Italiano and 简体中文. Mystral follows your macOS language, or pick
 | | |
 |---|---|
 | **macOS** | 14 Sonoma or later |
-| **Mac** | Apple Silicon, M1 through M5 |
+| **Mac** | Apple Silicon, M1 through M6 |
 | **Permissions** | One administrator password to install the fan helper |
 
 > [!NOTE]
-> Mystral takes manual control of the fans by unlocking the SMC `Ftst` key; this is verified on an M3 Pro MacBook Pro running macOS 27. **Settings → Chip Detection → Fan control** shows **Working** while Mystral is driving the fans. If it says **Not available** on your Mac, please [open an issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export from **Settings → Diagnostics**.
+> Mystral takes manual control of the fans by unlocking the SMC `Ftst` key. Fan control is verified on an M3 Pro MacBook Pro running macOS 27; sensor layouts are checked for M1 through M6. **Settings → Chip Detection → Fan control** shows **Working** while Mystral is driving the fans. If it says **Not available** on your Mac, please [open an issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export from **Settings → Diagnostics**.
 
 ## Installation
 

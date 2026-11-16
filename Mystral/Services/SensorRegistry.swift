@@ -2,8 +2,10 @@ import Foundation
 import SwiftUI
 
 enum SensorCategory: String, CaseIterable, Sendable {
-    case cpuPerformance = "CPU P-Cores"
-    case cpuEfficiency = "CPU E-Cores"
+    /// Every CPU cluster sensor: performance, efficiency and (M5 on) super cores.
+    /// Which cluster a sensor belongs to is in its name; the clusters a chip has
+    /// differ too much between generations for one category per cluster.
+    case cpu = "CPU"
     case cpuSummary = "CPU Summary"
     case gpu = "GPU"
     case soc = "SoC"
@@ -11,6 +13,7 @@ enum SensorCategory: String, CaseIterable, Sendable {
     case ssd = "SSD"
     case battery = "Battery"
     case airflow = "Airflow"
+    case board = "Board"
     case vrm = "VRM"
     case other = "Other"
 
@@ -24,89 +27,173 @@ struct SensorInfo: Sendable {
 }
 
 enum SensorRegistry {
-    /// The chip family of this Mac (1 for M1 … 5 for M5), nil if unknown.
-    static let chipFamily: Int? = HardwareInfo.chipFamily
-
     /// Keys whose meaning holds on every Apple Silicon Mac that has them.
     private static let exactKeys: [String: (String, SensorCategory)] = [
-        // CPU summary values computed by the SMC
+        // Summary values the SMC computes
         "TCMz": ("CPU Die Max", .cpuSummary),
         "TCMb": ("CPU Virtual Die", .cpuSummary),
         "TCDX": ("SoC Die Max", .cpuSummary),
-        "TVD0": ("CPU Virtual Die", .other),      // same value as TCMb; not a regulator
+        "TVD0": ("CPU Virtual Die", .soc),          // same value as TCMb
         "TCHP": ("CPU Heat Pipe", .other),
 
-        // Battery
         "TB0T": ("Battery 1", .battery),
         "TB1T": ("Battery 2", .battery),
         "TB2T": ("Battery 3", .battery),
 
-        // Airflow and enclosure
         "TaLP": ("Airflow Left", .airflow),
         "TaRP": ("Airflow Right", .airflow),
         "TaRF": ("Airflow Right", .airflow),
-        "TaLT": ("Thunderbolt Left", .airflow),   // port proximity, not an intake
-        "TaRT": ("Thunderbolt Right", .airflow),
+        "TaLT": ("Thunderbolt Left", .board),       // port proximity, not an intake
+        "TaRT": ("Thunderbolt Right", .board),
         "TAOL": ("Ambient", .airflow),
 
-        // Memory, storage, radios
-        "TMVR": ("Memory Regulator", .memory),
-        "TW0P": ("Wireless Module", .other),
+        "TH0x": ("SSD NAND", .ssd),
+        "TSDD": ("SSD Diode", .ssd),
         "TSCP": ("SoC Probe", .soc),
+        "TMVR": ("Memory Regulator", .memory),
+        "TVMN": ("Voltage Probe", .vrm),            // M5: a probe maximum, not virtual memory
+        "TW0P": ("Wireless Module", .board),
+        "TTSp": ("Touch Sensor", .board),
+        "TUCp": ("USB-C Port", .board),
+        "TR0Z": ("Calibration Constant", .other),   // fixed value, never a reading
     ]
 
     /// M1 publishes its efficiency-cluster readings among the `Tp` keys.
     /// From exelban/stats (MIT), Modules/Sensors/values.swift.
     private static let m1EfficiencyKeys: Set<String> = ["Tp09", "Tp0T"]
 
-    /// Name and category of an SMC temperature key.
+    /// Name and category of an SMC temperature key on a given chip.
     ///
     /// Apple documents none of these keys, and a key can mean different things on
-    /// different chips. Keys are grouped by prefix, checked with CPU-only, E-core-only
-    /// and GPU-only load tests on an M3 Pro and against what open-source monitors do
-    /// (exelban/stats, vladkens/macmon, metaspartan/mactop, dkorunic/iSMC). No key is
-    /// named after a specific core: each cluster publishes groups of probes,
-    /// aggregates and maxima, and none of those projects can tie a key to one core.
-    static func classify(_ key: String, chipFamily: Int?) -> (name: String, category: SensorCategory) {
+    /// different chips. The rules group keys by prefix. They were checked against
+    /// what exelban/stats, vladkens/macmon, metaspartan/mactop and dkorunic/iSMC do,
+    /// against a CPU-only / E-core-only / GPU-only load test on an M3 Pro, and
+    /// against the load captures iSMC publishes for M1 Ultra, M3, M3 Pro/Max, M4,
+    /// M4 Pro/Max, M5, M5 Pro/Max and M6: a group is CPU, GPU or SoC only if it warms
+    /// under that load, and storage, battery and board sensors only if it does not.
+    ///
+    /// No key is named after one core. Each cluster publishes groups of probes,
+    /// aggregates and maxima, and none of those projects can tie a key to a core.
+    static func classify(_ key: String, chip: HardwareInfo.Chip) -> (name: String, category: SensorCategory) {
         if let known = exactKeys[key] { return known }
+        let characters = Array(key)
+        guard characters.count == 4 else { return (key, .other) }
+        let third = characters[2], last = characters[3]
+
         switch key.prefix(2) {
+        // CPU clusters
         case "Tp":
-            if chipFamily == 1, m1EfficiencyKeys.contains(key) { return ("CPU E-Cluster", .cpuEfficiency) }
-            return ("CPU P-Cluster", .cpuPerformance)
+            if third == "D" { return ("Power Delivery", .vrm) }        // M1: TpD0… never follow CPU load
+            if chip.family == 1, m1EfficiencyKeys.contains(key) { return ("CPU E-Cluster", .cpu) }
+            return (performanceClusterName(chip), .cpu)
         case "Te":
-            // M1 uses Te0x for the CPU die; from M2 on they are efficiency-cluster groups.
-            if chipFamily == 1 { return ("CPU Die", .cpuSummary) }
-            return ("CPU E-Cluster", .cpuEfficiency)
+            // M1 uses Te0x for the CPU die; from M2 on they are the efficiency cluster.
+            return (chip.family == 1 ? "CPU Die" : "CPU E-Cluster", .cpu)
+        case "Tc":
+            return ("CPU", .cpu)                                       // M1
+        case "Tm":
+            // M5 Pro/Max reuse Tm for their performance cluster: 40 keys that warm by
+            // 14–22 °C under CPU load, where memory sensors move by 1–3 °C.
+            if chip.family == 5, chip.tier != .base { return ("CPU P-Cluster", .cpu) }
+            return ("Memory", .memory)
+
         case "Tg": return ("GPU", .gpu)
-        case "TG": return ("Battery Gauge", .battery)          // uppercase G: gas gauge, not GPU
-        case "Tf": return ("SoC Fabric", .soc)                 // per-SKU blocks near CPU or GPU, plus held min/max
-        case "Tm": return ("Memory", .memory)
-        case "Ts": return key.hasSuffix("P") ? ("SSD Controller", .ssd) : ("SoC", .soc)
-        case "TS": return key.hasSuffix("P") ? ("SSD Proximity", .ssd) : (key, .other)
-        case "TH": return ("SSD NAND", .ssd)
-        case "Th": return ("Heatsink", .other)
-        case "TB": return ("Battery", .battery)
-        case "Ta", "TA": return ("Airflow", .airflow)
-        case "TV": return ("Voltage Regulator", .vrm)
-        case "TD": return ("SoC Diode", .soc)
+
+        // SoC: warms with CPU or GPU load, but is neither cluster
+        case "Tf": return ("SoC Fabric", .soc)
+        case "Th": return ("SoC Heatsink", .soc)
+        case "Td": return ("SoC Diode", .soc)                          // M1
         case "TE", "TF": return ("SoC", .soc)
+        case "TQ": return ("Image Signal Processor", .soc)             // A18 Pro
+        case "TN": return ("SoC Package", .soc)
+        case "Ts":
+            // Ts…P never moves under load (SSD controller); every other Ts key
+            // follows CPU and GPU load on every chip from M1 to M6.
+            return last == "P" ? ("SSD Controller", .ssd) : ("SoC", .soc)
+        case "TU":
+            if third == "D" { return ("SoC Uncore", .soc) }            // M4 Pro, M5 Pro/Max: follows GPU load
+            if third == "V" { return ("SoC Regulator", .vrm) }
+            return (key, .other)
+        case "TC":
+            // M1: TC1x…TCAx are groups of die probes.
+            if chip.family == 1, (third.isNumber && third != "0") || third == "A" { return ("SoC Die Probe", .soc) }
+            return (key, .other)
+
+        // Storage
+        case "TH": return ("SSD", .ssd)
+        case "TS":
+            if last == "P" || last == "p" { return ("SSD Proximity", .ssd) }
+            if third == "V" || third == "W" || third == "X" { return ("SoC Regulator", .vrm) }
+            if third == "C" { return ("System Controller", .board) }
+            return (key, .other)
+
+        // Battery
+        case "TB":
+            return last == "T" || last == "S" ? ("Battery", .battery) : (key, .other)
+        case "TG":
+            // Uppercase G is the battery gas gauge on Apple Silicon, not the GPU.
+            return "ABCHV".contains(last) ? ("Battery Gauge", .battery) : (key, .other)
+
+        // Air and enclosure
+        case "Ta":
+            // M5 and M6 add Ta0x keys that warm with the CPU; they are not airflow.
+            if third.isNumber, last != "p" { return ("SoC", .soc) }
+            return ("Airflow", .airflow)
+        case "TA": return ("Ambient", .airflow)
+        case "TD": return ("Board Diode", .board)                      // no response to any load
+        case "TT": return ("Thunderbolt", .board)
+        case "TI": return ("I/O", .board)
+        case "TL": return ("Display", .board)
+        case "TW": return ("Wireless Module", .board)
+        case "TM": return ("Memory", .memory)
+
+        // Power
+        case "Tr": return ("Power Delivery", .vrm)                     // M1
+        case "TP":
+            switch third {
+            case "D": return ("Power Delivery", .vrm)
+            case "M": return ("Power Management", .vrm)
+            case "S": return ("Power Supply", .vrm)
+            case "H": return ("Power Heatsink", .vrm)
+            case "V": return ("Power Probe", .vrm)
+            default: return (key, .other)
+            }
+        case "TR":
+            return third == "D" ? ("Power Delivery", .vrm) : ("Radio", .board)
+        case "TV":
+            // Mostly values the SMC models rather than measures.
+            switch third {
+            case "D": return ("Virtual Die", .soc)
+            case "A": return ("Virtual Ambient", .airflow)
+            case "M", "m", "h": return ("Virtual Memory", .memory)
+            case "V": return ("Virtual Voltage", .vrm)
+            case "N": return ("Voltage Probe", .vrm)
+            default: return third.isNumber ? ("Voltage Probe", .vrm) : ("Virtual Sensor", .other)
+            }
+
         default:
-            if key.hasPrefix("TPD") || key.hasPrefix("TRD") { return ("Power Delivery", .vrm) }
             return (key, .other)
         }
     }
 
+    /// What the `Tp` keys measure depends on the cores the chip has.
+    private static func performanceClusterName(_ chip: HardwareInfo.Chip) -> String {
+        guard chip.hasSuperCores else { return "CPU P-Cluster" }
+        // M5 Pro/Max and M6 have both super and performance cores behind Tp keys.
+        return chip.hasPerformanceCores ? "CPU Super/P-Cluster" : "CPU Super-Cluster"
+    }
+
     /// True when a rule or the exact-key table knows this key.
     static func isRecognized(_ key: String) -> Bool {
-        classify(key, chipFamily: chipFamily).name != key
+        classify(key, chip: HardwareInfo.chip).name != key
     }
 
     static func nameForKey(_ key: String) -> String {
-        classify(key, chipFamily: chipFamily).name
+        classify(key, chip: HardwareInfo.chip).name
     }
 
     static func categoryForKey(_ key: String) -> SensorCategory {
-        classify(key, chipFamily: chipFamily).category
+        classify(key, chip: HardwareInfo.chip).category
     }
 
     static func info(for key: String) -> SensorInfo {
@@ -129,14 +216,10 @@ enum SensorRegistry {
     /// alternates between two banks of P-cluster keys and holds the idle one at 40.0.
     static let parkedCpuReading = 40.0
 
-    /// CPU-cluster sensors (performance and efficiency) that carry a live reading.
-    /// Like macmon and mactop, the CPU average covers both clusters.
+    /// CPU-cluster sensors that carry a live reading. Like macmon and mactop, the
+    /// CPU average covers every cluster the chip has.
     static func cpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
-        sensors.filter { sensor in
-            let category = categoryForKey(sensor.id)
-            return (category == .cpuPerformance || category == .cpuEfficiency)
-                && sensor.temperature != parkedCpuReading
-        }
+        sensors.filter { categoryForKey($0.id) == .cpu && $0.temperature != parkedCpuReading }
     }
 
     static func gpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
@@ -157,6 +240,19 @@ enum SensorRegistry {
     }
 
     static let defaultCpuSensorKey = "TCMz"
+
+    /// What a fan curve follows when its profile names no sensor: the hottest point
+    /// of the CPU. TCMz is the SMC's own die maximum (M1–M4). M5 and M6 do not publish
+    /// it, so they use the hottest cluster sensor, which is what TCMz equals where
+    /// both exist. Never the average: the same curve would react far later on the
+    /// chips without TCMz.
+    static func defaultDrivingTemperature(from sensors: [Sensor]) -> Double {
+        if let dieMax = sensors.first(where: { $0.id == defaultCpuSensorKey }) {
+            return dieMax.temperature
+        }
+        let hottest = cpuMaximumTemperature(from: sensors)
+        return hottest > 0 ? hottest : (sensors.first?.temperature ?? 0)
+    }
     static let defaultGpuSensorKey = ""
 
     /// Readings outside this range are not real temperatures. Some SMC keys are
@@ -209,11 +305,12 @@ enum SensorRegistry {
         lines.append("=== Mystral SMC Export ===")
         lines.append("Date: \(ISO8601DateFormatter().string(from: Date()))")
         lines.append("Model: \(HardwareInfo.modelIdentifier())")
-        lines.append("Chip: \(HardwareInfo.chipName()) (family \(chipFamily.map(String.init) ?? "unknown"))")
+        lines.append("Chip: \(HardwareInfo.chipName()) (family \(HardwareInfo.chip.family.map(String.init) ?? "unknown"))")
 
         let chip = detectChip(sensors: sensors, fans: fans)
+        let levels = chip.cores.levels.map { "\($0.name) \($0.cores)" }.joined(separator: ", ")
         lines.append("Detected chip: \(chip.chipName)")
-        lines.append("CPU cores: \(chip.cores.total) (P \(chip.cores.performance), E \(chip.cores.efficiency)), GPU cores: \(chip.cores.gpu)")
+        lines.append("CPU cores: \(chip.cores.total) (\(levels)), GPU cores: \(chip.cores.gpu)")
         lines.append("CPU sensors: \(chip.cpuSensorCount), GPU sensors: \(chip.gpuSensorCount)")
         lines.append("Supported: \(chip.isSupported)")
         lines.append("")

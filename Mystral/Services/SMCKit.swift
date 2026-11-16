@@ -150,6 +150,10 @@ final class SMCKit: @unchecked Sendable {
 
     func readFloat(key: String) throws -> Double {
         let (bytes, dataType, _) = try readRawBytes(key: key)
+        return try Self.decode(bytes: bytes, dataType: dataType, key: key)
+    }
+
+    private static func decode(bytes: [UInt8], dataType: UInt32, key: String) throws -> Double {
         switch dataType {
         case DataType.flt:
             guard bytes.count >= 4 else { return 0 }
@@ -185,6 +189,16 @@ final class SMCKit: @unchecked Sendable {
     }
 
     func readInteger(key: String) throws -> Int { Int(try readFloat(key: key)) }
+
+    /// A temperature key's reading, or nil when the key does not hold a temperature.
+    /// Not every key starting with "T" is one: integer and flag keys decode to numbers
+    /// that can look like plausible temperatures. Apple Silicon publishes temperatures
+    /// as `flt`; `sp78` is the older fixed-point form. macmon and mactop read `flt` only.
+    func readTemperature(key: String) throws -> Double? {
+        let (bytes, dataType, _) = try readRawBytes(key: key)
+        guard dataType == DataType.flt || dataType == DataType.sp78 else { return nil }
+        return try Self.decode(bytes: bytes, dataType: dataType, key: key)
+    }
 
     func writeBytes(key: String, dataType: UInt32, bytes: [UInt8]) throws {
         let code = try tryWriteBytes(key: key, dataType: dataType, bytes: bytes)

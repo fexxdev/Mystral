@@ -54,19 +54,19 @@
     "%lld" : {
       "shouldTranslate" : false
     },
-    "%lld (%lld P + %lld E)" : {
-      "comment" : "CPU core count: total, performance cores, efficiency cores",
+    "%lld (%@)" : {
+      "comment" : "CPU core count: total, then the breakdown by core type, e.g. 11 (5 Performance + 6 Efficiency)",
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld (%2$lld P + %3$lld E)"
+            "value" : "%1$lld (%2$@)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld（%2$lld 个性能核心 + %3$lld 个能效核心）"
+            "value" : "%1$lld（%2$@）"
           }
         }
       }
@@ -574,6 +574,23 @@
         }
       }
     },
+    "Board" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scheda"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主板"
+          }
+        }
+      }
+    },
     "Build" : {
       "localizations" : {
         "it" : {
@@ -639,39 +656,6 @@
         }
       }
     },
-    "CPU Average (all cores)" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Media CPU (tutti i core)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CPU 平均温度（所有核心）"
-          }
-        }
-      }
-    },
-    "CPU E-Cores" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core E CPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CPU 能效核心"
-          }
-        }
-      }
-    },
     "CPU Max" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -685,23 +669,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU 最高温度"
-          }
-        }
-      }
-    },
-    "CPU P-Cores" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Core P CPU"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CPU 性能核心"
           }
         }
       }
@@ -766,6 +733,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU 核心数"
+          }
+        }
+      }
+    },
+    "CPU hottest sensor (default)" : {
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensore CPU più caldo (predefinito)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU 最热传感器（默认）"
           }
         }
       }
@@ -1186,18 +1169,18 @@
         }
       }
     },
-    "Driving: CPU Average" : {
+    "Driving: CPU hottest sensor" : {
       "localizations" : {
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guida: Media CPU"
+            "value" : "Guida: sensore CPU più caldo"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "参考：CPU 平均温度"
+            "value" : "参考：CPU 最热传感器"
           }
         }
       }
@@ -1214,6 +1197,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制为自定义配置"
+          }
+        }
+      }
+    },
+    "Efficiency" : {
+      "comment" : "CPU core type",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Efficienza"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "能效"
           }
         }
       }
@@ -2254,7 +2254,6 @@
       }
     },
     "Performance" : {
-      "extractionState" : "manual",
       "localizations" : {
         "it" : {
           "stringUnit" : {
@@ -2933,6 +2932,23 @@
         }
       }
     },
+    "Super" : {
+      "comment" : "CPU core type",
+      "localizations" : {
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Super"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超级"
+          }
+        }
+      }
+    },
     "Supported" : {
       "localizations" : {
         "it" : {
@@ -2977,22 +2993,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "“跟随系统”使用 macOS 的语言。更改将在 Mystral 重新启动后生效。"
-          }
-        }
-      }
-    },
-    "TCMz / %lld sensors" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCMz / %lld sensori"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "TCMz / %lld 个传感器"
           }
         }
       }
