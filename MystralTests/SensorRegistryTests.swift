@@ -149,30 +149,30 @@ final class SensorRegistryTests: XCTestCase {
     }
 
     /// The breakdown follows the levels the chip has, whatever the UI language calls them.
-    func testCpuCoresTextListsEveryLevel() {
+    func testCpuDescriptionListsEveryLevel() {
         func text(_ levels: [(String, Int)]) -> String {
-            SettingsView.cpuCoresText(.init(levels: levels.map { Level(name: $0.0, cores: $0.1) },
-                                            total: levels.reduce(0) { $0 + $1.1 }, gpu: 0))
+            HardwareInfo.CoreCounts(levels: levels.map { Level(name: $0.0, cores: $0.1) },
+                                    total: levels.reduce(0) { $0 + $1.1 }, gpu: 0).cpuDescription
         }
         let m3Pro = text([("Performance", 5), ("Efficiency", 6)])
         XCTAssertTrue(m3Pro.hasPrefix("11"))
         XCTAssertEqual(m3Pro.components(separatedBy: " + ").count, 2)
-        XCTAssertTrue(m3Pro.contains("5 \(SettingsView.localizedLevelName("Performance"))"))
-        XCTAssertTrue(m3Pro.contains("6 \(SettingsView.localizedLevelName("Efficiency"))"))
+        XCTAssertTrue(m3Pro.contains("5 \(Level(name: "Performance", cores: 0).localizedName)"))
+        XCTAssertTrue(m3Pro.contains("6 \(Level(name: "Efficiency", cores: 0).localizedName)"))
 
         // M5 Pro: super and performance cores, no efficiency cores.
         let m5Pro = text([("Super", 6), ("Performance", 12)])
         XCTAssertTrue(m5Pro.hasPrefix("18"))
-        XCTAssertTrue(m5Pro.contains("6 \(SettingsView.localizedLevelName("Super"))"))
-        XCTAssertFalse(m5Pro.contains(SettingsView.localizedLevelName("Efficiency")))
+        XCTAssertTrue(m5Pro.contains("6 \(Level(name: "Super", cores: 0).localizedName)"))
+        XCTAssertFalse(m5Pro.contains(Level(name: "Efficiency", cores: 0).localizedName))
 
         // M6: three levels.
         let m6 = text([("Super", 2), ("Performance", 4), ("Efficiency", 6)])
         XCTAssertTrue(m6.hasPrefix("12"))
         XCTAssertEqual(m6.components(separatedBy: " + ").count, 3)
 
-        XCTAssertEqual(SettingsView.cpuCoresText(.init(levels: [], total: 8, gpu: 0)), "8")
-        XCTAssertEqual(SettingsView.cpuCoresText(.unknown), "—")
+        XCTAssertEqual(HardwareInfo.CoreCounts(levels: [], total: 8, gpu: 0).cpuDescription, "8")
+        XCTAssertEqual(HardwareInfo.CoreCounts.unknown.cpuDescription, "—")
     }
 
     func testThisMacReportsConsistentCoreCounts() {

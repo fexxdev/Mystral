@@ -74,6 +74,16 @@ enum HardwareInfo {
             /// The kernel's name for the level: "Performance", "Efficiency" or "Super".
             var name: String
             var cores: Int
+
+            /// The kernel names core types in English; translate the ones we know.
+            var localizedName: String {
+                switch name {
+                case "Performance": String(localized: "Performance", comment: "CPU core type")
+                case "Efficiency": String(localized: "Efficiency", comment: "CPU core type")
+                case "Super": String(localized: "Super", comment: "CPU core type")
+                default: name
+                }
+            }
         }
 
         /// CPU performance levels, fastest first. Two on most chips, three on M6;
@@ -84,6 +94,17 @@ enum HardwareInfo {
         var gpu: Int
 
         static let unknown = CoreCounts(levels: [], total: 0, gpu: 0)
+
+        /// "11 (5 Performance + 6 Efficiency)", with the levels the chip really has:
+        /// Super + Efficiency on M5, Super + Performance on M5 Pro/Max, all three on M6.
+        /// The plain count when the system reports no levels, "—" when it reports nothing.
+        var cpuDescription: String {
+            guard total > 0 else { return "—" }
+            guard levels.count > 1 else { return "\(total)" }
+            let parts = levels.map { "\($0.cores) \($0.localizedName)" }.joined(separator: " + ")
+            return String(localized: "\(total) (\(parts))",
+                          comment: "CPU core count: total, then the breakdown by core type, e.g. 11 (5 Performance + 6 Efficiency)")
+        }
     }
 
     /// Read once: the hardware does not change while the app runs.

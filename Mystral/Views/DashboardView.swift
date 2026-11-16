@@ -162,7 +162,7 @@ struct DashboardView: View {
     /// Points for one series sampled once per tick, newest last. A nil entry is a tick
     /// without a reading: it gets no point, but still counts for the timing, so every
     /// other point stays at the moment it was measured.
-    static func chartPoints(_ history: [Double?], series: String, interval: Double) -> [ChartPoint] {
+    nonisolated static func chartPoints(_ history: [Double?], series: String, interval: Double) -> [ChartPoint] {
         let n = history.count
         return history.enumerated().compactMap { i, value in
             value.map { ChartPoint(id: "\(series)-\(i)", series: series,
