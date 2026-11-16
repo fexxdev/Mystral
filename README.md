@@ -28,7 +28,7 @@ macOS keeps Apple Silicon fans quiet until the chip is already hot. Mystral lets
 - **Driving sensor**: base a curve on the CPU average or on any single sensor.
 - **Manual override**: pin a fan to a fixed speed from the Fans view.
 - **Smooth, quiet behaviour**: EMA smoothing on the input temperature, a deadband that skips tiny speed changes, and an optional minimum fan speed.
-- **Aggressive re-assert**: re-applies forced mode on every tick when the SMC firmware tries to take control back.
+- **Aggressive re-assert**: keeps re-applying forced mode in case the SMC firmware takes control back.
 - **Quiet sleep**: before the Mac sleeps, fans go back to macOS automatic control. Your curve takes over again on wake.
 
 ### 📊 Monitoring
@@ -86,8 +86,8 @@ English, Italiano and 简体中文. Mystral follows your macOS language, or pick
 | **Mac** | Apple Silicon, M1 through M5 |
 | **Permissions** | One administrator password to install the fan helper |
 
-> [!WARNING]
-> **M3/M4 Pro and Max MacBook Pro on macOS Sequoia or later:** Apple locks manual fan control in firmware on these models (`MacBookPro20,2`–`20,7` and `MacBookPro21,2`–`21,5`). No third-party app can override it. Mystral detects these models, shows a warning in Settings, and still gives you full monitoring, power readings and alerts.
+> [!NOTE]
+> Mystral takes manual control of the fans by unlocking the SMC `Ftst` key; this is verified on an M3 Pro MacBook Pro running macOS 27. **Settings → Chip Detection → Fan control** shows **Working** while Mystral is driving the fans. If it says **Not available** on your Mac, please [open an issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export from **Settings → Diagnostics**.
 
 ## Installation
 
@@ -167,7 +167,7 @@ log show --last 1h --predicate 'subsystem == "com.fexxdev.Mystral"'
 <details>
 <summary><b>My fans don't change speed</b></summary>
 
-- Check **Settings → Chip Detection**. If it shows the firmware-lock warning, Apple blocks manual fan control on your model (see [Requirements](#requirements)).
+- Check **Settings → Chip Detection → Fan control**. **Working** means the fans are in forced mode under Mystral. **Not available** means the SMC kept them in automatic mode: please [report it](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export.
 - Make sure **Aggressively re-assert manual control** is on in **Settings → Fan Behavior**.
 - Run the **30s stress test** in **Settings → Diagnostics** to check whether the fans react.
 </details>
@@ -218,7 +218,7 @@ Mystral collects no telemetry or usage data. Its only network request is the Git
 
 ## Credits
 
-Built by [@fexxdev](https://github.com/fexxdev). Simplified Chinese translation by [@huangyixin447](https://github.com/huangyixin447). The firmware-lock model list comes from the [Macs Fan Control investigation](https://github.com/crystalidea/macs-fan-control/issues/785).
+Built by [@fexxdev](https://github.com/fexxdev). Simplified Chinese translation by [@huangyixin447](https://github.com/huangyixin447).
 
 ## License
 

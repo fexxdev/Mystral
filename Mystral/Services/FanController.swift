@@ -205,7 +205,7 @@ final class FanController {
                 forcedModeSet = true
                 ticksSinceForcedReassert = 0
             } catch {
-                logger.info("Forced fan mode not available (expected on M3/M4 Pro/Max): \(error.localizedDescription, privacy: .public)")
+                logger.info("Forced fan mode not available: \(error.localizedDescription, privacy: .public)")
             }
         }
 

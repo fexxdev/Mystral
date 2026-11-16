@@ -417,22 +417,6 @@
         }
       }
     },
-    "Apple firmware-locks manual fan control on M3/M4 Pro/Max MacBook Pros running macOS Sequoia and later. No third-party app — including Mystral, Macs Fan Control, or iStat — can override this." : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple blocca a livello di firmware il controllo manuale delle ventole sui MacBook Pro M3/M4 Pro/Max con macOS Sequoia e successivi. Nessuna app di terze parti, comprese Mystral, Macs Fan Control e iStat, può aggirare questo blocco."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在运行 macOS Sequoia 及更高版本的 M3/M4 Pro/Max MacBook Pro 上，Apple 固件锁定了手动风扇控制。任何第三方软件（包括 Mystral、Macs Fan Control 或 iStat）均无法突破此限制。"
-          }
-        }
-      }
-    },
     "Are you sure you want to delete \"%@\"?" : {
       "localizations" : {
         "it" : {
@@ -1840,22 +1824,6 @@
         }
       }
     },
-    "Limited fan control on this Mac" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Controllo ventole limitato su questo Mac"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 Mac 上的风扇控制受限"
-          }
-        }
-      }
-    },
     "Manual Override" : {
       "localizations" : {
         "it" : {
@@ -2546,22 +2514,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每个周期都重新设置强制模式，防止 SMC 固件还原你的设置。"
-          }
-        }
-      }
-    },
-    "Read more" : {
-      "localizations" : {
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Scopri di più"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "了解详情"
           }
         }
       }

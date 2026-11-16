@@ -42,7 +42,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             chipSection
-            if HardwareInfo.isFirmwareLocked { firmwareLockSection }
             generalSection
             menuBarSection
             monitoringSection
@@ -86,28 +85,6 @@ struct SettingsView: View {
                 badText: "Not available",
                 badColor: .red
             )
-        }
-    }
-
-    private var firmwareLockSection: some View {
-        Section {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.orange)
-                    .font(.title2)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Limited fan control on this Mac")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Apple firmware-locks manual fan control on M3/M4 Pro/Max MacBook Pros running macOS Sequoia and later. No third-party app — including Mystral, Macs Fan Control, or iStat — can override this.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Link("Read more", destination: URL(string: "https://github.com/crystalidea/macs-fan-control/issues/785")!)
-                        .font(.caption)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 4)
         }
     }
 

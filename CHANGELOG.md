@@ -13,6 +13,8 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 ### Fixed
 - Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
 - Italian: restored the parts of several Settings and Profiles explanations that were cut short.
+- Removed the firmware-lock warning for M3/M4 Pro and Max MacBook Pros. Its model list used identifiers no Mac has (`MacBookPro20,x`, `MacBookPro21,x`), so it never appeared, and manual fan control does work on an M3 Pro (`Mac15,6`) running macOS 27.
+- **Settings → Chip Detection → Fan control** now shows **Working** only while the fans are actually in forced mode under Mystral. It used to show **Working** for any fan with a speed range.
 
 ## [1.1.7] — 2026-11-11
 

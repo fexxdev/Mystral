@@ -218,7 +218,9 @@ enum SensorRegistry {
         let cpuCores = cpuCoreSensors(from: sensors).count
         let gpuCores = gpuCoreSensors(from: sensors).count
         let hasSummary = keys.contains("TCMz") || keys.contains("TCMb")
-        let hasFanControl = fans.contains { $0.maxRPM > $0.minRPM }
+        // Mystral forces every fan it drives, so a fan still in automatic mode means the
+        // SMC did not accept manual control (or the helper hasn't applied it yet).
+        let hasFanControl = fans.contains { $0.maxRPM > $0.minRPM && $0.mode == .forced }
 
         let sysName = HardwareInfo.chipName()
         let chipName = sysName.isEmpty ? (cpuCores > 0 ? "Apple Silicon" : "Unknown") : sysName
