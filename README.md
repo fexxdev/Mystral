@@ -211,7 +211,7 @@ open Mystral.xcodeproj            # develop and run
 
 For a Developer ID build, set `MYSTRAL_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"`. `build-dmg.sh` also writes `Mystral-x.x.x.dmg.sig` with the Ed25519 release key from your Keychain (`scripts/update-key.sh`). Forks must generate their own key and replace `UpdateSignature.publicKeyBase64`.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for tests, the release process and translations.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for tests, the release process and translations, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the app, the helper and the sensor rules work in detail.
 
 ## Privacy
 

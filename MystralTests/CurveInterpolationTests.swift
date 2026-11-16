@@ -22,4 +22,24 @@ final class CurveInterpolationTests: XCTestCase {
                         CurvePoint(temperature: 90, fanPercentage: 100), CurvePoint(temperature: 50, fanPercentage: 30)]
         XCTAssertEqual(FanController.interpolate(temperature: 40, curve: unsorted), 20, accuracy: 0.01)
     }
+
+    // MARK: - Heartbeat
+
+    /// The helper hands the fans back to macOS when it hears nothing for
+    /// `heartbeatTimeout`, and it only looks every `tickInterval`. Whatever polling
+    /// interval the user picks, a heartbeat must land inside that window. At 10 s
+    /// polling the per-tick heartbeat did not, and the fans ran on automatic control.
+    func testHeartbeatAlwaysBeatsTheHelperTimeout() {
+        for polling in [2.0, 5.0, 10.0] {
+            let gap = FanController.heartbeatPeriod(forPollingInterval: polling) ?? polling
+            XCTAssertLessThan(gap + SMCHelperMode.tickInterval, SMCHelperMode.heartbeatTimeout,
+                              "polling every \(polling) s leaves the helper without a heartbeat for too long")
+        }
+    }
+
+    func testFastPollingNeedsNoSeparateHeartbeat() {
+        XCTAssertNil(FanController.heartbeatPeriod(forPollingInterval: 2))
+        XCTAssertEqual(FanController.heartbeatPeriod(forPollingInterval: 5), FanController.heartbeatInterval)
+        XCTAssertEqual(FanController.heartbeatPeriod(forPollingInterval: 10), FanController.heartbeatInterval)
+    }
 }

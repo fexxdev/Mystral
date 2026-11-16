@@ -75,6 +75,12 @@ enum SMCHelperMode {
         }
     }
 
+    /// How often the helper wakes to apply commands and publish readings.
+    static let tickInterval: TimeInterval = 2
+    /// Without a heartbeat from the app for this long, the helper hands the fans back
+    /// to macOS: a crashed or hung app must not leave them pinned at a stale speed.
+    static let heartbeatTimeout: TimeInterval = 8
+
     static func shouldRestoreForHeartbeat(lastHeartbeat: Date?, now: Date, timeout: TimeInterval) -> Bool {
         guard let lastHeartbeat else { return false }
         return now.timeIntervalSince(lastHeartbeat) >= timeout
@@ -129,7 +135,7 @@ enum SMCHelperMode {
         var restoredAfterReadFailure = false
         var ipcUnavailable = false
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now(), repeating: 2.0, leeway: .milliseconds(100))
+        timer.schedule(deadline: .now(), repeating: tickInterval, leeway: .milliseconds(100))
         timer.setEventHandler {
             // Reopened every tick so a recreated directory is picked up and re-validated.
             let ipc = SMCIPC.openForHelper()
@@ -140,7 +146,7 @@ enum SMCHelperMode {
             if let ipc {
                 processCommands(smc: smc, ipc: ipc, lastHeartbeat: &lastHeartbeat)
             }
-            if shouldRestoreForHeartbeat(lastHeartbeat: lastHeartbeat, now: Date(), timeout: 8) {
+            if shouldRestoreForHeartbeat(lastHeartbeat: lastHeartbeat, now: Date(), timeout: heartbeatTimeout) {
                 logger.warning("SMCHelper — app heartbeat timed out; restoring automatic fan control")
                 ipc?.purgeCommands()
                 _ = restoreAutoMode(smc: smc)

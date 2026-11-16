@@ -31,7 +31,9 @@ open Mystral.xcodeproj
 | `Mystral/Localizable.xcstrings` | String catalog for every language |
 | `MystralTests` | Unit tests |
 | `scripts` | Release DMG build, update-signing key tools |
-| `docs/superpowers` | Design specs and implementation plans for larger features |
+| `docs/ARCHITECTURE.md` | How the system works today: processes, helper protocol, polling loop, sensors, power |
+| `docs/superpowers` | Dated design specs and implementation plans written before each feature |
+| `CLAUDE.md` | Working notes for AI coding agents: build, verification, sensor and localization rules, release |
 
 ## Running tests
 
@@ -44,6 +46,8 @@ xcodebuild test \
 ```
 
 CI ([`ci.yml`](.github/workflows/ci.yml)) also builds Debug and Release, lints `Info.plist`, the preset JSON files and the shell scripts, and requires at least 10% line coverage.
+
+CI uses Xcode 16.4, which is stricter about actor isolation than newer Xcodes: every member of a SwiftUI `View`, static ones included, is isolated to the main actor. If you develop with a newer Xcode, keep helpers that tests or services call off the views (put them on the model or service), or run the tests once with Xcode 16 before pushing.
 
 ## Debugging
 
@@ -69,6 +73,7 @@ Writing new UI code:
 - For a `String` built in code, use `String(localized: "…")`.
 - Don't add `String` overloads to helpers that take `LocalizedStringKey`. For literals Swift picks the `String` one, and the text silently stays in English.
 - Text that is only looked up at runtime (enum `rawValue`s, preset names) must be in the catalog with **Manual** extraction, and covered in `LocalizationTests`.
+- Sensor names are English and not translated; sensor category names are.
 
 The build extracts strings from Swift (`SWIFT_EMIT_LOC_STRINGS`), so Xcode adds new keys to the catalog when you build in the IDE.
 
@@ -80,6 +85,7 @@ The build extracts strings from Swift (`SWIFT_EMIT_LOC_STRINGS`), so Xcode adds 
 - No force-unwraps in non-test code unless the invariant truly cannot break.
 - Prefer existing files; don't add abstractions for one-off needs.
 - Anything that runs as root (helper mode, IPC, install) gets extra scrutiny: validate inputs, don't follow symlinks, and never pass unescaped input to a shell.
+- Claims about hardware need evidence. Before naming an SMC key or saying a chip supports something, measure it on a real Mac or find it confirmed by independent projects, and say which in the commit. See the Sensors section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Filing a PR
 

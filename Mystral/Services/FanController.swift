@@ -18,6 +18,7 @@ final class FanController {
     private let smcService: SMCServiceProtocol
     private let profileManager: ProfileManager
     private var timer: Timer?
+    private var heartbeatTimer: Timer?
 
     /// Power readings, sampled once per tick so their history shares the polling
     /// cadence with sensor history (consumed by the dashboard's power chart and the
@@ -126,12 +127,42 @@ final class FanController {
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+        startHeartbeatIfNeeded()
+    }
+
+    /// The longest the app may go between heartbeats. The helper gives the fans back
+    /// to macOS after `SMCHelperMode.heartbeatTimeout` and only looks every
+    /// `tickInterval`, so a heartbeat must land well inside that window.
+    nonisolated static let heartbeatInterval: TimeInterval = 3
+
+    /// A polling tick sends a heartbeat, which is enough at the 2 s interval. At 5 s
+    /// and 10 s it is not: at 10 s the helper timed out between ticks and the fans
+    /// spent most of the time on automatic control. Those intervals get a separate
+    /// heartbeat. Returns its period, or nil when the ticks suffice.
+    nonisolated static func heartbeatPeriod(forPollingInterval interval: TimeInterval) -> TimeInterval? {
+        interval > heartbeatInterval ? heartbeatInterval : nil
+    }
+
+    private func startHeartbeatIfNeeded() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+        guard let period = Self.heartbeatPeriod(forPollingInterval: pollingInterval) else { return }
+        let t = Timer(timeInterval: period, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isRunning else { return }
+                try? self.smcService.heartbeat()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        heartbeatTimer = t
     }
 
     func stop() {
         logger.info("stop() — invalidating timer, restoring auto mode")
         timer?.invalidate()
         timer = nil
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
         isRunning = false
         restoreAutoMode()
     }
