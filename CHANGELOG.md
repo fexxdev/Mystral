@@ -6,31 +6,41 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+## [1.1.8] — 2026-11-16
+
 ### Added
 - Simplified Chinese (zh-Hans) localization across all menus, views, alerts, settings, and sensor categories (thanks @huangyixin447).
 - **Language** picker in Settings → General: System, English, Italiano or 简体中文. It sets Mystral's own language (the same setting as System Settings → Language & Region → Applications) and offers to restart, reopening on Settings.
 
 ### Fixed
-- With the polling interval set to 10 seconds, the fans ran on macOS automatic control most of the time. The helper gives the fans back when it hears nothing from the app for 8 seconds, and the app only signalled once per polling tick. It now signals every 3 seconds whenever the polling interval is longer than that.
-- Sensor names and categories were wrong on most chips. The catalog named keys like `Tp0C` "CPU E-Core 4" on every Mac and filed every `Ts*` key as SSD. Keys are now grouped by what they measure (CPU, GPU, SoC, memory, SSD, battery, airflow, board, power delivery), with rules for each chip generation from M1 to M6 and the A18 Pro. The rules were checked against Stats, macmon, mactop and iSMC, against CPU-only, E-core-only and GPU-only load tests on an M3 Pro, and against the load recordings iSMC publishes for twelve Macs (M1 Ultra, M3, M3 Pro, M3 Max, M4, M4 Pro, M4 Max, M5, M5 Pro, M5 Max, M6): a group counts as CPU or GPU only if it warms under that load, and as SSD, battery or board only if it does not. No key is named after a specific core any more, since no tool can tie these keys to one core.
-- Chip-specific fixes that came out of those recordings: on M5 Pro and M5 Max the 40 `Tm` keys are CPU sensors, not memory; on M5 and M6 the `Ta0x` keys follow the CPU and are not airflow; on M1 the `TpD` keys are power-delivery sensors that were counted as CPU; `Ts` keys follow CPU and GPU load on every chip and are SoC sensors, with only `Ts…P` belonging to the SSD.
-- The default fan-curve temperature is the hottest point of the CPU on every chip. M5 and M6 do not publish the `TCMz` key the default relied on, so their curves followed the average of the CPU sensors and reacted later than on older chips. The curve editor and Dashboard now say "CPU hottest sensor" instead of "CPU Average", which the default never was.
-- **Settings → Chip Detection** shows the real CPU and GPU core counts, with the core types the chip has: for example 11 (5 Performance + 6 Efficiency) on an M3 Pro, Super + Efficiency on M5, Super + Performance on M5 Pro/Max and three types on M6. It used to show the number of SMC temperature sensors, for example 48 CPU and 18 GPU "cores" on an M3 Pro (thanks @huangyixin447 for the approach).
-- The CPU average covers every CPU cluster the chip has, and ignores the parked 40.0 °C bank that M4 Pro/Max report. The app names sensors from its own catalog, so new names apply without reinstalling the fan helper.
-- Only SMC keys that hold a temperature value are read as sensors. Integer and flag keys starting with "T" could show up as temperatures when their value happened to fall between 10 and 130.
-- CPU and GPU power on Ultra chips add up the per-die counters once, whether or not the chip also publishes a total.
-- The Dashboard grids and temperature cards say **sensors** instead of **cores**, since each square is an SMC sensor, not a core. The grids are open by default and remember whether you closed them.
-- Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
-- Italian: restored the parts of several Settings and Profiles explanations that were cut short.
-- Removed the firmware-lock warning for M3/M4 Pro and Max MacBook Pros. Its model list used identifiers no Mac has (`MacBookPro20,x`, `MacBookPro21,x`), so it never appeared, and manual fan control does work on an M3 Pro (`Mac15,6`) running macOS 27.
-- **Settings → Chip Detection → Fan control** now shows **Working** only while the fans are actually in forced mode under Mystral. It used to show **Working** for any fan with a speed range.
+
+#### Power (macOS 27)
 - CPU power no longer spikes to impossible values such as 1,900 W on macOS 27 (#4). On macOS 27 the CPU energy counter Mystral reads stops moving for long stretches and then delivers all the missed energy in one sample. That energy is now averaged over the whole time the counter stood still. A reading that is negative, above 500 W, or far above the Mac's total power is dropped.
 - On macOS 27, CPU and GPU power are read from the AppleCLPC energy counters, which keep counting where the old source freezes. This covers the 17 Apple Silicon drivers known for macOS 27 (table ported from [macmon](https://github.com/vladkens/macmon), MIT). Other macOS versions and unknown chips keep the old source.
 - While a CPU energy counter stands still, CPU power is shown as unavailable after 6 seconds instead of a false 0 W.
 - A power reading is taken over at least half the polling interval, measured on a clock that keeps running during sleep, and the measurement restarts after the Mac wakes from sleep (not when only a display wakes). A total system power reading above 1,500 W is ignored.
 - The power chart keeps a missed reading as a gap, so the CPU, GPU and Total lines stay lined up in time.
 - Power below 10 W is shown with one decimal (for example CPU 1.4 W, GPU 0.1 W) in the menu bar, the dropdown and the Dashboard. Rounding to whole watts showed real idle readings as 0 W or 1 W.
+- CPU and GPU power on Ultra chips add up the per-die counters once, whether or not the chip also publishes a total.
+
+#### Fan control
+- With the polling interval set to 10 seconds, the fans ran on macOS automatic control most of the time. The helper gives the fans back when it hears nothing from the app for 8 seconds, and the app only signalled once per polling tick. It now signals every 3 seconds whenever the polling interval is longer than that.
+- The default fan-curve temperature is the hottest point of the CPU on every chip. M5 and M6 do not publish the `TCMz` key the default relied on, so their curves followed the average of the CPU sensors and reacted later than on older chips. The curve editor and Dashboard now say "CPU hottest sensor" instead of "CPU Average", which the default never was.
+- **Settings → Chip Detection → Fan control** now shows **Working** only while the fans are actually in forced mode under Mystral. It used to show **Working** for any fan with a speed range.
+- Removed the firmware-lock warning for M3/M4 Pro and Max MacBook Pros. Its model list used identifiers no Mac has (`MacBookPro20,x`, `MacBookPro21,x`), so it never appeared, and manual fan control does work on an M3 Pro (`Mac15,6`) running macOS 27.
+
+#### Sensors and chips (M1 to M6)
+- Sensor names and categories were wrong on most chips. The catalog named keys like `Tp0C` "CPU E-Core 4" on every Mac and filed every `Ts*` key as SSD. Keys are now grouped by what they measure (CPU, GPU, SoC, memory, SSD, battery, airflow, board, power delivery), with rules for each chip generation from M1 to M6 and the A18 Pro. The rules were checked against Stats, macmon, mactop and iSMC, against CPU-only, E-core-only and GPU-only load tests on an M3 Pro, and against the load recordings iSMC publishes for twelve Macs (M1 Ultra, M3, M3 Pro, M3 Max, M4, M4 Pro, M4 Max, M5, M5 Pro, M5 Max, M6): a group counts as CPU or GPU only if it warms under that load, and as SSD, battery or board only if it does not. No key is named after a specific core any more, since no tool can tie these keys to one core.
+- Chip-specific fixes that came out of those recordings: on M5 Pro and M5 Max the 40 `Tm` keys are CPU sensors, not memory; on M5 and M6 the `Ta0x` keys follow the CPU and are not airflow; on M1 the `TpD` keys are power-delivery sensors that were counted as CPU; `Ts` keys follow CPU and GPU load on every chip and are SoC sensors, with only `Ts…P` belonging to the SSD.
+- **Settings → Chip Detection** shows the real CPU and GPU core counts, with the core types the chip has: for example 11 (5 Performance + 6 Efficiency) on an M3 Pro, Super + Efficiency on M5, Super + Performance on M5 Pro/Max and three types on M6. It used to show the number of SMC temperature sensors, for example 48 CPU and 18 GPU "cores" on an M3 Pro (thanks @huangyixin447 for the approach).
+- The CPU average covers every CPU cluster the chip has, and ignores the parked 40.0 °C bank that M4 Pro/Max report. The app names sensors from its own catalog, so new names apply without reinstalling the fan helper.
+- Only SMC keys that hold a temperature value are read as sensors. Integer and flag keys starting with "T" could show up as temperatures when their value happened to fall between 10 and 130.
 - The temperature charts no longer dip toward 0 °C. Readings outside 10–130 °C, such as unpopulated SMC rails at 1–3 °C, are ignored. A sensor that drops out for a few ticks keeps its history, and sensors with histories of different lengths are now lined up on their newest sample. They used to be lined up on their oldest, which put recent readings at the wrong time on the dashboard chart and in the menu bar mini graph.
+- The Dashboard grids and temperature cards say **sensors** instead of **cores**, since each square is an SMC sensor, not a core. The grids are open by default and remember whether you closed them.
+
+#### Languages
+- Settings captions, profile trigger labels, preset profile names, the update and export status lines, chart legends and a few counters were shown in English in every language; they now go through the string catalog.
+- Italian: restored the parts of several Settings and Profiles explanations that were cut short.
 
 ## [1.1.7] — 2026-11-11
 
