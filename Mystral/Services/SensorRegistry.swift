@@ -84,9 +84,13 @@ enum SensorRegistry {
         // CPU clusters
         case "Tp":
             if third == "D" { return ("Power Delivery", .vrm) }        // M1: TpD0… never follow CPU load
+            if third == "x" { return ("CPU Die Aggregate", .cpuSummary) }
             if chip.family == 1, m1EfficiencyKeys.contains(key) { return ("CPU E-Cluster", .cpu) }
             return (performanceClusterName(chip), .cpu)
         case "Te":
+            // Tpx… and Tex… (M4) are per-die aggregates: half of them repeat the maximum
+            // of a probe group exactly. They are summaries, not further probes.
+            if third == "x" { return ("CPU Die Aggregate", .cpuSummary) }
             // M1 uses Te0x for the CPU die; from M2 on they are the efficiency cluster.
             return (chip.family == 1 ? "CPU Die" : "CPU E-Cluster", .cpu)
         case "Tc":
@@ -226,8 +230,12 @@ enum SensorRegistry {
         sensors.filter { categoryForKey($0.id) == .gpu }
     }
 
+    /// The three whole-CPU values every chip publishes, in display order. Other
+    /// summary keys (the per-die aggregates on M4) stay in the Sensors list.
+    static let headlineSummaryKeys = ["TCMz", "TCMb", "TCDX"]
+
     static func cpuSummarySensors(from sensors: [Sensor]) -> [Sensor] {
-        sensors.filter { categoryForKey($0.id) == .cpuSummary }
+        headlineSummaryKeys.compactMap { key in sensors.first { $0.id == key } }
     }
 
     static func cpuMaximumTemperature(from sensors: [Sensor]) -> Double {
@@ -242,15 +250,19 @@ enum SensorRegistry {
     static let defaultCpuSensorKey = "TCMz"
 
     /// What a fan curve follows when its profile names no sensor: the hottest point
-    /// of the CPU. TCMz is the SMC's own die maximum (M1–M4). M5 and M6 do not publish
-    /// it, so they use the hottest cluster sensor, which is what TCMz equals where
-    /// both exist. Never the average: the same curve would react far later on the
-    /// chips without TCMz.
+    /// of the CPU, which is the highest of TCMz and the CPU cluster sensors.
+    ///
+    /// TCMz is the SMC's own die maximum (M1–M4), and where it is published it equals
+    /// the hottest cluster sensor. M5 and M6 do not publish it. Never the average: the
+    /// same curve would react far later.
+    ///
+    /// TCMz alone is not steady on M4 Pro/Max. It is the maximum over the keys that are
+    /// live that instant, so when the performance cores switch off for a second it
+    /// falls by 15–20 °C and comes straight back, and it lags for a tick when the two
+    /// key banks swap. The cluster sensors, live or held through such a gap, do not.
     static func defaultDrivingTemperature(from sensors: [Sensor]) -> Double {
-        if let dieMax = sensors.first(where: { $0.id == defaultCpuSensorKey }) {
-            return dieMax.temperature
-        }
-        let hottest = cpuMaximumTemperature(from: sensors)
+        let dieMax = sensors.first(where: { $0.id == defaultCpuSensorKey })?.temperature ?? 0
+        let hottest = max(dieMax, cpuMaximumTemperature(from: sensors))
         return hottest > 0 ? hottest : (sensors.first?.temperature ?? 0)
     }
     static let defaultGpuSensorKey = ""
@@ -348,7 +360,8 @@ enum SensorRegistry {
     }
 }
 
-/// Keeps per-sensor temperature history across ticks.
+/// Keeps per-sensor temperature history across ticks, and bridges the moments when
+/// the SMC switches CPU keys off.
 ///
 /// A sensor can be missing for a tick or two: its read failed, or the value was
 /// outside `SensorRegistry.plausibleTemperatureRange` and was dropped. Its history
@@ -356,15 +369,43 @@ enum SensorRegistry {
 /// Here a short absence repeats the last value for each missed tick, so the history
 /// keeps one entry per tick and stays lined up in time with the other sensors.
 /// A long absence discards it.
+///
+/// CPU cluster keys go further. An M4 Pro publishes two banks of 51 performance
+/// keys. Under heavy load both are live; under light load only one is, and they take
+/// turns; when the cores idle, both are off for a second or two. A bank that is off
+/// reads exactly 40.0 °C or a few degrees around zero. So the CPU went from 61
+/// sensors to 10 and back between ticks, and the average, the maximum and the grid
+/// jumped with it (issue #8; the same shows in iSMC's M4 Pro recording).
+///
+/// A key that just went off is therefore held at its last live reading for a few
+/// ticks, but only to fill a gap: as many keys are shown as on the previous tick,
+/// never more. When the other bank takes over, as many keys are live as before and
+/// nothing is held.
 struct SensorHistoryStore {
     /// Ticks a sensor may be missing before its history is discarded.
     static let maximumMissedTicks = 5
+    /// How long a CPU key that went off keeps showing its last live reading.
+    static let cpuHoldDuration: TimeInterval = 10
+
+    /// Hold ticks for a polling interval: about `cpuHoldDuration`, at least one tick.
+    static func cpuHoldTicks(forPollingInterval interval: TimeInterval) -> Int {
+        max(1, Int((cpuHoldDuration / max(0.1, interval)).rounded()))
+    }
 
     private var histories: [String: [Double]] = [:]
     private var missedTicks: [String: Int] = [:]
+    private var lastLiveCPU: [String: (value: Double, missed: Int)] = [:]
+    /// CPU cluster keys shown on the previous tick, live and held.
+    private var shownCPUCount = 0
 
     /// Attach the stored history to each sensor and record its current temperature.
-    mutating func carry(into sensors: inout [Sensor], maxHistory: Int) {
+    /// CPU cluster keys that are parked or absent are held at their last live reading
+    /// (`Sensor.isHeld`); absent ones are added back to `sensors`.
+    mutating func carry(into sensors: inout [Sensor], maxHistory: Int,
+                        cpuHoldTicks: Int = SensorHistoryStore.maximumMissedTicks,
+                        isCPUCluster: (String) -> Bool = { SensorRegistry.categoryForKey($0) == .cpu }) {
+        holdGatedCPUKeys(in: &sensors, holdTicks: max(1, cpuHoldTicks), isCPUCluster: isCPUCluster)
+
         let limit = max(1, maxHistory)
         var seen = Set<String>()
         for i in sensors.indices {
@@ -389,6 +430,45 @@ struct SensorHistoryStore {
                 }
             }
         }
+    }
+
+    private mutating func holdGatedCPUKeys(in sensors: inout [Sensor], holdTicks: Int, isCPUCluster: (String) -> Bool) {
+        var liveIDs = Set<String>()
+        var parkedIndex: [String: Int] = [:]
+        for i in sensors.indices where isCPUCluster(sensors[i].id) {
+            if sensors[i].temperature == SensorRegistry.parkedCpuReading {
+                parkedIndex[sensors[i].id] = i
+            } else {
+                liveIDs.insert(sensors[i].id)
+                lastLiveCPU[sensors[i].id] = (sensors[i].temperature, 0)
+            }
+        }
+        for (id, entry) in lastLiveCPU where !liveIDs.contains(id) {
+            lastLiveCPU[id] = entry.missed >= holdTicks ? nil : (entry.value, entry.missed + 1)
+        }
+
+        // Fill up to what was shown last tick, most recently live first, so a key that
+        // just went off wins over a bank that has been idle for a while.
+        let gap = shownCPUCount - liveIDs.count
+        let held = gap > 0
+            ? Array(lastLiveCPU.filter { !liveIDs.contains($0.key) }
+                .sorted { ($0.value.missed, $0.key) < ($1.value.missed, $1.key) }
+                .prefix(gap))
+            : []
+        shownCPUCount = liveIDs.count + held.count
+        guard !held.isEmpty else { return }
+        var appended = false
+        for (id, entry) in held {
+            if let index = parkedIndex[id] {
+                sensors[index].temperature = entry.value
+                sensors[index].isHeld = true
+            } else {
+                sensors.append(Sensor(id: id, name: SensorRegistry.nameForKey(id), temperature: entry.value, isHeld: true))
+                appended = true
+            }
+        }
+        // The helper lists keys in SMC order, which is sorted; keep a held key in its place.
+        if appended { sensors.sort { $0.id < $1.id } }
     }
 }
 

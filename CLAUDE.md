@@ -39,7 +39,9 @@ This project has shipped wrong facts copied from code or other tools: a firmware
 - Unknown keys keep their key as name (`isRecognized` is false). Do not invent a label.
 - Reference projects: exelban/stats, vladkens/macmon, metaspartan/mactop (MIT: data may be ported with a notice in `THIRD-PARTY-NOTICES.md`); dkorunic/iSMC and narugit/smctemp (GPL: read and test against them, copy nothing).
 - Only `flt` and `sp78` SMC keys are temperatures. Readings outside 10–130 °C are dropped, and a CPU key at exactly 40.0 °C is a parked slot.
-- The fan curve's default temperature is the hottest CPU point (`defaultDrivingTemperature`): `TCMz` where it exists, else the hottest cluster sensor. M5 and M6 have no `TCMz`.
+- CPU keys switch off and on within seconds on M4 Pro/Max (two banks of 51 keys; off means 40.0 °C or a value below 10 °C). `SensorHistoryStore` holds a key that just went off at its last live reading for about 10 s. Anything computed from "the CPU sensors" must tolerate the set changing from tick to tick; replay iSMC's `m4-pro-run.json` series when touching this.
+- `Tpx…`/`Tex…` are per-die aggregates (CPU summary), not cluster sensors.
+- The fan curve's default temperature is the hottest CPU point (`defaultDrivingTemperature`): the highest of `TCMz` and the cluster sensors, live or held. M5 and M6 have no `TCMz`, and on M4 Pro/Max `TCMz` alone drops 15–20 °C for a tick when the cluster switches off.
 - Core counts and core types come from `sysctl` (`hw.nperflevels`, `hw.perflevelN.name`), never from sensor counts and never assumed to be P + E.
 
 ## Power

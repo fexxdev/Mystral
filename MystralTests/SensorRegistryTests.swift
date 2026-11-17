@@ -100,11 +100,11 @@ final class SensorRegistryTests: XCTestCase {
 
     func testHistorySurvivesShortDropout() {
         var store = SensorHistoryStore()
-        var tick1 = [Sensor(id: "Tp01", name: "P1", temperature: 40)]
+        var tick1 = [Sensor(id: "TB0T", name: "Battery", temperature: 40)]
         store.carry(into: &tick1, maxHistory: 10)
         var tick2: [Sensor] = [] // read dropped this tick
         store.carry(into: &tick2, maxHistory: 10)
-        var tick3 = [Sensor(id: "Tp01", name: "P1", temperature: 45)]
+        var tick3 = [Sensor(id: "TB0T", name: "Battery", temperature: 45)]
         store.carry(into: &tick3, maxHistory: 10)
         // The missed tick repeats the last value, so the history keeps one entry
         // per tick and stays aligned with sensors that never dropped out.
@@ -113,13 +113,13 @@ final class SensorRegistryTests: XCTestCase {
 
     func testHistoryDiscardedAfterLongAbsence() {
         var store = SensorHistoryStore()
-        var first = [Sensor(id: "Tp01", name: "P1", temperature: 40)]
+        var first = [Sensor(id: "TB0T", name: "Battery", temperature: 40)]
         store.carry(into: &first, maxHistory: 10)
         for _ in 0...SensorHistoryStore.maximumMissedTicks {
             var empty: [Sensor] = []
             store.carry(into: &empty, maxHistory: 10)
         }
-        var back = [Sensor(id: "Tp01", name: "P1", temperature: 50)]
+        var back = [Sensor(id: "TB0T", name: "Battery", temperature: 50)]
         store.carry(into: &back, maxHistory: 10)
         XCTAssertEqual(back[0].history, [50])
     }
@@ -370,9 +370,168 @@ final class SensorRegistryTests: XCTestCase {
         XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: sensors), 81)
     }
 
+    /// When the two key banks of an M4 Pro swap, TCMz lags for a tick (82 °C against a
+    /// hottest live sensor at 97 °C in iSMC's recording).
+    func testDefaultDrivingTemperatureIsNeverBelowTheHottestCpuSensor() {
+        let sensors = [
+            Sensor(id: "TCMz", name: "", temperature: 82.3),
+            Sensor(id: "Tp0E", name: "", temperature: 97.1),
+            Sensor(id: "Tg0D", name: "", temperature: 99)
+        ]
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: sensors), 97.1)
+    }
+
     func testDefaultDrivingTemperatureFallsBackToSummaryThenAnything() {
         XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: [Sensor(id: "TCMb", name: "", temperature: 61)]), 61)
         XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: [Sensor(id: "TB0T", name: "", temperature: 30)]), 30)
         XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: []), 0)
+    }
+
+    // MARK: - CPU keys the SMC switches off (issue #8, M4 Pro)
+
+    /// On M4 Pro the performance cluster publishes two banks of 51 keys. `bankA` and
+    /// `bankB` stand in for them here with three keys each.
+    private let bankA = ["Tp00", "Tp01", "Tp02"]
+    private let bankB = ["Tp1i", "Tp1j", "Tp1k"]
+    private let efficiency = ["Te04", "Te05"]
+
+    private func tick(_ store: inout SensorHistoryStore, _ readings: [String: Double]) -> [Sensor] {
+        var sensors = readings.keys.sorted().map { Sensor(id: $0, name: "", temperature: readings[$0]!) }
+        store.carry(into: &sensors, maxHistory: 20)
+        return sensors
+    }
+
+    private func readings(_ keys: [String], _ value: Double) -> [String: Double] {
+        Dictionary(uniqueKeysWithValues: keys.map { ($0, value) })
+    }
+
+    /// Reported sequence: 61 CPU sensors, then 10 for one tick, then 61 again.
+    func testCpuKeysAreHeldWhileTheClusterIsOffForATick() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 77).merging(readings(efficiency, 60)) { $1 })
+        // Both banks off: A is absent (it reads below 10 °C and is dropped), B was never live.
+        let gap = tick(&store, readings(efficiency, 61))
+        XCTAssertEqual(gap.map(\.id), (bankA + efficiency).sorted(), "held keys keep their place in the list")
+        for id in bankA {
+            let sensor = gap.first { $0.id == id }
+            XCTAssertEqual(sensor?.temperature, 77)
+            XCTAssertEqual(sensor?.isHeld, true)
+        }
+        XCTAssertEqual(gap.first { $0.id == "Te04" }?.isHeld, false)
+        XCTAssertEqual(SensorRegistry.cpuCoreSensors(from: gap).count, 5)
+        XCTAssertEqual(SensorRegistry.cpuMaximumTemperature(from: gap), 77)
+
+        let back = tick(&store, readings(bankA, 74).merging(readings(efficiency, 60)) { $1 })
+        XCTAssertFalse(back.contains { $0.isHeld })
+        XCTAssertEqual(back.first { $0.id == "Tp00" }?.history, [77, 77, 74])
+    }
+
+    /// A parked key reads exactly 40.0 °C. It shows its last live reading instead.
+    func testParkedKeysShowTheirLastLiveReading() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 70).merging(readings(efficiency, 55)) { $1 })
+        var next = readings(bankA, 71).merging(readings(efficiency, 55)) { $1 }
+        next["Tp02"] = SensorRegistry.parkedCpuReading
+        let sensors = tick(&store, next)
+        XCTAssertEqual(sensors.first { $0.id == "Tp02" }?.temperature, 70)
+        XCTAssertEqual(sensors.first { $0.id == "Tp02" }?.isHeld, true)
+        XCTAssertEqual(SensorRegistry.cpuCoreSensors(from: sensors).count, 5)
+    }
+
+    /// When the other bank takes over, as many keys are live as before, so nothing
+    /// is held and the two banks are never listed side by side.
+    func testBankSwitchDoesNotDoubleTheSensors() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 70).merging(readings(efficiency, 55)) { $1 })
+        let switched = tick(&store, readings(bankB, 72).merging(readings(efficiency, 55)) { $1 })
+        XCTAssertEqual(switched.map(\.id), (bankB + efficiency).sorted())
+        XCTAssertFalse(switched.contains { $0.isHeld })
+    }
+
+    /// After a bank switch, a gap is filled with the bank that was live last.
+    func testGapAfterBankSwitchHoldsTheMostRecentBank() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 70).merging(readings(efficiency, 55)) { $1 })
+        _ = tick(&store, readings(bankB, 72).merging(readings(efficiency, 55)) { $1 })
+        let gap = tick(&store, readings(efficiency, 55))
+        XCTAssertEqual(gap.filter(\.isHeld).map(\.id), bankB)
+    }
+
+    /// A cluster that stays off is really off: the held readings expire.
+    func testHeldReadingsExpire() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 70).merging(readings(efficiency, 55)) { $1 })
+        for _ in 0..<SensorHistoryStore.maximumMissedTicks {
+            XCTAssertEqual(tick(&store, readings(efficiency, 55)).filter(\.isHeld).count, bankA.count)
+        }
+        let expired = tick(&store, readings(efficiency, 55))
+        XCTAssertEqual(expired.map(\.id), efficiency)
+    }
+
+    /// The hold lasts about ten seconds whatever the polling interval is.
+    func testHoldLastsAboutTenSecondsAtEveryPollingInterval() {
+        XCTAssertEqual(SensorHistoryStore.cpuHoldTicks(forPollingInterval: 2), 5)
+        XCTAssertEqual(SensorHistoryStore.cpuHoldTicks(forPollingInterval: 5), 2)
+        XCTAssertEqual(SensorHistoryStore.cpuHoldTicks(forPollingInterval: 10), 1)
+
+        var store = SensorHistoryStore()
+        func step(_ readings: [String: Double]) -> [Sensor] {
+            var sensors = readings.keys.sorted().map { Sensor(id: $0, name: "", temperature: readings[$0]!) }
+            store.carry(into: &sensors, maxHistory: 20, cpuHoldTicks: 1)
+            return sensors
+        }
+        _ = step(readings(bankA, 70).merging(readings(efficiency, 55)) { $1 })
+        XCTAssertEqual(step(readings(efficiency, 55)).filter(\.isHeld).count, bankA.count)
+        XCTAssertEqual(step(readings(efficiency, 55)).filter(\.isHeld).count, 0)
+    }
+
+    /// Under heavy load both banks are live; when one goes off its keys are held, then
+    /// dropped, and they are not brought back while the other bank carries on.
+    func testBankGoingOffAfterBothWereLive() {
+        var store = SensorHistoryStore()
+        let both = readings(bankA, 90).merging(readings(bankB, 88)) { $1 }.merging(readings(efficiency, 60)) { $1 }
+        XCTAssertEqual(tick(&store, both).count, 8)
+        let oneBank = readings(bankB, 80).merging(readings(efficiency, 60)) { $1 }
+        for _ in 0..<SensorHistoryStore.maximumMissedTicks {
+            XCTAssertEqual(tick(&store, oneBank).filter(\.isHeld).map(\.id), bankA)
+        }
+        XCTAssertEqual(tick(&store, oneBank).map(\.id), (bankB + efficiency).sorted())
+        XCTAssertFalse(tick(&store, oneBank).contains { $0.isHeld })
+    }
+
+    func testOnlyCpuKeysAreHeld() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, ["Tp00": 70, "Tg0D": 50, "TB0T": 30])
+        let next = tick(&store, ["Tp00": 70])
+        XCTAssertEqual(next.map(\.id), ["Tp00"])
+    }
+
+    /// TCMz is the maximum over live keys, so it collapses with the cluster
+    /// (77 → 62 → 73 °C across three ticks in the report). The curve must not follow it down.
+    func testDefaultDrivingTemperatureBridgesTheGap() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 77).merging(["Te04": 62, "TCMz": 77]) { $1 })
+        let gap = tick(&store, ["Te04": 62, "TCMz": 62])
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: gap), 77)
+        let back = tick(&store, readings(bankA, 73).merging(["Te04": 62, "TCMz": 73]) { $1 })
+        XCTAssertEqual(SensorRegistry.defaultDrivingTemperature(from: back), 73)
+    }
+
+    /// Tpx… and Tex… repeat group maxima (Tex1 == Te06, Tpx1 == Tp0E on an M4 Pro):
+    /// summaries, not more probes to average.
+    func testDieAggregatesAreSummariesNotClusterSensors() {
+        for key in ["Tpx0", "Tpx1", "TpxD", "Tex0", "Tex3"] {
+            XCTAssertEqual(category(key, m4Pro), .cpuSummary, key)
+            XCTAssertEqual(name(key, m4Pro), "CPU Die Aggregate")
+        }
+        XCTAssertEqual(category("Tsx0", m4Pro), .soc)
+        let sensors = [Sensor(id: "Tp0E", name: "", temperature: 98), Sensor(id: "Tpx1", name: "", temperature: 98)]
+        XCTAssertEqual(SensorRegistry.cpuCoreSensors(from: sensors).map(\.id), ["Tp0E"])
+    }
+
+    /// The Dashboard box shows the three whole-CPU values, not every summary key.
+    func testHeadlineSummaryIsThreeKeysInOrder() {
+        let sensors = ["Tpx1", "TCDX", "Tex0", "TCMz", "TCMb"].map { Sensor(id: $0, name: "", temperature: 50) }
+        XCTAssertEqual(SensorRegistry.cpuSummarySensors(from: sensors).map(\.id), ["TCMz", "TCMb", "TCDX"])
     }
 }

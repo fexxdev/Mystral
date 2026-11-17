@@ -177,7 +177,8 @@ final class FanController {
         powerMonitor.sample(maxHistory: historyLimit, minimumInterval: pollingInterval / 2)
         do {
             var newSensors = try smcService.getAllSensors()
-            sensorHistories.carry(into: &newSensors, maxHistory: historyLimit)
+            sensorHistories.carry(into: &newSensors, maxHistory: historyLimit,
+                                  cpuHoldTicks: SensorHistoryStore.cpuHoldTicks(forPollingInterval: pollingInterval))
             sensors = newSensors
             fans = try smcService.getAllFans()
             try smcService.heartbeat()

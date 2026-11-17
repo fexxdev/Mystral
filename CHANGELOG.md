@@ -6,6 +6,11 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 ## [Unreleased]
 
+### Fixed
+- M4 Pro and M4 Max: the CPU sensor count, average and maximum no longer jump between ticks (#8). These chips publish two banks of 51 performance-cluster keys; under light load only one is live, and when the cores idle both switch off for a second or two, so the CPU went from 61 sensors to 10 and back. A key that just switched off now keeps its last live reading for about 10 seconds, shown dimmed in the Dashboard grid. Verified against the report and against iSMC's M4 Pro recording; not tested on an M4 Pro directly.
+- The default fan-curve temperature no longer dips when that happens. `TCMz` is the maximum over the keys that are live at that instant, so it fell by 15–20 °C for a tick and came straight back. The curve now follows the highest of `TCMz` and the CPU cluster sensors, live or held.
+- `Tpx…` and `Tex…` keys (M4) are per-die aggregates, half of them exact copies of a group's maximum. They are listed as CPU summary values and no longer counted in the CPU average or shown in the sensor grid.
+
 ## [1.1.8] — 2026-11-16
 
 ### Added

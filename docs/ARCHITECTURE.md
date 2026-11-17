@@ -120,7 +120,7 @@ Fan control is verified on an M3 Pro MacBook Pro (macOS 27). It is not verified 
 
 ### The driving temperature
 
-A profile either names a sensor key or uses the default. The default is the hottest point of the CPU (`SensorRegistry.defaultDrivingTemperature`): the `TCMz` key where it exists (M1–M4), otherwise the hottest CPU cluster sensor. M5 and M6 publish no `TCMz`.
+A profile either names a sensor key or uses the default. The default is the hottest point of the CPU (`SensorRegistry.defaultDrivingTemperature`): the highest of the `TCMz` key and the CPU cluster sensors. Where `TCMz` exists (M1–M4) the two normally agree; M5 and M6 publish no `TCMz`. `TCMz` alone is not steady on M4 Pro/Max: it is the maximum over the keys live at that instant, so it drops by 15–20 °C for a tick when the performance cores switch off.
 
 ## Sensors
 
@@ -151,6 +151,14 @@ A reading is used only if the key's SMC type is `flt` or `sp78` and the value is
 How the rules were checked, and what is not checked, is in the comment on `classify` and in `THIRD-PARTY-NOTICES.md`: load tests on an M3 Pro, and the load recordings published by iSMC for M1 Ultra, M3, M3 Pro/Max, M4, M4 Pro/Max, M5, M5 Pro/Max and M6. There is no recording for the A18 Pro.
 
 Histories: `SensorHistoryStore` keeps one value per tick per sensor, repeating the last value for up to five missed ticks, so all series stay aligned in time. `SensorRegistry.alignedHistory` combines them aligned on the newest sample.
+
+### CPU keys that switch off
+
+An M4 Pro publishes two banks of 51 performance-cluster keys. Under heavy load both are live; under light load one is, and they take turns; when the cores idle both are off for a second or two. A bank that is off reads exactly 40.0 °C or a few degrees around zero. Without care the CPU goes from 61 sensors to 10 and back between ticks.
+
+`SensorHistoryStore` therefore holds a CPU cluster key that just went off at its last live reading (`Sensor.isHeld`) for about 10 seconds (`cpuHoldTicks`). It only fills a gap: it shows as many keys as on the previous tick, never more, so when the other bank takes over nothing is held. Held sensors count in the CPU average, the maximum and the default driving temperature, and the Dashboard draws them dimmed. Stats and smctemp do the same thing without a time limit; macmon and mactop average whatever is valid at that instant.
+
+`Tpx…` and `Tex…` (M4) are per-die aggregates, half of them exact copies of a group maximum. They are CPU summary values, not cluster sensors. The Dashboard summary box shows only `TCMz`, `TCMb` and `TCDX`.
 
 ### Core counts
 

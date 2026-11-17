@@ -134,6 +134,8 @@ struct DashboardView: View {
                         .padding(.vertical, 4)
                         .background(temperatureColor(sensor.temperature).opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
+                        // A held reading is a moment old: the key is switched off right now.
+                        .opacity(sensor.isHeld ? 0.5 : 1)
                     }
                 }
             } label: {
