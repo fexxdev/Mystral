@@ -414,7 +414,8 @@ struct SettingsView: View {
     }
 
     private func exportSMCData() {
-        let content = SensorRegistry.exportDiagnosticData(sensors: fanController.sensors, fans: fanController.fans)
+        let content = SensorRegistry.exportDiagnosticData(sensors: fanController.sensors, fans: fanController.fans,
+                                                          trace: fanController.sensorTraceReport())
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "mystral-smc-export.txt"
         panel.allowedContentTypes = [.plainText]

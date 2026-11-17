@@ -54,6 +54,9 @@ final class FanController {
     var minimumFanPercentage: Double = 0
     var aggressiveOverrideEnabled: Bool = true
     private var sensorHistories = SensorHistoryStore()
+    private var sensorTrace = SensorTrace()
+    /// What the active profile's curve was given on this tick; nil when no curve ran.
+    private var lastCurveInput: Double?
     private var smoothedTemps: [String: Double] = [:]
     private var lastWrittenPct: [Int: Double] = [:]
     private var ticksSinceForcedReassert = 0
@@ -177,6 +180,7 @@ final class FanController {
         powerMonitor.sample(maxHistory: historyLimit, minimumInterval: pollingInterval / 2)
         do {
             var newSensors = try smcService.getAllSensors()
+            let rawSensors = newSensors
             sensorHistories.carry(into: &newSensors, maxHistory: historyLimit,
                                   cpuHoldTicks: SensorHistoryStore.cpuHoldTicks(forPollingInterval: pollingInterval))
             sensors = newSensors
@@ -191,6 +195,7 @@ final class FanController {
             isHelperResponsive = true
 
             applyActiveProfile()
+            sensorTrace.record(SensorTrace.entry(raw: rawSensors, shown: sensors, curveInput: lastCurveInput, fans: fans))
             alertManager?.evaluate(sensors: sensors, fans: fans, expectedFanPercent: lastWrittenPct)
         } catch {
             consecutiveHelperFailures += 1
@@ -223,6 +228,7 @@ final class FanController {
     private var forcedModeSet = false
 
     private func applyActiveProfile() {
+        lastCurveInput = nil
         guard let profile = profileManager.activeProfile else { return }
         guard !fans.isEmpty else { return }
 
@@ -247,6 +253,7 @@ final class FanController {
         let drivingTemp = smoothingEnabled
             ? smooth(key: profile.sensorKey.isEmpty ? "_avg" : profile.sensorKey, raw: rawTemp)
             : rawTemp
+        lastCurveInput = drivingTemp
 
         for fan in fans {
             let curve = profile.curve(for: fan.id)
@@ -285,6 +292,12 @@ final class FanController {
             return sensor.temperature
         }
         return SensorRegistry.defaultDrivingTemperature(from: sensors)
+    }
+
+    /// The CPU sensor trace for the diagnostics export (see `SensorTrace`).
+    func sensorTraceReport() -> [String] {
+        sensorTrace.report(pollingInterval: pollingInterval,
+                           curveSensor: profileManager.activeProfile?.sensorKey ?? "")
     }
 
     func requestManualRestart() {

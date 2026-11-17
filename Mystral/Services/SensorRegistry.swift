@@ -312,10 +312,16 @@ enum SensorRegistry {
         )
     }
 
-    static func exportDiagnosticData(sensors: [Sensor], fans: [Fan]) -> String {
+    /// - Parameter trace: the lines of `SensorTrace.report`, appended as they are.
+    static func exportDiagnosticData(sensors: [Sensor], fans: [Fan], trace: [String] = []) -> String {
         var lines: [String] = []
         lines.append("=== Mystral SMC Export ===")
         lines.append("Date: \(ISO8601DateFormatter().string(from: Date()))")
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let build = info?["CFBundleVersion"] as? String ?? "unknown"
+        lines.append("Mystral: \(version) (\(build))")
+        lines.append("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
         lines.append("Model: \(HardwareInfo.modelIdentifier())")
         lines.append("Chip: \(HardwareInfo.chipName()) (family \(HardwareInfo.chip.family.map(String.init) ?? "unknown"))")
 
@@ -331,7 +337,8 @@ enum SensorRegistry {
         for sensor in sensors {
             let cat = categoryForKey(sensor.id)
             let known = isRecognized(sensor.id) ? "KNOWN" : "UNMAPPED"
-            lines.append("\(sensor.id) | \(sensor.name) | \(cat.rawValue) | \(String(format: "%.2f", sensor.temperature))°C | \(known)")
+            let held = sensor.isHeld ? " | HELD" : ""
+            lines.append("\(sensor.id) | \(sensor.name) | \(cat.rawValue) | \(String(format: "%.2f", sensor.temperature))°C | \(known)\(held)")
         }
 
         lines.append("")
@@ -349,6 +356,11 @@ enum SensorRegistry {
                 let known = isRecognized(s.id)
                 lines.append("  \(s.id) → \(s.name) \(known ? "" : "[NEEDS MAPPING]")")
             }
+        }
+
+        if !trace.isEmpty {
+            lines.append("")
+            lines.append(contentsOf: trace)
         }
 
         lines.append("")

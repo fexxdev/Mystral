@@ -12,6 +12,7 @@
 		0931DA9FD9A6DF2B5C1DDCFD /* SMCIPC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A73DF33BB8A7747E548544D /* SMCIPC.swift */; };
 		0DB5B4CC35587BF02A1830FB /* SMCProxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D1A2E70A200040B2020DA5 /* SMCProxyService.swift */; };
 		14F963889C40BB573B7C85B0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E40345530F6EBC95C639FE /* main.swift */; };
+		174795211D840BB7A70320B0 /* SensorTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718FA4A378FDA57E9AD91515 /* SensorTraceTests.swift */; };
 		1F17A09E0B12AFF9DDB990E1 /* HardwareInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */; };
 		20157A49BC121C0B85F8CDEC /* FansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBACE8663AB1AB3822319558 /* FansView.swift */; };
 		234680899946A89D7DA35577 /* ViewConstructionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D77E008E65777E4C46736B /* ViewConstructionTests.swift */; };
@@ -20,6 +21,7 @@
 		2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044D527A57845C5CC26E4D89 /* SMCService.swift */; };
 		30D6D3BE7454C72C20441CD8 /* PowerMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAC1D7536B09515F3F8E889 /* PowerMonitorTests.swift */; };
 		3257E50BB400D6B76FD40F90 /* CurveInterpolationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */; };
+		389E6E4A65DB1DD85F0583D2 /* SensorTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCB869D8E2E0949BC5E8D93E /* SensorTrace.swift */; };
 		3BB787CFA3AB97F1DFDF5CB4 /* UpdateSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A0A7E5C6E56BB0C0A77FA5 /* UpdateSignature.swift */; };
 		3D66717DD0F5B7FE2463E52D /* AppLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5774E3FFA6A27C0B9927E018 /* AppLanguageTests.swift */; };
 		41F0C24AABCC1A8DA9906D19 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64319980C33FE2804285A28 /* UpdateChecker.swift */; };
@@ -112,6 +114,7 @@
 		69DB5298EB34D69B0470542B /* Mystral.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mystral.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6CCE7887A29FE406A8DC1F87 /* HardwareInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareInfo.swift; sourceTree = "<group>"; };
 		6F2CB65F4FBC7DF6F26A823F /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
+		718FA4A378FDA57E9AD91515 /* SensorTraceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorTraceTests.swift; sourceTree = "<group>"; };
 		76D45FE9AA6E54A07C10FDC7 /* MystralApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MystralApp.swift; sourceTree = "<group>"; };
 		7803D3A88F6FE0C25AD383D5 /* CurveInterpolationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurveInterpolationTests.swift; sourceTree = "<group>"; };
 		8B0A28B83087A7AF696730F0 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
@@ -129,6 +132,7 @@
 		B308C0724E27C538E68CE1FD /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		BA93ECE73A3B2340948236B3 /* MystralTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MystralTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StressTesterTests.swift; sourceTree = "<group>"; };
+		BCB869D8E2E0949BC5E8D93E /* SensorTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorTrace.swift; sourceTree = "<group>"; };
 		C6E40345530F6EBC95C639FE /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		CBACE8663AB1AB3822319558 /* FansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FansView.swift; sourceTree = "<group>"; };
 		CCC5ED462667D818802B10FD /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
@@ -210,6 +214,7 @@
 				31CC0853F58CB9816BE8A409 /* ProfileAutoSwitcher.swift */,
 				B1704CD9C898267DFA1A539A /* ProfileManager.swift */,
 				D55974A74B43876077772D5D /* SensorRegistry.swift */,
+				BCB869D8E2E0949BC5E8D93E /* SensorTrace.swift */,
 				93CF7452AAC9270DEEE70F65 /* SMCHelperMode.swift */,
 				2A73DF33BB8A7747E548544D /* SMCIPC.swift */,
 				39DEB194BD8B7268EA696A8B /* SMCKit.swift */,
@@ -282,6 +287,7 @@
 				95F8BC552F6E77FDDCB62E15 /* ProfileModelTests.swift */,
 				FD0F753D19716E349C4722E8 /* SensorRegistryTests.swift */,
 				F396958B870BBA4EAA4FDF95 /* SensorTests.swift */,
+				718FA4A378FDA57E9AD91515 /* SensorTraceTests.swift */,
 				3CBF7C4452D1A30B8EBC939C /* SettingsDefaultsTests.swift */,
 				D6A51BBA4FEA1DFBDEEB8721 /* SMCServiceTests.swift */,
 				BBE82D2E1AA435C8483C62EB /* StressTesterTests.swift */,
@@ -413,6 +419,7 @@
 				2987C57E2AEE21A4C5BB2DCA /* SMCService.swift in Sources */,
 				8DC0DE1B97F97DC83F527D2C /* Sensor.swift in Sources */,
 				AFAA438FE7FF7868A67230D4 /* SensorRegistry.swift in Sources */,
+				389E6E4A65DB1DD85F0583D2 /* SensorTrace.swift in Sources */,
 				087F37A5A74965FBC32E170C /* SensorsView.swift in Sources */,
 				F043C27F29A95684188E630A /* SettingsView.swift in Sources */,
 				DFF2CDB314AE582DA1BF5566 /* StressTester.swift in Sources */,
@@ -442,6 +449,7 @@
 				9749F172B278C7C00382A6E3 /* SMCServiceTests.swift in Sources */,
 				2597AC1634E722BD0B0A9692 /* SensorRegistryTests.swift in Sources */,
 				B9D70EFE61A693B14E15AA96 /* SensorTests.swift in Sources */,
+				174795211D840BB7A70320B0 /* SensorTraceTests.swift in Sources */,
 				DE890C91E8FE4C7F45632577 /* SettingsDefaultsTests.swift in Sources */,
 				814977F6568741E44A2300EE /* StressTesterTests.swift in Sources */,
 				DBB3A459CD1B613B1967C3C6 /* UpdateCheckerTests.swift in Sources */,

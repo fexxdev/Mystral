@@ -160,6 +160,8 @@ An M4 Pro publishes two banks of 51 performance-cluster keys. Under heavy load b
 
 `Tpx…` and `Tex…` (M4) are per-die aggregates, half of them exact copies of a group maximum. They are CPU summary values, not cluster sensors. The Dashboard summary box shows only `TCMz`, `TCMb` and `TCDX`.
 
+`SensorTrace` records one entry per tick for the last 300 ticks: how many CPU cluster keys the helper delivered live and parked, how many are held, `TCMz` as read, the default driving temperature, what the curve was given and the fan speeds. It lives in memory in `FanController` and is appended to the SMC export (Settings → Diagnostics), so a user with a Mac we do not own can show what its keys do.
+
 ### Core counts
 
 `HardwareInfo.coreCounts` reads `hw.nperflevels`, each level's `hw.perflevelN.name` and `physicalcpu`, `hw.physicalcpu`, and `gpu-core-count` from the `AGXAccelerator` registry entry. Levels differ by chip: Performance + Efficiency up to M4, Super + Efficiency on M5, Super + Performance on M5 Pro/Max, all three on M6.
