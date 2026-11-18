@@ -390,9 +390,15 @@ enum SensorRegistry {
 /// jumped with it (issue #8; the same shows in iSMC's M4 Pro recording).
 ///
 /// A key that just went off is therefore held at its last live reading for a few
-/// ticks, but only to fill a gap: as many keys are shown as on the previous tick,
-/// never more. When the other bank takes over, as many keys are live as before and
-/// nothing is held.
+/// ticks, but only to fill a gap: as many keys are shown as were live at once during
+/// the hold window, never more. When the other bank takes over, as many keys are
+/// live as before and nothing is held.
+///
+/// The count to fill up to must come from live keys only. It used to be the number
+/// shown on the previous tick, held keys included. On an M4 Pro the banks take turns
+/// every 2–6 s, faster than a hold expires, so after both had been live once the
+/// bank that was off was held again and again and the count stayed at both banks for
+/// good (96 instead of 51 for ten minutes in the trace attached to issue #8).
 struct SensorHistoryStore {
     /// Ticks a sensor may be missing before its history is discarded.
     static let maximumMissedTicks = 5
@@ -407,8 +413,9 @@ struct SensorHistoryStore {
     private var histories: [String: [Double]] = [:]
     private var missedTicks: [String: Int] = [:]
     private var lastLiveCPU: [String: (value: Double, missed: Int)] = [:]
-    /// CPU cluster keys shown on the previous tick, live and held.
-    private var shownCPUCount = 0
+    /// How many CPU cluster keys were live on each of the last hold-window ticks,
+    /// oldest first, this tick excluded.
+    private var recentLiveCPUCounts: [Int] = []
 
     /// Attach the stored history to each sensor and record its current temperature.
     /// CPU cluster keys that are parked or absent are held at their last live reading
@@ -459,15 +466,19 @@ struct SensorHistoryStore {
             lastLiveCPU[id] = entry.missed >= holdTicks ? nil : (entry.value, entry.missed + 1)
         }
 
-        // Fill up to what was shown last tick, most recently live first, so a key that
-        // just went off wins over a bank that has been idle for a while.
-        let gap = shownCPUCount - liveIDs.count
+        // Fill up to the most keys that were live at once during the hold window, most
+        // recently live first, so a key that just went off wins over a bank that has
+        // been idle for a while.
+        let gap = (recentLiveCPUCounts.suffix(holdTicks).max() ?? 0) - liveIDs.count
+        recentLiveCPUCounts.append(liveIDs.count)
+        if recentLiveCPUCounts.count > holdTicks {
+            recentLiveCPUCounts.removeFirst(recentLiveCPUCounts.count - holdTicks)
+        }
         let held = gap > 0
             ? Array(lastLiveCPU.filter { !liveIDs.contains($0.key) }
                 .sorted { ($0.value.missed, $0.key) < ($1.value.missed, $1.key) }
                 .prefix(gap))
             : []
-        shownCPUCount = liveIDs.count + held.count
         guard !held.isEmpty else { return }
         var appended = false
         for (id, entry) in held {

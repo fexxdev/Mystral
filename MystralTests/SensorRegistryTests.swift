@@ -499,6 +499,46 @@ final class SensorRegistryTests: XCTestCase {
         XCTAssertFalse(tick(&store, oneBank).contains { $0.isHeld })
     }
 
+    /// Issue #8, trace from a real M4 Pro: after both banks had been live once, the
+    /// banks took turns every 1–3 ticks with one-tick gaps, and the count stayed at both
+    /// banks for ten minutes. It must settle at one bank once the hold window has passed.
+    func testAlternatingBanksSettleAtOneBankAfterBothWereLive() {
+        var store = SensorHistoryStore()
+        let e = readings(efficiency, 60)
+        let a = readings(bankA, 70).merging(e) { $1 }
+        let b = readings(bankB, 72).merging(e) { $1 }
+        _ = tick(&store, a.merging(b) { $1 })
+
+        // Within the hold window the bank that just went off is still shown.
+        XCTAssertEqual(tick(&store, a).filter(\.isHeld).map(\.id), bankB)
+        XCTAssertEqual(tick(&store, b).filter(\.isHeld).map(\.id), bankA)
+        for readings in [a, a, b] { _ = tick(&store, readings) }
+
+        // Past it, each bank shows alone, and a gap is filled with the last one only.
+        for _ in 0..<20 {
+            XCTAssertEqual(tick(&store, a).map(\.id), (bankA + efficiency).sorted())
+            XCTAssertEqual(tick(&store, a).filter(\.isHeld).count, 0)
+            XCTAssertEqual(tick(&store, e).filter(\.isHeld).map(\.id), bankA)
+            XCTAssertEqual(tick(&store, b).map(\.id), (bankB + efficiency).sorted())
+            XCTAssertEqual(tick(&store, e).filter(\.isHeld).map(\.id), bankB)
+            XCTAssertEqual(tick(&store, b).filter(\.isHeld).count, 0)
+        }
+    }
+
+    /// The hold window follows the polling interval when it changes.
+    func testHoldWindowShrinksWithTheHoldTicks() {
+        var store = SensorHistoryStore()
+        func step(_ readings: [String: Double], holdTicks: Int) -> [Sensor] {
+            var sensors = readings.keys.sorted().map { Sensor(id: $0, name: "", temperature: readings[$0]!) }
+            store.carry(into: &sensors, maxHistory: 20, cpuHoldTicks: holdTicks)
+            return sensors
+        }
+        let e = readings(efficiency, 60)
+        _ = step(readings(bankA, 70).merging(e) { $1 }, holdTicks: 5)
+        XCTAssertEqual(step(e, holdTicks: 5).filter(\.isHeld).count, bankA.count)
+        XCTAssertEqual(step(e, holdTicks: 1).filter(\.isHeld).count, 0)
+    }
+
     func testOnlyCpuKeysAreHeld() {
         var store = SensorHistoryStore()
         _ = tick(&store, ["Tp00": 70, "Tg0D": 50, "TB0T": 30])
