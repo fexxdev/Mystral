@@ -226,6 +226,19 @@ enum SensorRegistry {
         sensors.filter { categoryForKey($0.id) == .cpu && $0.temperature != parkedCpuReading }
     }
 
+    /// The CPU-cluster sensors whose reading counts as current: live ones, and held
+    /// ones for the first seconds (see `Sensor.isStale`). The CPU maximum, the average
+    /// and the default fan-curve temperature are computed from these.
+    static func cpuCurrentSensors(from sensors: [Sensor]) -> [Sensor] {
+        cpuCoreSensors(from: sensors).filter { !$0.isStale }
+    }
+
+    static func cpuAverageTemperature(from sensors: [Sensor]) -> Double? {
+        let current = cpuCurrentSensors(from: sensors)
+        guard !current.isEmpty else { return nil }
+        return current.map(\.temperature).reduce(0, +) / Double(current.count)
+    }
+
     static func gpuCoreSensors(from sensors: [Sensor]) -> [Sensor] {
         sensors.filter { categoryForKey($0.id) == .gpu }
     }
@@ -239,7 +252,7 @@ enum SensorRegistry {
     }
 
     static func cpuMaximumTemperature(from sensors: [Sensor]) -> Double {
-        if let maximumCore = cpuCoreSensors(from: sensors).map(\.temperature).max() {
+        if let maximumCore = cpuCurrentSensors(from: sensors).map(\.temperature).max() {
             return maximumCore
         }
         return ["TCMz", "TCMb"].compactMap { key in
@@ -264,6 +277,53 @@ enum SensorRegistry {
         let dieMax = sensors.first(where: { $0.id == defaultCpuSensorKey })?.temperature ?? 0
         let hottest = max(dieMax, cpuMaximumTemperature(from: sensors))
         return hottest > 0 ? hottest : (sensors.first?.temperature ?? 0)
+    }
+
+    /// What a fan curve is given on one tick.
+    struct DrivingReading: Equatable {
+        var temperature: Double
+        /// True when the hottest CPU point is a held reading, so `temperature` is not a
+        /// new measurement. The curve then keeps its previous input instead of taking
+        /// this value in again.
+        ///
+        /// Feeding a held reading to the curve's filter every tick counts one sample
+        /// several times. At idle the performance cores wake only for a burst, so the
+        /// last reading before they switch off is usually a peak: on an M4 Pro a
+        /// one-tick spike to 71 °C followed by idle at 46 °C raised the fans by 400–700
+        /// RPM for ten seconds, and a 113.8 °C reading outlived its load by ten seconds
+        /// (issue #8).
+        var isHeld: Bool
+    }
+
+    /// True when a held CPU cluster reading that still counts as current is hotter than
+    /// every live one: the hottest point of the CPU is not being measured this tick.
+    static func cpuHotSpotIsHeld(in sensors: [Sensor]) -> Bool {
+        let current = cpuCurrentSensors(from: sensors)
+        guard let heldMaximum = current.filter(\.isHeld).map(\.temperature).max() else { return false }
+        let liveCluster = current.filter { !$0.isHeld }.map(\.temperature).max() ?? 0
+        let dieMax = sensors.first(where: { $0.id == defaultCpuSensorKey })?.temperature ?? 0
+        return heldMaximum > max(liveCluster, dieMax)
+    }
+
+    /// The reading for a profile's sensor key; an empty key, or one that is missing or
+    /// stale, means the default (`defaultDrivingTemperature`).
+    ///
+    /// CPU summary keys (TCMz, TCMb) fall with the cluster when it switches off, so
+    /// they count as held under the same condition as the default. Sensors outside the
+    /// CPU are never held.
+    static func drivingReading(forProfileSensor key: String, from sensors: [Sensor]) -> DrivingReading {
+        if !key.isEmpty, let sensor = sensors.first(where: { $0.id == key }), !sensor.isStale {
+            switch categoryForKey(key) {
+            case .cpu:
+                return DrivingReading(temperature: sensor.temperature, isHeld: sensor.isHeld)
+            case .cpuSummary:
+                return DrivingReading(temperature: sensor.temperature, isHeld: cpuHotSpotIsHeld(in: sensors))
+            default:
+                return DrivingReading(temperature: sensor.temperature, isHeld: false)
+            }
+        }
+        return DrivingReading(temperature: defaultDrivingTemperature(from: sensors),
+                              isHeld: cpuHotSpotIsHeld(in: sensors))
     }
     static let defaultGpuSensorKey = ""
 
@@ -337,7 +397,7 @@ enum SensorRegistry {
         for sensor in sensors {
             let cat = categoryForKey(sensor.id)
             let known = isRecognized(sensor.id) ? "KNOWN" : "UNMAPPED"
-            let held = sensor.isHeld ? " | HELD" : ""
+            let held = sensor.isStale ? " | HELD (stale)" : sensor.isHeld ? " | HELD" : ""
             lines.append("\(sensor.id) | \(sensor.name) | \(cat.rawValue) | \(String(format: "%.2f", sensor.temperature))°C | \(known)\(held)")
         }
 
@@ -405,9 +465,23 @@ struct SensorHistoryStore {
     /// How long a CPU key that went off keeps showing its last live reading.
     static let cpuHoldDuration: TimeInterval = 10
 
+    /// How long a held reading counts as current. Longer than that the cluster is not
+    /// pausing, it is idle: the key stays listed until `cpuHoldDuration` so the count
+    /// does not jump, but its reading is out of the maximum, the average and the curve.
+    ///
+    /// Measured on an M4 Pro (issue #8): the gaps under continuous use last one tick
+    /// (50 of 50 in one ten-minute trace) and the reading comes back unchanged (median
+    /// +0.1 °C); gaps of three ticks or more are idle stretches.
+    static let cpuFreshDuration: TimeInterval = 4
+
     /// Hold ticks for a polling interval: about `cpuHoldDuration`, at least one tick.
     static func cpuHoldTicks(forPollingInterval interval: TimeInterval) -> Int {
         max(1, Int((cpuHoldDuration / max(0.1, interval)).rounded()))
+    }
+
+    /// Ticks a held reading counts as current: about `cpuFreshDuration`, at least one.
+    static func cpuFreshTicks(forPollingInterval interval: TimeInterval) -> Int {
+        max(1, Int((cpuFreshDuration / max(0.1, interval)).rounded()))
     }
 
     private var histories: [String: [Double]] = [:]
@@ -422,8 +496,10 @@ struct SensorHistoryStore {
     /// (`Sensor.isHeld`); absent ones are added back to `sensors`.
     mutating func carry(into sensors: inout [Sensor], maxHistory: Int,
                         cpuHoldTicks: Int = SensorHistoryStore.maximumMissedTicks,
+                        cpuFreshTicks: Int = SensorHistoryStore.cpuFreshTicks(forPollingInterval: 2),
                         isCPUCluster: (String) -> Bool = { SensorRegistry.categoryForKey($0) == .cpu }) {
-        holdGatedCPUKeys(in: &sensors, holdTicks: max(1, cpuHoldTicks), isCPUCluster: isCPUCluster)
+        holdGatedCPUKeys(in: &sensors, holdTicks: max(1, cpuHoldTicks), freshTicks: max(1, cpuFreshTicks),
+                         isCPUCluster: isCPUCluster)
 
         let limit = max(1, maxHistory)
         var seen = Set<String>()
@@ -451,7 +527,8 @@ struct SensorHistoryStore {
         }
     }
 
-    private mutating func holdGatedCPUKeys(in sensors: inout [Sensor], holdTicks: Int, isCPUCluster: (String) -> Bool) {
+    private mutating func holdGatedCPUKeys(in sensors: inout [Sensor], holdTicks: Int, freshTicks: Int,
+                                           isCPUCluster: (String) -> Bool) {
         var liveIDs = Set<String>()
         var parkedIndex: [String: Int] = [:]
         for i in sensors.indices where isCPUCluster(sensors[i].id) {
@@ -482,11 +559,15 @@ struct SensorHistoryStore {
         guard !held.isEmpty else { return }
         var appended = false
         for (id, entry) in held {
+            // `missed` is 1 on the first tick a key is off.
+            let isStale = entry.missed > freshTicks
             if let index = parkedIndex[id] {
                 sensors[index].temperature = entry.value
                 sensors[index].isHeld = true
+                sensors[index].isStale = isStale
             } else {
-                sensors.append(Sensor(id: id, name: SensorRegistry.nameForKey(id), temperature: entry.value, isHeld: true))
+                sensors.append(Sensor(id: id, name: SensorRegistry.nameForKey(id), temperature: entry.value,
+                                      isHeld: true, isStale: isStale))
                 appended = true
             }
         }

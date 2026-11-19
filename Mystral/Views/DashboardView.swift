@@ -25,9 +25,7 @@ struct DashboardView: View {
     }
 
     private var cpuAvg: Double {
-        let cores = cpuCoreSensors
-        guard !cores.isEmpty else { return 0 }
-        return cores.map(\.temperature).reduce(0, +) / Double(cores.count)
+        SensorRegistry.cpuAverageTemperature(from: fanController.sensors) ?? 0
     }
 
     private var gpuMax: Double {
@@ -135,7 +133,7 @@ struct DashboardView: View {
                         .background(temperatureColor(sensor.temperature).opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         // A held reading is a moment old: the key is switched off right now.
-                        .opacity(sensor.isHeld ? 0.5 : 1)
+                        .opacity(sensor.isStale ? 0.3 : sensor.isHeld ? 0.5 : 1)
                     }
                 }
             } label: {

@@ -539,6 +539,149 @@ final class SensorRegistryTests: XCTestCase {
         XCTAssertEqual(step(e, holdTicks: 1).filter(\.isHeld).count, 0)
     }
 
+    // MARK: - Held readings and the fan curve (issue #8, second report)
+
+    /// A held reading counts as current for about four seconds. After that the key
+    /// stays listed, so the count does not jump, but it is out of the maximum and average.
+    func testHeldReadingsGoStaleAfterTheFreshWindow() {
+        XCTAssertEqual(SensorHistoryStore.cpuFreshTicks(forPollingInterval: 2), 2)
+        XCTAssertEqual(SensorHistoryStore.cpuFreshTicks(forPollingInterval: 5), 1)
+        XCTAssertEqual(SensorHistoryStore.cpuFreshTicks(forPollingInterval: 10), 1)
+
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 71).merging(readings(efficiency, 46)) { $1 })
+        for age in 1...SensorHistoryStore.maximumMissedTicks {
+            let gap = tick(&store, readings(efficiency, 46))
+            let held = gap.filter(\.isHeld)
+            XCTAssertEqual(held.map(\.id), bankA, "listed for the whole hold")
+            XCTAssertEqual(held.allSatisfy(\.isStale), age > 2, "age \(age)")
+            XCTAssertEqual(SensorRegistry.cpuCoreSensors(from: gap).count, 5)
+            XCTAssertEqual(SensorRegistry.cpuCurrentSensors(from: gap).count, age > 2 ? 2 : 5)
+            XCTAssertEqual(SensorRegistry.cpuMaximumTemperature(from: gap), age > 2 ? 46 : 71)
+            XCTAssertEqual(SensorRegistry.cpuAverageTemperature(from: gap), age > 2 ? 46 : 61)
+        }
+    }
+
+    func testDrivingReadingIsHeldWhileTheHotSpotIsOff() {
+        var store = SensorHistoryStore()
+        let live = tick(&store, readings(bankA, 93).merging(["Te04": 72, "TCMz": 93]) { $1 })
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "", from: live),
+                       .init(temperature: 93, isHeld: false))
+        for _ in 0..<2 {
+            let gap = tick(&store, ["Te04": 72, "TCMz": 72])
+            XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "", from: gap),
+                           .init(temperature: 93, isHeld: true))
+        }
+        // Past the fresh window the load has ended: the live reading is the measurement.
+        let idle = tick(&store, ["Te04": 72, "TCMz": 72])
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "", from: idle),
+                       .init(temperature: 72, isHeld: false))
+    }
+
+    /// One bank goes off after both were live. If the live bank is the hotter one,
+    /// the hot spot is being measured and nothing is paused.
+    func testDrivingReadingIsLiveWhenTheLiveBankIsHotter() {
+        var store = SensorHistoryStore()
+        let e = readings(efficiency, 60)
+        _ = tick(&store, readings(bankA, 80).merging(readings(bankB, 90)) { $1 }.merging(e) { $1 })
+        let hotterLive = tick(&store, readings(bankB, 91).merging(e) { $1 })
+        XCTAssertEqual(hotterLive.filter(\.isHeld).map(\.id), bankA)
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "", from: hotterLive),
+                       .init(temperature: 91, isHeld: false))
+
+        var other = SensorHistoryStore()
+        _ = tick(&other, readings(bankA, 95).merging(readings(bankB, 90)) { $1 }.merging(e) { $1 })
+        let hotterHeld = tick(&other, readings(bankB, 91).merging(e) { $1 })
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "", from: hotterHeld),
+                       .init(temperature: 95, isHeld: true))
+    }
+
+    /// TCMz and TCMb fall with the cluster, so a profile that names one is held under
+    /// the same condition. A sensor outside the CPU never is.
+    func testProfileSensorsAndTheHeldHotSpot() {
+        var store = SensorHistoryStore()
+        _ = tick(&store, readings(bankA, 93).merging(["Te04": 72, "TCMz": 93, "TCMb": 74, "Tg0D": 55]) { $1 })
+        let gap = tick(&store, ["Te04": 72, "TCMz": 72, "TCMb": 68, "Tg0D": 56])
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "TCMz", from: gap), .init(temperature: 72, isHeld: true))
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "TCMb", from: gap), .init(temperature: 68, isHeld: true))
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "Tp00", from: gap), .init(temperature: 93, isHeld: true))
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "Tg0D", from: gap), .init(temperature: 56, isHeld: false))
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "ZZZZ", from: gap), .init(temperature: 93, isHeld: true),
+                       "a missing sensor means the default")
+
+        _ = tick(&store, ["Te04": 72, "TCMz": 72])
+        let stale = tick(&store, ["Te04": 72, "TCMz": 72])
+        XCTAssertEqual(SensorRegistry.drivingReading(forProfileSensor: "Tp00", from: stale), .init(temperature: 72, isHeld: false),
+                       "a stale sensor means the default")
+    }
+
+    func testCurveInputKeepsItsValueWhileTheReadingIsHeld() {
+        let halve: (Double) -> Double = { $0 / 2 }
+        XCTAssertEqual(FanController.curveInput(for: .init(temperature: 90, isHeld: false), previous: 60, smoothed: halve), 45)
+        XCTAssertEqual(FanController.curveInput(for: .init(temperature: 90, isHeld: true), previous: 60, smoothed: halve), 60)
+        XCTAssertEqual(FanController.curveInput(for: .init(temperature: 90, isHeld: true), previous: nil, smoothed: halve), 45)
+    }
+
+    /// The store, the driving reading and the curve input together, with the default
+    /// smoothing (alpha 0.3), on the three cases measured on an M4 Pro.
+    private func curveInputs(_ ticks: [[String: Double]]) -> [Double] {
+        var store = SensorHistoryStore()
+        var smoothedValue: Double?
+        var previous: Double?
+        return ticks.map { readings in
+            let sensors = tick(&store, readings)
+            let reading = SensorRegistry.drivingReading(forProfileSensor: "", from: sensors)
+            let input = FanController.curveInput(for: reading, previous: previous) { raw in
+                let next = smoothedValue.map { 0.3 * raw + 0.7 * $0 } ?? raw
+                smoothedValue = next
+                return next
+            }
+            previous = input
+            return input
+        }
+    }
+
+    private func on(_ temperature: Double, efficiency e: Double) -> [String: Double] {
+        readings(bankA, temperature).merging(["Te04": e, "TCMz": temperature]) { $1 }
+    }
+
+    private func off(efficiency e: Double) -> [String: Double] { ["Te04": e, "TCMz": e] }
+
+    /// Steady load with a one-tick gap every fourth tick (iSMC's M4 Pro recording:
+    /// 93 → 72.6 → 93 °C). The curve input must not move.
+    func testCurveInputDoesNotDipInShortGaps() {
+        let ticks = (0..<40).map { $0 % 4 == 3 ? off(efficiency: 72.6) : on(93, efficiency: 72.6) }
+        for input in curveInputs(ticks) { XCTAssertEqual(input, 93, accuracy: 0.001) }
+    }
+
+    /// A one-tick spike followed by idle. Held for ten seconds, the spike weighed 83%
+    /// on the curve input instead of 30% and the fans rose for ten seconds. It must
+    /// weigh what one sample weighs.
+    func testSpikeBeforeIdleIsNotAmplified() {
+        let ticks = Array(repeating: on(50, efficiency: 46), count: 10) + [on(71, efficiency: 46)]
+            + Array(repeating: off(efficiency: 46), count: 8)
+        let inputs = curveInputs(ticks)
+        XCTAssertEqual(inputs[10], 56.3, accuracy: 0.001)
+        XCTAssertEqual(inputs.max() ?? 0, 56.3, accuracy: 0.001, "the spike is counted once")
+        XCTAssertEqual(Array(inputs[11...12]), [56.3, 56.3], "paused for the fresh window")
+        XCTAssertLessThan(inputs[13], 56.3)
+        XCTAssertLessThan(inputs.last ?? 100, 48)
+    }
+
+    /// The load ends at 113.8 °C with the live reading at 64.4 °C (reported on an M4
+    /// Pro). The input may keep its value for the fresh window, about four seconds,
+    /// not ten, and then comes down through the filter without a step.
+    func testCurveInputComesDownAfterTheLoadEnds() {
+        let ticks = Array(repeating: on(113.8, efficiency: 64.4), count: 20)
+            + Array(repeating: off(efficiency: 64.4), count: 12)
+        let inputs = curveInputs(ticks)
+        XCTAssertEqual(Array(inputs[20...21]), [113.8, 113.8])
+        XCTAssertEqual(inputs[22], 0.3 * 64.4 + 0.7 * 113.8, accuracy: 0.001)
+        let falls = zip(inputs[21...], inputs[22...]).map { $0 - $1 }
+        XCTAssertLessThanOrEqual(falls.max() ?? 0, 0.3 * (113.8 - 64.4) + 0.001, "no fall larger than the filter's own")
+        XCTAssertLessThan(inputs.last ?? 100, 67)
+    }
+
     func testOnlyCpuKeysAreHeld() {
         var store = SensorHistoryStore()
         _ = tick(&store, ["Tp00": 70, "Tg0D": 50, "TB0T": 30])

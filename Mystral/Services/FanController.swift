@@ -57,6 +57,10 @@ final class FanController {
     private var sensorTrace = SensorTrace()
     /// What the active profile's curve was given on this tick; nil when no curve ran.
     private var lastCurveInput: Double?
+    /// The reading offered to the curve on this tick, for the trace.
+    private var lastDrivingReading: SensorRegistry.DrivingReading?
+    /// The curve's input on the previous tick, kept while the reading is held.
+    private var curveInputState: (key: String, value: Double)?
     private var smoothedTemps: [String: Double] = [:]
     private var lastWrittenPct: [Int: Double] = [:]
     private var ticksSinceForcedReassert = 0
@@ -182,7 +186,8 @@ final class FanController {
             var newSensors = try smcService.getAllSensors()
             let rawSensors = newSensors
             sensorHistories.carry(into: &newSensors, maxHistory: historyLimit,
-                                  cpuHoldTicks: SensorHistoryStore.cpuHoldTicks(forPollingInterval: pollingInterval))
+                                  cpuHoldTicks: SensorHistoryStore.cpuHoldTicks(forPollingInterval: pollingInterval),
+                                  cpuFreshTicks: SensorHistoryStore.cpuFreshTicks(forPollingInterval: pollingInterval))
             sensors = newSensors
             fans = try smcService.getAllFans()
             try smcService.heartbeat()
@@ -195,7 +200,10 @@ final class FanController {
             isHelperResponsive = true
 
             applyActiveProfile()
-            sensorTrace.record(SensorTrace.entry(raw: rawSensors, shown: sensors, curveInput: lastCurveInput, fans: fans))
+            sensorTrace.record(SensorTrace.entry(
+                raw: rawSensors, shown: sensors, driving: lastDrivingReading, curveInput: lastCurveInput,
+                fans: fans, targetPercent: fans.map { lastWrittenPct[$0.id] },
+                cpuWatts: powerMonitor.cpuWatts, gpuWatts: powerMonitor.gpuWatts))
             alertManager?.evaluate(sensors: sensors, fans: fans, expectedFanPercent: lastWrittenPct)
         } catch {
             consecutiveHelperFailures += 1
@@ -229,6 +237,7 @@ final class FanController {
 
     private func applyActiveProfile() {
         lastCurveInput = nil
+        lastDrivingReading = nil
         guard let profile = profileManager.activeProfile else { return }
         guard !fans.isEmpty else { return }
 
@@ -249,10 +258,13 @@ final class FanController {
             }
         }
 
-        let rawTemp = resolveDrivingTemperature(for: profile)
-        let drivingTemp = smoothingEnabled
-            ? smooth(key: profile.sensorKey.isEmpty ? "_avg" : profile.sensorKey, raw: rawTemp)
-            : rawTemp
+        let reading = SensorRegistry.drivingReading(forProfileSensor: profile.sensorKey, from: sensors)
+        let key = profile.sensorKey.isEmpty ? "_avg" : profile.sensorKey
+        let drivingTemp = Self.curveInput(
+            for: reading, previous: curveInputState?.key == key ? curveInputState?.value : nil,
+            smoothed: { smoothingEnabled ? smooth(key: key, raw: $0) : $0 })
+        curveInputState = (key, drivingTemp)
+        lastDrivingReading = reading
         lastCurveInput = drivingTemp
 
         for fan in fans {
@@ -287,17 +299,24 @@ final class FanController {
         return raw
     }
 
-    private func resolveDrivingTemperature(for profile: Profile) -> Double {
-        if !profile.sensorKey.isEmpty, let sensor = sensors.first(where: { $0.id == profile.sensorKey }) {
-            return sensor.temperature
-        }
-        return SensorRegistry.defaultDrivingTemperature(from: sensors)
+    /// The curve's input for one tick. A held reading is not a new measurement: the
+    /// input stays where it was instead of taking the same sample in again. With no
+    /// previous input (the profile's sensor just changed) the held value is used.
+    nonisolated static func curveInput(for reading: SensorRegistry.DrivingReading, previous: Double?,
+                                       smoothed: (Double) -> Double) -> Double {
+        if reading.isHeld, let previous { return previous }
+        return smoothed(reading.temperature)
     }
 
     /// The CPU sensor trace for the diagnostics export (see `SensorTrace`).
     func sensorTraceReport() -> [String] {
-        sensorTrace.report(pollingInterval: pollingInterval,
-                           curveSensor: profileManager.activeProfile?.sensorKey ?? "")
+        let profile = profileManager.activeProfile
+        return sensorTrace.report(SensorTrace.Settings(
+            pollingInterval: pollingInterval,
+            curveSensor: profile?.sensorKey ?? "",
+            curve: profile?.curve(for: fans.first?.id ?? 0) ?? [],
+            smoothingAlpha: smoothingEnabled ? max(0.05, min(1.0, smoothingAlpha)) : nil,
+            minimumFanPercentage: minimumFanPercentage))
     }
 
     func requestManualRestart() {

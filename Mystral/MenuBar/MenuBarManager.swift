@@ -219,8 +219,8 @@ final class MenuBarManager {
         let gpuCores = SensorRegistry.gpuCoreSensors(from: sensors)
 
         if let item = liveCpuItem, !cpuCores.isEmpty {
-            let avg = cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
-            let mx = cpuCores.map(\.temperature).max() ?? 0
+            let avg = SensorRegistry.cpuAverageTemperature(from: sensors) ?? 0
+            let mx = SensorRegistry.cpuMaximumTemperature(from: sensors)
             item.title = "CPU  \(Int(avg.rounded()))° avg  ·  \(Int(mx.rounded()))° max"
         }
         if let item = liveGpuItem, !gpuCores.isEmpty {
@@ -344,14 +344,11 @@ final class MenuBarManager {
 
     private func currentTemperature() -> Double {
         let sensors = fanController.sensors
-        let cpuCores = SensorRegistry.cpuCoreSensors(from: sensors)
         let gpuCores = SensorRegistry.gpuCoreSensors(from: sensors)
         switch tempSource {
         case .cpuAverage:
-            if !cpuCores.isEmpty {
-                return cpuCores.map(\.temperature).reduce(0, +) / Double(cpuCores.count)
-            }
-            return SensorRegistry.cpuMaximumTemperature(from: sensors)
+            return SensorRegistry.cpuAverageTemperature(from: sensors)
+                ?? SensorRegistry.cpuMaximumTemperature(from: sensors)
         case .cpuMax:
             return SensorRegistry.cpuMaximumTemperature(from: sensors)
         case .gpuAverage:
@@ -360,7 +357,7 @@ final class MenuBarManager {
         case .gpuMax:
             return gpuCores.map(\.temperature).max() ?? 0
         case .hottest:
-            return sensors.map(\.temperature).max() ?? 0
+            return sensors.filter { !$0.isStale }.map(\.temperature).max() ?? 0
         }
     }
 
