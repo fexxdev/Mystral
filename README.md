@@ -87,8 +87,19 @@ English, Italiano and 简体中文. Mystral follows your macOS language, or pick
 | **Mac** | Apple Silicon, M1 through M6 |
 | **Permissions** | One administrator password to install the fan helper |
 
+### Verified on real hardware
+
+Mystral is confirmed working on these Macs, by running it on them:
+
+| Mac | macOS | Verified |
+|---|---|---|
+| **M3 Pro** MacBook Pro (`Mac15,6`) | 27 | Fan control, sensor layout, power readings |
+| **M4 Pro** (`Mac16,11`) | 15.7 | Fan control, sensor layout. Needs a release after 1.1.8 ([#8](https://github.com/fexxdev/Mystral/issues/8)) |
+
+On every other chip from M1 to M6 the sensor layout is checked against load recordings and other open-source monitors, not on the Mac itself. If Mystral works on yours, or does not, an [issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export gets it added here.
+
 > [!NOTE]
-> Mystral takes manual control of the fans by unlocking the SMC `Ftst` key. Fan control is verified on an M3 Pro MacBook Pro running macOS 27; sensor layouts are checked for M1 through M6. **Settings → Chip Detection → Fan control** shows **Working** while Mystral is driving the fans. If it says **Not available** on your Mac, please [open an issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export from **Settings → Diagnostics**.
+> Mystral takes manual control of the fans by unlocking the SMC `Ftst` key. **Settings → Chip Detection → Fan control** shows **Working** while Mystral is driving the fans. If it says **Not available** on your Mac, please [open an issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export from **Settings → Diagnostics**.
 
 ## Installation
 
