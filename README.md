@@ -8,6 +8,8 @@
 
 [![Latest release](https://img.shields.io/github/v/release/fexxdev/Mystral?label=release&color=blue)](https://github.com/fexxdev/Mystral/releases/latest) [![CI](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml/badge.svg)](https://github.com/fexxdev/Mystral/actions/workflows/ci.yml) ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?logo=apple) ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%E2%80%93M6-green) ![Languages](https://img.shields.io/badge/languages-EN%20%C2%B7%20IT%20%C2%B7%20%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-orange) [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
+<a href="https://macpip.com/apps/mystral?ref=badge"><img src="https://macpip.com/badge/mystral.svg" height="40" alt="Mystral is listed on MacPip"></a>
+
 [**Download**](https://github.com/fexxdev/Mystral/releases/latest) · [Features](#features) · [Install](#installation) · [Usage](#usage) · [How it works](#how-it-works) · [FAQ](#troubleshooting)
 
 <br>
@@ -94,7 +96,7 @@ Mystral is confirmed working on these Macs, by running it on them:
 | Mac | macOS | Verified |
 |---|---|---|
 | **M3 Pro** MacBook Pro (`Mac15,6`) | 27 | Fan control, sensor layout, power readings |
-| **M4 Pro** (`Mac16,11`) | 15.7 | Fan control, sensor layout. Needs a release after 1.1.8 ([#8](https://github.com/fexxdev/Mystral/issues/8)) |
+| **M4 Pro** (`Mac16,11`) | 15.7 | Fan control, sensor layout. Needs Mystral 1.1.9 or later ([#8](https://github.com/fexxdev/Mystral/issues/8)) |
 
 On every other chip from M1 to M6 the sensor layout is checked against load recordings and other open-source monitors, not on the Mac itself. If Mystral works on yours, or does not, an [issue](https://github.com/fexxdev/Mystral/issues/new/choose) with the SMC export gets it added here.
 
